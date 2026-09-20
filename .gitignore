@@ -33,5 +33,4 @@ frankenphp-worker.php
 *.log
 Thumbs.db
 _ide_helper.php
-/.codex
 /.cursor/
