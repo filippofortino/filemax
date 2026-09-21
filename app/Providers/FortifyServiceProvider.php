@@ -9,8 +9,12 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Http\Responses\PasswordResetLinkResponse;
 use App\Http\Responses\RegisterResponse;
 use App\Models\User;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\SessionGuard;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -34,6 +38,14 @@ final class FortifyServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Event::listen(Login::class, function (Login $event): void {
+            $guard = Auth::guard($event->guard);
+
+            if ($guard instanceof SessionGuard) {
+                session()->put('password_hash_'.$event->guard, $guard->hashPasswordForCookie($event->user->getAuthPassword()));
+            }
+        });
+
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::loginView(fn (): Response => Inertia::render('auth/login'));

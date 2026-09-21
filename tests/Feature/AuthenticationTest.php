@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 use App\Http\Middleware\EnsureEligibleEmail;
 use App\Models\Team;
+use App\Models\Transfer;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 
 beforeEach(function (): void {
     Route::middleware(['web', 'auth', EnsureEligibleEmail::class, 'verified'])
@@ -141,6 +144,54 @@ test('password recovery sends a reset token and consumes it once', function (): 
         return true;
     });
 });
+
+test('password recovery invalidates the original registration session before any subsequent visit', function (string $destination): void {
+    config(['session.driver' => 'database']);
+    $this->withoutVite();
+    Notification::fake();
+    $cookieName = config('session.cookie');
+    $switchBrowserSession = function (string $sessionId) use ($cookieName): void {
+        Auth::forgetGuards();
+        $this->app->forgetInstance('auth.driver');
+        session()->flush();
+        $this->withCookie($cookieName, $sessionId);
+    };
+
+    $registration = $this->post(route('register.store'), [
+        'name' => 'Alice', 'email' => 'alice@mediamaxcommunication.it',
+        'password' => 'original-password', 'password_confirmation' => 'original-password',
+    ])->assertRedirect(route('verification.notice'));
+    $originalCookie = $registration->getCookie($cookieName)->getValue();
+    $user = User::query()->sole();
+
+    $switchBrowserSession(Str::random(40));
+    $reset = $this->post(route('password.update'), [
+        'email' => $user->email, 'token' => Password::createToken($user),
+        'password' => 'recovered-password', 'password_confirmation' => 'recovered-password',
+    ])->assertRedirect(route('login'));
+
+    $switchBrowserSession($reset->getCookie($cookieName)->getValue());
+    $login = $this->post(route('login.store'), [
+        'email' => $user->email, 'password' => 'recovered-password',
+    ])->assertRedirect(route('home'));
+    $ownerCookie = $login->getCookie($cookieName)->getValue();
+    $verificationUrl = URL::temporarySignedRoute('verification.verify', now()->addHour(), [
+        'id' => $user->id, 'hash' => sha1($user->email),
+    ]);
+
+    $switchBrowserSession($ownerCookie);
+    $this->get($verificationUrl)->assertRedirect();
+    expect($user->refresh()->hasVerifiedEmail())->toBeTrue();
+    $switchBrowserSession($ownerCookie);
+    $this->get(route('home'))->assertOk();
+
+    $url = $destination === 'home'
+        ? route('home')
+        : route('shared.show', Transfer::factory()->create()->token);
+    $switchBrowserSession($originalCookie);
+    $this->get($url)->assertRedirect(route('login'));
+    $this->assertGuest();
+})->with(['home', 'shared.show']);
 
 test('invalid and expired password reset tokens are rejected', function (): void {
     $user = User::factory()->create();

@@ -53,6 +53,7 @@ test('regular users cannot administer teams or self assign membership', function
 test('administration requires verification and current domain eligibility', function (): void {
     $this->get(route('teams.index'))->assertRedirect(route('login'));
     $this->actingAs(User::factory()->admin()->unverified()->create())->post(route('teams.store'), ['name' => 'Design'])->assertRedirect(route('verification.notice'));
+    $this->flushSession();
     $this->actingAs(User::factory()->admin()->create(['email' => 'former@example.com']))->post(route('teams.store'), ['name' => 'Design'])->assertForbidden();
 });
 
