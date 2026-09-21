@@ -4,6 +4,7 @@ import {
     File01Icon,
     FileZipIcon,
     Image01Icon,
+    Key01Icon,
     Logout01Icon,
     Tick02Icon,
     Video01Icon,
@@ -20,6 +21,7 @@ import {
 import { bytes, initials } from '@/lib/format';
 import type { SharedProps, Team } from '@/lib/types';
 import { home, logout } from '@/routes';
+import { passkeys } from '@/routes/account';
 import { index as teams } from '@/routes/teams';
 import { index as transfers } from '@/routes/transfers';
 
@@ -61,7 +63,7 @@ export function Shell({
     headerAction,
 }: {
     children: ReactNode;
-    active?: 'new' | 'transfers' | 'teams';
+    active?: 'new' | 'transfers' | 'teams' | 'account';
     recipient?: boolean;
     recipientAccount?: boolean;
     headerAction?: ReactNode;
@@ -127,6 +129,19 @@ export function Shell({
                                     <span className="muted break-all">
                                         {user.email}
                                     </span>
+                                    {user.email_verified_at && (
+                                        <Link
+                                            href={passkeys()}
+                                            className="flex items-center gap-2"
+                                        >
+                                            <HugeiconsIcon
+                                                icon={Key01Icon}
+                                                size={18}
+                                                aria-hidden="true"
+                                            />
+                                            Passkeys
+                                        </Link>
+                                    )}
                                     <Link
                                         href={logout()}
                                         method="post"

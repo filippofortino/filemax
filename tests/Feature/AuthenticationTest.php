@@ -240,3 +240,12 @@ test('malformed reset tokens are rejected before reaching the password broker', 
         'password' => 'changed-password', 'password_confirmation' => 'changed-password',
     ])->assertSessionHasErrors('token');
 });
+
+test('password confirmation rejects malformed input before reaching Fortify', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->postJson(route('password.confirm.store'), ['password' => ['password']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('password')
+        ->assertSessionMissing('auth.password_confirmed_at');
+});

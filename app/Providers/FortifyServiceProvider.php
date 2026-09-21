@@ -8,6 +8,7 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Http\Responses\PasswordResetLinkResponse;
 use App\Http\Responses\RegisterResponse;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -19,6 +20,8 @@ use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
 use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Fortify;
+use Laravel\Passkeys\Contracts\PasskeyUser;
+use Laravel\Passkeys\Passkeys;
 
 final class FortifyServiceProvider extends ServiceProvider
 {
@@ -41,13 +44,19 @@ final class FortifyServiceProvider extends ServiceProvider
             'email' => $request->string('email')->toString(),
         ]));
         Fortify::verifyEmailView(fn (): Response => Inertia::render('auth/verify-email'));
+        Fortify::confirmPasswordView(fn (Request $request): Response => Inertia::render('auth/confirm-password', [
+            'hasPasskeys' => $request->user()?->hasPasskeysEnabled() ?? false,
+        ]));
+
+        Passkeys::authorizeLoginUsing(fn (Request $request, PasskeyUser $user): bool => $user instanceof User && $user->isEligible());
 
         RateLimiter::for('login', function (Request $request): Limit {
             $email = $request->input('email');
 
             return Limit::perMinute(5)->by((is_string($email) ? Str::lower(mb_trim($email)) : '').'|'.$request->ip());
         });
-        RateLimiter::for('filemax-auth', fn (Request $request): Limit => $request->routeIs('register.store', 'password.email', 'password.update')
+        RateLimiter::for('passkeys', fn (Request $request): Limit => Limit::perMinute(10)->by($request->session()->getId().'|'.$request->ip()));
+        RateLimiter::for('filemax-auth', fn (Request $request): Limit => $request->routeIs('register.store', 'password.email', 'password.update', 'password.confirm.store')
             ? Limit::perMinute(5)->by($request->route()?->getName().'|'.$request->ip())
             : Limit::none());
     }

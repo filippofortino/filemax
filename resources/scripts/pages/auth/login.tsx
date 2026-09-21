@@ -1,5 +1,6 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import { AuthLayout, ErrorMessage } from '@/components/filemax';
+import { PasskeyButton } from '@/components/passkey-button';
 import { Button } from '@/components/ui/button';
 import { register } from '@/routes';
 import { store } from '@/routes/login';
@@ -80,6 +81,7 @@ export default function Login() {
                     </>
                 )}
             </Form>
+            <PasskeyButton />
         </AuthLayout>
     );
 }

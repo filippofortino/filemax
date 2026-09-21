@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
+use Laravel\Fortify\Contracts\PasskeyUser;
+use Laravel\Fortify\PasskeyAuthenticatable;
 
 /**
  * @property-read string $id
@@ -32,13 +34,14 @@ use Illuminate\Support\Str;
     'remember_token',
 ])]
 #[Fillable(['name', 'email', 'password'])]
-final class User extends Authenticatable implements MustVerifyEmail
+final class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory;
 
     use HasUuids;
     use Notifiable;
+    use PasskeyAuthenticatable;
 
     /** @var array<string, mixed> */
     protected $attributes = ['is_admin' => false];

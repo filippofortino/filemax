@@ -34,9 +34,16 @@ final class ProtectFortifyRequests
             Validator::make($request->only(array_keys($rules)), $rules)->validate();
         }
 
-        if ($request->user() && $request->routeIs('verification.*')) {
+        if ($request->routeIs('password.confirm.store')) {
+            Validator::make($request->only('password'), ['password' => ['required', 'string']])->validate();
+        }
+
+        if ($request->user() && $request->routeIs('verification.*', 'passkey.confirm*', 'passkey.registration-options', 'passkey.store', 'passkey.destroy')) {
             abort_unless($request->user()->isEligible(), 403);
 
+            if (! $request->routeIs('verification.*')) {
+                abort_unless($request->user()->hasVerifiedEmail(), 403);
+            }
         }
 
         return $next($request);
