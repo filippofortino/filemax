@@ -11,6 +11,7 @@
     "require": {
         "php": "^8.5.0",
         "inertiajs/inertia-laravel": "^3.3.4",
+        "laravel/fortify": "^1.39",
         "laravel/framework": "^13.32.0",
         "laravel/octane": "^2.19.1",
         "laravel/wayfinder": "^0.1.21",

@@ -1,17 +1,23 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
+import { Shell } from '@/components/filemax';
+import { logout } from '@/routes';
 
 export default function Index() {
     return (
-        <>
+        <Shell>
             <Head title="Home" />
-            <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-50 text-gray-900">
-                <h1 className="text-4xl font-bold tracking-tight">
-                    Hello, world 👋
-                </h1>
-                <p className="text-gray-500">
-                    Inertia v3 + React + TypeScript + SSR
-                </p>
+            <main className="mx-auto flex w-full max-w-[1064px] flex-col gap-4 px-5 py-12 sm:px-8">
+                <h1>Welcome</h1>
+                <p className="muted">You are signed in to Filemax.</p>
+                <Link
+                    href={logout()}
+                    method="post"
+                    as="button"
+                    className="self-start"
+                >
+                    Sign out
+                </Link>
             </main>
-        </>
+        </Shell>
     );
 }
