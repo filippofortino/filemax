@@ -7,7 +7,7 @@ import {
     UserGroupIcon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import {
     CopyLink,
@@ -20,7 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { bytes, date } from '@/lib/format';
 import { request, uploadPart } from '@/lib/http';
-import type { SharedProps, Team, Transfer, TransferFile } from '@/lib/types';
+import type { Team, Transfer, TransferFile } from '@/lib/types';
 import { home } from '@/routes';
 import { destroy, show, store, update } from '@/routes/transfers';
 import { complete, finalize, remove, sign } from '@/routes/transfers/uploads';
@@ -34,7 +34,6 @@ type Entry = {
     error?: string;
 };
 export default function Create({ teams }: { teams: Team[] }) {
-    const csrf = usePage<SharedProps>().props.csrf_token;
     const [entries, setEntries] = useState<Entry[]>([]);
     const currentEntries = useRef<Entry[]>([]);
     const draft = useRef<Transfer | null>(null);
@@ -121,7 +120,6 @@ export default function Create({ teams }: { teams: Team[] }) {
                         transfer: draft.current.id,
                         file: entry.remote.id,
                     }),
-                    csrf,
                     'DELETE',
                 );
             changeEntries(
@@ -152,7 +150,6 @@ export default function Create({ teams }: { teams: Team[] }) {
             if (!draft.current) {
                 const result = await request<{ transfer: Transfer }>(
                     store.url(),
-                    csrf,
                     'POST',
                     {
                         title,
@@ -197,7 +194,6 @@ export default function Create({ teams }: { teams: Team[] }) {
                                 file: remote.id,
                                 part,
                             }),
-                            csrf,
                             'POST',
                             undefined,
                             controller.signal,
@@ -211,15 +207,9 @@ export default function Create({ teams }: { teams: Team[] }) {
                             ),
                         );
                         if (!signed.completed) {
-                            const headers = { ...signed.headers };
-                            if (
-                                new URL(signed.url, window.location.href)
-                                    .origin === window.location.origin
-                            )
-                                headers['X-CSRF-TOKEN'] = csrf;
                             await uploadPart(
                                 signed.url,
-                                headers,
+                                signed.headers,
                                 blob,
                                 controller.signal,
                                 (loaded) => {
@@ -252,7 +242,6 @@ export default function Create({ teams }: { teams: Team[] }) {
                     }
                     await request(
                         complete.url({ transfer: transferId, file: remote.id }),
-                        csrf,
                         'POST',
                         undefined,
                         controller.signal,
@@ -281,14 +270,12 @@ export default function Create({ teams }: { teams: Team[] }) {
             if (visibility === 'teams')
                 await request(
                     update.url(transferId),
-                    csrf,
                     'PATCH',
                     { team_ids: selectedTeams },
                     controller.signal,
                 );
             const result = await request<{ transfer: Transfer }>(
                 finalize.url(transferId),
-                csrf,
                 'POST',
                 undefined,
                 controller.signal,
@@ -315,7 +302,7 @@ export default function Create({ teams }: { teams: Team[] }) {
         setBusy(true);
         try {
             if (draft.current)
-                await request(destroy.url(draft.current.id), csrf, 'DELETE');
+                await request(destroy.url(draft.current.id), 'DELETE');
             draft.current = null;
             changeEntries([]);
             setError('');

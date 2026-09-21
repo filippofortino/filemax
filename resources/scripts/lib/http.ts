@@ -1,6 +1,13 @@
+function xsrfHeaders(url: string): Record<string, string> {
+    if (new URL(url, window.location.href).origin !== window.location.origin)
+        return {};
+
+    const token = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/)?.[1];
+    return token ? { 'X-XSRF-TOKEN': decodeURIComponent(token) } : {};
+}
+
 export async function request<T>(
     url: string,
-    csrf: string,
     method = 'POST',
     data?: unknown,
     signal?: AbortSignal,
@@ -11,7 +18,7 @@ export async function request<T>(
         headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrf,
+            ...xsrfHeaders(url),
             'X-Requested-With': 'XMLHttpRequest',
         },
         ...(data === undefined ? {} : { body: JSON.stringify(data) }),
@@ -42,8 +49,8 @@ export function uploadPart(
         const abort = () => xhr.abort();
         signal.addEventListener('abort', abort, { once: true });
         xhr.open('PUT', url);
-        Object.entries(headers).forEach(([name, value]) =>
-            xhr.setRequestHeader(name, value),
+        Object.entries({ ...headers, ...xsrfHeaders(url) }).forEach(
+            ([name, value]) => xhr.setRequestHeader(name, value),
         );
         xhr.upload.onprogress = (event) => progress(event.loaded);
         xhr.onload = () =>

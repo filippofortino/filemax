@@ -30,6 +30,7 @@ it('records the first public page opening without counting a download or exposin
         ->component('shared/show', false)
         ->where('transfer.title', $file->original_name)
         ->where('transfer.files.0.name', $file->original_name)
+        ->missing('csrf_token')
         ->missing('transfer.files.0.path')
         ->missing('transfer.download_count'));
     $firstOpened = $transfer->refresh()->first_opened_at;

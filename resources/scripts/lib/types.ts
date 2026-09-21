@@ -9,7 +9,6 @@ export type User = {
 export type SharedProps = {
     auth: { user: User | null };
     status?: string;
-    csrf_token: string;
     [key: string]: unknown;
 };
 export type TransferFile = {

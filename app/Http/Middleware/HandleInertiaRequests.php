@@ -41,7 +41,6 @@ final class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => ['user' => fn (): ?array => $request->user()?->only(['id', 'name', 'email', 'is_admin', 'email_verified_at'])],
             'status' => fn (): mixed => $request->session()->get('status'),
-            'csrf_token' => csrf_token(...),
         ];
     }
 }

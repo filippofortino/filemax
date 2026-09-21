@@ -7,6 +7,49 @@ use App\Models\Transfer;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 
+it('uses the current XSRF cookie only for same-origin upload requests', function (bool $external): void {
+    Storage::fake('local');
+    config(['filemax.disk' => 'local']);
+    $this->actingAs(User::factory()->create());
+    $page = visit('/')->assertSee('Browse files');
+    $page->script('window.externalUpload = '.($external ? 'true' : 'false'));
+    $page->script(<<<'JS'
+() => {
+    const data = new DataTransfer(); data.items.add(new File(['hello'], 'csrf.txt'));
+    document.querySelector('.upload-grid').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    const fetch = window.fetch;
+    window.jsonCsrfChecks = [];
+    window.uploadHeaders = {};
+    window.fetch = async (url, options) => {
+        const cookie = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/)?.[1];
+        window.jsonCsrfChecks.push(Boolean(cookie) && options.headers['X-XSRF-TOKEN'] === decodeURIComponent(cookie) && !options.headers['X-CSRF-TOKEN']);
+        const response = await fetch(url, options);
+        const body = await response.clone().json();
+        if ('completed' in body) {
+            document.cookie = 'XSRF-TOKEN=rotated%2Btoken; path=/';
+            if (window.externalUpload) return Response.json({...body, url: 'https://uploads.example.test/object'});
+        }
+        return response;
+    };
+    const setHeader = XMLHttpRequest.prototype.setRequestHeader;
+    XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
+        window.uploadHeaders[name] = value;
+        return setHeader.call(this, name, value);
+    };
+    const send = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function(body) {
+        if (body instanceof Blob) { this.dispatchEvent(new ProgressEvent('error')); return; }
+        return send.call(this, body);
+    };
+}
+JS);
+    $page->press('Create transfer')->assertSee('Some files could not be uploaded.')->assertNoJavascriptErrors();
+
+    expect($page->script('() => window.jsonCsrfChecks.length > 0 && window.jsonCsrfChecks.every(Boolean)'))->toBeTrue()
+        ->and($page->script("() => window.uploadHeaders['X-CSRF-TOKEN'] ?? null"))->toBeNull()
+        ->and($page->script("() => window.uploadHeaders['X-XSRF-TOKEN'] ?? null"))->toBe($external ? null : 'rotated+token');
+})->with(['local upload' => false, 'object storage upload' => true]);
+
 it('recovers a failed multi-file upload while preserving finished files and sharing', function (): void {
     Storage::fake('local');
     config(['filemax.disk' => 'local']);

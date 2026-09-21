@@ -1,12 +1,10 @@
 import { Download01Icon, Loading03Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { ErrorMessage } from '@/components/filemax';
 import { Button } from '@/components/ui/button';
 import { bytes } from '@/lib/format';
 import { request } from '@/lib/http';
-import type { SharedProps } from '@/lib/types';
 import { archive, download } from '@/routes/shared';
 import { download as downloadFile } from '@/routes/shared/files';
 
@@ -27,7 +25,6 @@ export function DownloadAll({
     disabled?: boolean;
     onDownload?: () => void;
 }) {
-    const { csrf_token } = usePage<SharedProps>().props;
     const [busy, setBusy] = useState(false);
     const [progress, setProgress] = useState(0);
     const [error, setError] = useState('');
@@ -45,7 +42,6 @@ export function DownloadAll({
         try {
             let result = await request<Archive>(
                 download.url(token),
-                csrf_token,
                 'POST',
                 undefined,
                 active.signal,
@@ -62,7 +58,6 @@ export function DownloadAll({
                 active.signal.throwIfAborted();
                 result = await request<Archive>(
                     archive.url(token),
-                    csrf_token,
                     'GET',
                     undefined,
                     active.signal,
@@ -136,7 +131,6 @@ export function FileDownload({
     name: string;
     onDownload?: () => void;
 }) {
-    const { csrf_token } = usePage<SharedProps>().props;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const controller = useRef<AbortController | null>(null);
@@ -151,7 +145,6 @@ export function FileDownload({
         try {
             const result = await request<{ url: string }>(
                 downloadFile.url({ transfer: token, file: fileId }),
-                csrf_token,
                 'POST',
                 undefined,
                 active.signal,
