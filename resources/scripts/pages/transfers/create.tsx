@@ -67,13 +67,28 @@ export default function Create({ teams }: { teams: Team[] }) {
     }
     useEffect(() => {
         function warn(event: BeforeUnloadEvent) {
-            if (draft.current && !ready) {
+            if ((draft.current || operating.current) && !ready) {
                 event.preventDefault();
             }
         }
         window.addEventListener('beforeunload', warn);
+        const stopGuardingVisits = router.on('before', (event) => {
+            const visit = event.detail.visit;
+            if (
+                (draft.current || operating.current) &&
+                !ready &&
+                !(
+                    visit.url.href === window.location.href &&
+                    visit.preserveState === true
+                )
+            )
+                return window.confirm(
+                    'Leave this upload? You will need to select and upload these files again.',
+                );
+        });
         return () => {
             window.removeEventListener('beforeunload', warn);
+            stopGuardingVisits();
             abort.current?.abort();
         };
     }, [ready]);

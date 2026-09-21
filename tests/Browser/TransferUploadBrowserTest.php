@@ -74,6 +74,8 @@ it('keeps upload cancellation disabled until the draft has been revoked', functi
         if (options?.method === 'DELETE') { await new Promise(resolve => { window.releaseDelete = resolve; }); }
         return fetch(url, options);
     };
+    window.leavePrompts = 0;
+    window.confirm = () => { window.leavePrompts++; return false; };
 }
 JS);
     $page->press('Create transfer')->assertSee('Cancel upload')->press('Cancel upload');
@@ -81,6 +83,87 @@ JS);
     $page->script('() => window.releaseDelete()');
     $page->assertSee('Drop files here')->assertNoJavascriptErrors();
     expect(Transfer::query()->sole()->revoked_at)->not->toBeNull();
+    $page->click('My transfers')->assertSee('No transfers yet');
+    expect($page->script('() => window.leavePrompts'))->toBe(0);
+});
+
+it('asks before leaving an unfinished upload and respects the choice', function (bool $leave): void {
+    Storage::fake('local');
+    config(['filemax.disk' => 'local']);
+    $this->actingAs(User::factory()->create());
+    $page = visit('/')->assertSee('Browse files');
+    $page->script(<<<'JS'
+() => {
+    const data = new DataTransfer();
+    data.items.add(new File(['finished'], 'finished.txt'));
+    data.items.add(new File(['pending'], 'pending.txt'));
+    document.querySelector('.upload-grid').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    const send = XMLHttpRequest.prototype.send;
+    let uploads = 0;
+    XMLHttpRequest.prototype.send = function(body) {
+        if (body instanceof Blob && ++uploads === 2) {
+            window.resumeUpload = () => send.call(this, body);
+            return;
+        }
+        return send.call(this, body);
+    };
+    window.leavePrompts = 0;
+    window.allowNavigation = false;
+    window.confirm = () => { window.leavePrompts++; return window.allowNavigation; };
+}
+JS);
+    $page->press('Create transfer')->assertSee('Done')->assertSee('Cancel upload');
+    expect(Transfer::query()->sole()->files()->where('status', 'ready')->count())->toBe(1);
+
+    if ($leave) {
+        $page->script('() => { window.allowNavigation = true; }');
+    }
+
+    $page->click('My transfers');
+    expect($page->script('() => window.leavePrompts'))->toBe(1);
+
+    if ($leave) {
+        $page->assertSee('No transfers yet')->click('nav a:has-text("New transfer")')->assertSee('Drop files here')->assertDontSee('finished.txt');
+        expect(Transfer::query()->sole()->status)->toBe('uploading');
+    } else {
+        $page->assertSee('Cancel upload')->assertSee('finished.txt')->assertSee('pending.txt');
+        $page->script('() => window.resumeUpload()');
+        $page->assertSee('Your link is ready')->click('View transfer')->assertSee('Downloads');
+        expect(Transfer::query()->sole()->status)->toBe('ready');
+    }
+
+    expect($page->script('() => window.leavePrompts'))->toBe(1);
+    $page->assertNoJavascriptErrors();
+})->with(['stay' => false, 'leave' => true]);
+
+it('guards navigation while the upload draft is being created', function (): void {
+    Storage::fake('local');
+    config(['filemax.disk' => 'local']);
+    $this->actingAs(User::factory()->create());
+    $page = visit('/')->assertSee('Browse files');
+    $page->script(<<<'JS'
+() => {
+    const data = new DataTransfer(); data.items.add(new File(['hello'], 'draft.txt'));
+    document.querySelector('.upload-grid').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    const fetch = window.fetch;
+    window.fetch = async (url, options) => {
+        if (options?.method === 'POST' && new URL(url, location.href).pathname === '/transfers') {
+            await new Promise(resolve => { window.resumeDraft = resolve; });
+        }
+        return fetch(url, options);
+    };
+    window.leavePrompts = 0;
+    window.confirm = () => { window.leavePrompts++; return false; };
+}
+JS);
+    $page->press('Create transfer')->assertSee('Uploading…')->click('My transfers')->assertSee('Uploading…')->assertSee('draft.txt');
+    expect($page->script('() => window.leavePrompts'))->toBe(1);
+    expect(Transfer::query()->count())->toBe(0);
+
+    $page->script('() => window.resumeDraft()');
+    $page->assertSee('Your link is ready')->click('Send another')->assertSee('Drop files here')->assertNoJavascriptErrors();
+    expect($page->script('() => window.leavePrompts'))->toBe(1);
+    expect(Transfer::query()->sole()->status)->toBe('ready');
 });
 
 it('can repair sharing after losing membership during an upload', function (): void {
@@ -101,6 +184,8 @@ it('can repair sharing after losing membership during an upload', function (): v
         if (body instanceof Blob) { window.uploadPutCount++; window.resumeUpload = () => send.call(this, body); return; }
         return send.call(this, body);
     };
+    window.leavePrompts = 0;
+    window.confirm = () => { window.leavePrompts++; return false; };
 }
 JS);
     $page->press('Create transfer')->assertSee('Uploading…');
@@ -110,4 +195,5 @@ JS);
     $page->click('[aria-label="Choose teams"]')->check('[aria-label="New team"]')->keys('#team-search', 'Escape')->press('Retry and create link')->assertSee('Your link is ready')->assertNoJavascriptErrors();
     expect(Transfer::query()->sole()->teams()->sole()->id)->toBe($newTeam->id);
     expect($page->script('() => window.uploadPutCount'))->toBe(1);
+    expect($page->script('() => window.leavePrompts'))->toBe(0);
 });
