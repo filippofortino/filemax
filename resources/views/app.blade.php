@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
 
+        @fonts
         @viteReactRefresh
         @vite('resources/scripts/app.tsx')
         <x-inertia::head>

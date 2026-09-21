@@ -4,6 +4,7 @@ import { wayfinder } from '@laravel/vite-plugin-wayfinder';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
+import { bunny } from 'laravel-vite-plugin/fonts';
 import { defineConfig } from 'vite-plus';
 
 const checkIgnorePatterns = [
@@ -69,6 +70,18 @@ export default defineConfig({
         laravel({
             input: ['resources/scripts/app.tsx'],
             refresh: true,
+            fonts: [
+                bunny('DM Sans', {
+                    weights: [400, 500, 600, 700],
+                    preload: [{ weight: 400 }],
+                    optimizedFallbacks: false,
+                }),
+                bunny('Bricolage Grotesque', {
+                    weights: [400, 500, 700],
+                    preload: [{ weight: 700 }],
+                    optimizedFallbacks: false,
+                }),
+            ],
         }),
         inertia({ ssr: { sourcemap: false } }),
         react(),

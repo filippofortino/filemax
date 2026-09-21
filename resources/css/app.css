@@ -2,21 +2,6 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 @source '../scripts/**/*.{ts,tsx}';
-@font-face {
-    font-family: 'DM Sans';
-    font-style: normal;
-    font-weight: 100 1000;
-    font-display: swap;
-    src: url('../../public/fonts/dm-sans-latin.woff2') format('woff2');
-}
-@font-face {
-    font-family: 'Bricolage Grotesque';
-    font-style: normal;
-    font-weight: 200 800;
-    font-display: swap;
-    src: url('../../public/fonts/bricolage-grotesque-latin.woff2')
-        format('woff2');
-}
 @theme inline {
     --font-sans: 'DM Sans', system-ui, sans-serif;
     --font-heading: 'Bricolage Grotesque', system-ui, sans-serif;
