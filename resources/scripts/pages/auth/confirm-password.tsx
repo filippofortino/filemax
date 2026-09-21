@@ -19,17 +19,19 @@ export default function ConfirmPassword({
             <Head title="Confirm your identity" />
             <Form
                 action={store()}
-                className="form-stack"
+                className="flex flex-col gap-5"
                 resetOnSuccess={['password']}
             >
                 {({ errors, processing }) => (
                     <>
                         <div className="flex flex-col gap-2">
-                            <label className="field-label" htmlFor="password">
+                            <label
+                                className="text-sm font-semibold"
+                                htmlFor="password"
+                            >
                                 Password
                             </label>
                             <input
-                                className="field"
                                 id="password"
                                 name="password"
                                 type="password"

@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/popover';
 import { bytes, initials } from '@/lib/format';
 import type { SharedProps, Team } from '@/lib/types';
+import { cn } from '@/lib/utils';
 import { home, logout } from '@/routes';
 import { passkeys } from '@/routes/account';
 import { index as teams } from '@/routes/teams';
@@ -27,7 +28,13 @@ import { index as transfers } from '@/routes/transfers';
 
 export function Brand({ large = false }: { large?: boolean }) {
     return (
-        <Link href={home()} className={`brand${large ? ' brand-large' : ''}`}>
+        <Link
+            href={home()}
+            className={cn(
+                'inline-flex shrink-0 items-center gap-2 font-heading text-xl font-bold tracking-tight text-foreground hover:text-foreground md:gap-2.5 md:text-2xl',
+                large && 'gap-3 text-3xl md:gap-3 md:text-3xl',
+            )}
+        >
             <svg
                 width={large ? 32 : 24}
                 height={large ? 32 : 24}
@@ -71,29 +78,56 @@ export function Shell({
     const user = usePage<SharedProps>().props.auth.user;
     return (
         <div
-            className={
-                recipient ? 'app-shell recipient-shell dotted' : 'app-shell'
-            }
+            className={cn(
+                'flex min-h-svh flex-col',
+                recipient && 'bg-background md:bg-muted',
+            )}
         >
-            <header className="site-header">
+            <header
+                className={cn(
+                    'relative flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-3 border-b bg-background px-5 md:h-16 md:flex-nowrap md:gap-5 md:px-8',
+                    recipient &&
+                        !recipientAccount &&
+                        'md:border-0 md:bg-transparent',
+                )}
+            >
                 <Brand />
                 {!recipient && (
-                    <nav aria-label="Main navigation">
+                    <nav
+                        aria-label="Main navigation"
+                        className={cn(
+                            'order-last flex h-12 w-full items-stretch justify-center gap-1 md:order-none md:h-full md:w-auto',
+                            headerAction &&
+                                'lg:absolute lg:left-1/2 lg:-translate-x-1/2',
+                        )}
+                    >
                         <Link
-                            className={active === 'new' ? 'active' : ''}
+                            className={cn(
+                                'flex items-center border-b-2 border-transparent px-3 text-xs font-medium text-muted-foreground md:text-sm',
+                                active === 'new' &&
+                                    'border-primary font-semibold text-primary',
+                            )}
                             href={home()}
                         >
                             New transfer
                         </Link>
                         <Link
-                            className={active === 'transfers' ? 'active' : ''}
+                            className={cn(
+                                'flex items-center border-b-2 border-transparent px-3 text-xs font-medium text-muted-foreground md:text-sm',
+                                active === 'transfers' &&
+                                    'border-primary font-semibold text-primary',
+                            )}
                             href={transfers()}
                         >
                             My transfers
                         </Link>
                         {user?.is_admin && (
                             <Link
-                                className={active === 'teams' ? 'active' : ''}
+                                className={cn(
+                                    'flex items-center border-b-2 border-transparent px-3 text-xs font-medium text-muted-foreground md:text-sm',
+                                    active === 'teams' &&
+                                        'border-primary font-semibold text-primary',
+                                )}
                                 href={teams()}
                             >
                                 Teams
@@ -101,10 +135,10 @@ export function Shell({
                         )}
                     </nav>
                 )}
-                <div className="site-header-actions">
+                <div className="flex items-center gap-2 md:gap-4">
                     {headerAction}
                     {recipient && !recipientAccount ? (
-                        <span className="organization">
+                        <span className="text-xs text-muted-foreground md:text-sm">
                             Mediamax Communication
                         </span>
                     ) : (
@@ -112,21 +146,28 @@ export function Shell({
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <button
-                                        className="account"
+                                        className="flex items-center gap-2.5 text-muted-foreground"
                                         aria-label="Account menu"
                                     >
-                                        <span>{user.name.split(' ')[0]}</span>
-                                        <span className="avatar">
+                                        <span
+                                            className={cn(
+                                                'hidden md:inline',
+                                                headerAction && 'md:hidden',
+                                            )}
+                                        >
+                                            {user.name.split(' ')[0]}
+                                        </span>
+                                        <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-xs font-bold text-primary">
                                             {initials(user.name)}
                                         </span>
                                     </button>
                                 </PopoverTrigger>
                                 <PopoverContent
                                     align="end"
-                                    className="account-popover"
+                                    className="gap-3 p-5"
                                 >
                                     <strong>{user.name}</strong>
-                                    <span className="muted break-all">
+                                    <span className="break-all text-muted-foreground">
                                         {user.email}
                                     </span>
                                     {user.email_verified_at && (
@@ -146,7 +187,7 @@ export function Shell({
                                         href={logout()}
                                         method="post"
                                         as="button"
-                                        className="account-logout"
+                                        className="flex items-center gap-2 border-t pt-3"
                                     >
                                         <HugeiconsIcon
                                             icon={Logout01Icon}
@@ -163,7 +204,7 @@ export function Shell({
             </header>
             {children}
             {recipient && (
-                <footer>
+                <footer className="min-h-12 px-5 py-3 text-center text-xs text-muted-foreground">
                     Sent with Filemax, the file-sharing tool of Mediamax
                     Communication.
                 </footer>
@@ -184,15 +225,18 @@ export function AuthLayout({
 }) {
     const status = usePage<SharedProps>().props.status;
     return (
-        <main className="auth-shell dotted">
+        <main className="flex min-h-svh flex-col items-center justify-center gap-8 bg-muted px-5 py-8">
             <Brand large />
-            <section className="auth-card">
+            <section className="flex w-full max-w-sm flex-col gap-6 rounded-xl border bg-background p-7 md:p-9">
                 <div className="flex flex-col gap-1.5">
-                    <h1>{title}</h1>
-                    <p className="muted">{description}</p>
+                    <h1 className="text-2xl">{title}</h1>
+                    <p className="text-muted-foreground">{description}</p>
                 </div>
                 {status && (
-                    <p className="notice" role="status">
+                    <p
+                        className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-slate-700"
+                        role="status"
+                    >
                         {status === 'verification-link-sent'
                             ? 'A new verification link has been sent to your email.'
                             : status}
@@ -200,13 +244,17 @@ export function AuthLayout({
                 )}
                 {children}
             </section>
-            {footer && <p className="auth-footer">{footer}</p>}
+            {footer && (
+                <p className="max-w-sm text-center text-sm text-muted-foreground">
+                    {footer}
+                </p>
+            )}
         </main>
     );
 }
 export function ErrorMessage({ children }: { children?: ReactNode }) {
     return children ? (
-        <p className="error-message" role="alert">
+        <p className="text-sm wrap-anywhere text-destructive" role="alert">
             {children}
         </p>
     ) : null;
@@ -214,20 +262,26 @@ export function ErrorMessage({ children }: { children?: ReactNode }) {
 export function TeamBadges({
     teams,
     limit = Infinity,
+    variant = 'default',
 }: {
     teams: Team[];
     limit?: number;
+    variant?: 'default' | 'muted';
 }) {
+    const badgeClassName = cn(
+        'inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold wrap-anywhere text-primary',
+        variant === 'muted' && 'border-border bg-muted text-slate-700',
+    );
     return (
-        <span className="team-badges">
+        <span className="inline-flex max-w-full flex-wrap items-center gap-1.5">
             {teams.slice(0, limit).map((team) => (
-                <span className="team-badge" key={team.id}>
+                <span className={badgeClassName} key={team.id}>
                     {team.name}
                 </span>
             ))}
             {teams.length > limit && (
                 <span
-                    className="team-badge"
+                    className={badgeClassName}
                     title={teams
                         .slice(limit)
                         .map((team) => team.name)
@@ -261,13 +315,13 @@ export function TeamPicker({
                 : [...availableSelection, id],
         );
     return (
-        <div className="team-picker">
+        <div className="flex min-w-0 flex-col gap-2.5">
             <Popover>
                 <PopoverTrigger asChild>
                     <Button
                         type="button"
                         variant="outline"
-                        className="w-full justify-between"
+                        className="w-full flex-wrap justify-between gap-y-1 py-2 whitespace-normal"
                         aria-label="Choose teams"
                         disabled={disabled}
                     >
@@ -279,7 +333,10 @@ export function TeamPicker({
                         </span>
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="team-options" align="start">
+                <PopoverContent
+                    className="w-(--radix-popover-trigger-width) max-w-(--radix-popover-content-available-width) min-w-64 p-2"
+                    align="start"
+                >
                     <label className="sr-only" htmlFor="team-search">
                         Search teams
                     </label>
@@ -289,7 +346,7 @@ export function TeamPicker({
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                     />
-                    <fieldset>
+                    <fieldset className="mt-2 max-h-56 overflow-auto">
                         <legend className="sr-only">Teams with access</legend>
                         {teams
                             .filter((team) =>
@@ -298,7 +355,10 @@ export function TeamPicker({
                                     .includes(query.toLocaleLowerCase()),
                             )
                             .map((team) => (
-                                <label className="team-option" key={team.id}>
+                                <label
+                                    className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2.5 hover:bg-muted"
+                                    key={team.id}
+                                >
                                     <input
                                         type="checkbox"
                                         aria-label={team.name}
@@ -307,8 +367,12 @@ export function TeamPicker({
                                         )}
                                         onChange={() => toggle(team.id)}
                                     />
-                                    <span>{team.name}</span>
-                                    <small>{team.users_count} members</small>
+                                    <span className="min-w-0 flex-1 wrap-anywhere">
+                                        {team.name}
+                                    </span>
+                                    <small className="text-muted-foreground">
+                                        {team.users_count} members
+                                    </small>
                                 </label>
                             ))}
                     </fieldset>
@@ -316,20 +380,28 @@ export function TeamPicker({
                         team.name
                             .toLocaleLowerCase()
                             .includes(query.toLocaleLowerCase()),
-                    ) && <p className="muted p-3">No teams found.</p>}
+                    ) && (
+                        <p className="p-3 text-muted-foreground">
+                            No teams found.
+                        </p>
+                    )}
                 </PopoverContent>
             </Popover>
-            <div className="team-badges">
+            <div className="inline-flex flex-wrap items-center gap-1.5">
                 {teams
                     .filter((team) => availableSelection.includes(team.id))
                     .map((team) => (
-                        <span className="team-badge" key={team.id}>
+                        <span
+                            className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold wrap-anywhere text-primary"
+                            key={team.id}
+                        >
                             {team.name}
                             <button
                                 type="button"
                                 onClick={() => toggle(team.id)}
                                 aria-label={`Remove ${team.name}`}
                                 disabled={disabled}
+                                className="inline-flex shrink-0 p-1"
                             >
                                 <HugeiconsIcon
                                     icon={Cancel01Icon}
@@ -359,17 +431,18 @@ export function CopyLink({ url }: { url: string }) {
     }
     return (
         <div className="flex flex-col gap-2">
-            <label className="field-label" htmlFor="share-link">
+            <label className="text-sm font-semibold" htmlFor="share-link">
                 Share this link
             </label>
-            <div className="copy-link">
+            <div className="flex flex-wrap gap-2 md:flex-nowrap">
                 <input
                     id="share-link"
                     readOnly
                     value={url}
+                    className="basis-48 text-sm md:flex-1"
                     onFocus={(event) => event.target.select()}
                 />
-                <Button type="button" onClick={copy}>
+                <Button type="button" onClick={copy} className="px-4">
                     <HugeiconsIcon
                         icon={copied ? Tick02Icon : Copy01Icon}
                         size={18}
@@ -389,10 +462,12 @@ export function FileRow({
     name,
     size,
     children,
+    variant = 'default',
 }: {
     name: string;
     size: number;
     children?: ReactNode;
+    variant?: 'default' | 'upload' | 'owner' | 'recipient';
 }) {
     const extension = name.split('.').pop()?.toLowerCase() ?? '';
     const icon = ['mp4', 'mov', 'avi', 'webm', 'mkv'].includes(extension)
@@ -405,15 +480,46 @@ export function FileRow({
             ? FileZipIcon
             : File01Icon;
     return (
-        <div className="file-row">
-            <span className="file-icon">
+        <div
+            className={cn(
+                'flex min-h-14 min-w-0 items-center gap-3 border-b border-slate-100',
+                variant === 'upload' && 'border-0',
+                variant === 'recipient' && 'min-h-15 md:min-h-14',
+            )}
+        >
+            <span
+                className={cn(
+                    'inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground',
+                    (variant === 'upload' || variant === 'owner') &&
+                        'bg-blue-50 text-primary',
+                )}
+            >
                 <HugeiconsIcon icon={icon} size={19} aria-hidden="true" />
             </span>
-            <span className="file-info">
-                <span className="file-name" title={name}>
+            <span
+                className={cn(
+                    'flex min-w-0 flex-1 flex-col',
+                    variant === 'owner' &&
+                        'md:flex-row md:items-center md:gap-3',
+                )}
+            >
+                <span
+                    className={cn(
+                        'truncate font-medium',
+                        variant === 'owner' && 'md:flex-1',
+                    )}
+                    title={name}
+                >
                     {name}
                 </span>
-                <small>{bytes(size)}</small>
+                <small
+                    className={cn(
+                        'text-xs text-muted-foreground',
+                        variant === 'owner' && 'shrink-0 md:text-sm',
+                    )}
+                >
+                    {bytes(size)}
+                </small>
             </span>
             {children}
         </div>

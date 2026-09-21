@@ -19,15 +19,18 @@ export default function Teams({
     return (
         <Shell active="teams">
             <Head title="Teams" />
-            <main className="mx-auto w-full max-w-[1064px] px-5 py-12 sm:px-8">
+            <main className="mx-auto w-full max-w-5xl px-5 py-12 sm:px-8">
                 <div className="mb-8 flex flex-col gap-2">
                     <h1>Teams</h1>
-                    <p className="muted">
+                    <p className="text-muted-foreground">
                         Manage who can receive transfers shared with each team.
                     </p>
                 </div>
                 {status && (
-                    <p className="notice mb-6" role="status">
+                    <p
+                        className="mb-6 rounded-lg border border-blue-200 bg-accent px-4 py-3 text-slate-700"
+                        role="status"
+                    >
                         {status}
                     </p>
                 )}
@@ -48,14 +51,13 @@ export default function Teams({
                                 <div className="flex flex-1 flex-col gap-2">
                                     <label
                                         htmlFor="team-name"
-                                        className="field-label"
+                                        className="text-sm font-semibold"
                                     >
                                         Team name
                                     </label>
                                     <input
                                         id="team-name"
                                         name="name"
-                                        className="field"
                                         placeholder="e.g. Creative Studio"
                                         required
                                         maxLength={255}
@@ -74,7 +76,7 @@ export default function Teams({
                     {teams.length === 0 && (
                         <div className="rounded-xl border bg-white p-10 text-center">
                             <h2 className="mb-2 text-xl">No teams yet</h2>
-                            <p className="muted">
+                            <p className="text-muted-foreground">
                                 Create your first team, then add registered
                                 colleagues.
                             </p>
@@ -101,7 +103,7 @@ function TeamCard({ team, users }: { team: ManagedTeam; users: Member[] }) {
             <div className="mb-6 flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-3">
                     <h2 className="text-xl">{team.name}</h2>
-                    <span className="muted text-sm">
+                    <span className="text-sm text-muted-foreground">
                         {team.users_count}{' '}
                         {team.users_count === 1 ? 'member' : 'members'}
                     </span>
@@ -115,13 +117,12 @@ function TeamCard({ team, users }: { team: ManagedTeam; users: Member[] }) {
                         <>
                             <div className="flex flex-1 flex-col gap-2">
                                 <label
-                                    className="field-label"
+                                    className="text-sm font-semibold"
                                     htmlFor={`name-${team.id}`}
                                 >
                                     Team name
                                 </label>
                                 <input
-                                    className="field"
                                     name="name"
                                     id={`name-${team.id}`}
                                     defaultValue={team.name}
@@ -140,7 +141,7 @@ function TeamCard({ team, users }: { team: ManagedTeam; users: Member[] }) {
             </div>
             <div className="divide-y border-y">
                 {team.users.length === 0 && (
-                    <p className="muted py-5 text-sm">
+                    <p className="py-5 text-sm text-muted-foreground">
                         This team has no members yet.
                     </p>
                 )}
@@ -151,7 +152,7 @@ function TeamCard({ team, users }: { team: ManagedTeam; users: Member[] }) {
                     >
                         <div className="min-w-0">
                             <strong className="text-sm">{member.name}</strong>
-                            <p className="muted text-sm break-all">
+                            <p className="text-sm break-all text-muted-foreground">
                                 {member.email}
                             </p>
                         </div>
@@ -183,7 +184,7 @@ function TeamCard({ team, users }: { team: ManagedTeam; users: Member[] }) {
                     <>
                         <div className="flex flex-1 flex-col gap-2">
                             <label
-                                className="field-label"
+                                className="text-sm font-semibold"
                                 htmlFor={`member-${team.id}`}
                             >
                                 Add a registered colleague
@@ -191,7 +192,6 @@ function TeamCard({ team, users }: { team: ManagedTeam; users: Member[] }) {
                             <select
                                 id={`member-${team.id}`}
                                 name="user_id"
-                                className="field"
                                 defaultValue=""
                                 required
                                 disabled={availableUsers.length === 0}

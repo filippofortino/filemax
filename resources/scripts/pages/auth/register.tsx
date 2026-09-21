@@ -18,17 +18,19 @@ export default function Register() {
             <Head title="Create account" />
             <Form
                 action={store()}
-                className="form-stack"
+                className="flex flex-col gap-5"
                 resetOnSuccess={['password', 'password_confirmation']}
             >
                 {({ errors, processing }) => (
                     <>
                         <div className="flex flex-col gap-2">
-                            <label className="field-label" htmlFor="name">
+                            <label
+                                className="text-sm font-semibold"
+                                htmlFor="name"
+                            >
                                 Full name
                             </label>
                             <input
-                                className="field"
                                 id="name"
                                 name="name"
                                 autoComplete="name"
@@ -39,11 +41,13 @@ export default function Register() {
                             <ErrorMessage>{errors.name}</ErrorMessage>
                         </div>
                         <div className="flex flex-col gap-2">
-                            <label className="field-label" htmlFor="email">
+                            <label
+                                className="text-sm font-semibold"
+                                htmlFor="email"
+                            >
                                 Company email
                             </label>
                             <input
-                                className="field"
                                 id="email"
                                 name="email"
                                 type="email"
@@ -56,11 +60,13 @@ export default function Register() {
                             <ErrorMessage>{errors.email}</ErrorMessage>
                         </div>
                         <div className="flex flex-col gap-2">
-                            <label className="field-label" htmlFor="password">
+                            <label
+                                className="text-sm font-semibold"
+                                htmlFor="password"
+                            >
                                 Password
                             </label>
                             <input
-                                className="field"
                                 id="password"
                                 name="password"
                                 type="password"
@@ -74,13 +80,12 @@ export default function Register() {
                         </div>
                         <div className="flex flex-col gap-2">
                             <label
-                                className="field-label"
+                                className="text-sm font-semibold"
                                 htmlFor="password_confirmation"
                             >
                                 Confirm password
                             </label>
                             <input
-                                className="field"
                                 id="password_confirmation"
                                 name="password_confirmation"
                                 type="password"

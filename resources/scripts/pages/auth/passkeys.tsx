@@ -42,13 +42,16 @@ export default function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
             <main className="mx-auto w-full max-w-3xl px-5 py-12 sm:px-8">
                 <div className="mb-8 flex flex-col gap-2">
                     <h1>Passkeys</h1>
-                    <p className="muted">
+                    <p className="text-muted-foreground">
                         Sign in with your fingerprint, face, or device lock.
                         Your password remains available.
                     </p>
                 </div>
                 {(status === 'passkey-deleted' || registered) && (
-                    <p className="notice mb-6" role="status">
+                    <p
+                        className="mb-6 rounded-lg border border-blue-200 bg-accent px-4 py-3 text-slate-700"
+                        role="status"
+                    >
                         {status === 'passkey-deleted'
                             ? 'Passkey removed.'
                             : 'Passkey added. You can now use it to sign in.'}
@@ -61,11 +64,11 @@ export default function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
                     <h2 id="add-passkey-title" className="mb-2 text-xl">
                         Add a passkey
                     </h2>
-                    <p className="muted mb-5 text-sm">
+                    <p className="mb-5 text-sm text-muted-foreground">
                         Give it a name you’ll recognize, such as “Work MacBook”.
                     </p>
                     <form
-                        className="form-stack"
+                        className="flex flex-col gap-5"
                         onSubmit={(event) => {
                             event.preventDefault();
                             setRegistered(false);
@@ -76,13 +79,12 @@ export default function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
                             <div className="flex flex-1 flex-col gap-2">
                                 <label
                                     htmlFor="passkey-name"
-                                    className="field-label"
+                                    className="text-sm font-semibold"
                                 >
                                     Passkey name
                                 </label>
                                 <input
                                     id="passkey-name"
-                                    className="field"
                                     value={name}
                                     onChange={(event) =>
                                         setName(event.target.value)
@@ -104,7 +106,7 @@ export default function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
                             </Button>
                         </div>
                         {!isSupported && (
-                            <p className="muted text-sm">
+                            <p className="text-sm text-muted-foreground">
                                 Passkeys aren’t supported in this browser. You
                                 can still sign in with your password.
                             </p>
@@ -119,12 +121,12 @@ export default function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
                     <h2 id="saved-passkeys-title" className="mb-2 text-xl">
                         Your passkeys
                     </h2>
-                    <p className="muted mb-5 text-sm">
+                    <p className="mb-5 text-sm text-muted-foreground">
                         Remove keys for devices you no longer use. Resetting
                         your password keeps your passkeys.
                     </p>
                     {passkeys.length === 0 ? (
-                        <p className="muted py-6 text-center">
+                        <p className="py-6 text-center text-muted-foreground">
                             You haven’t added any passkeys yet.
                         </p>
                     ) : (
@@ -143,7 +145,7 @@ export default function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
                                         <strong className="break-words">
                                             {passkey.name}
                                         </strong>
-                                        <p className="muted text-sm">
+                                        <p className="text-sm text-muted-foreground">
                                             Added {date(passkey.created_at)} ·{' '}
                                             {passkey.last_used_at
                                                 ? `Last used ${date(passkey.last_used_at)}`

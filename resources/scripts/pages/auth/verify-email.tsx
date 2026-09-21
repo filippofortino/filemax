@@ -18,7 +18,7 @@ export default function VerifyEmail() {
             }
         >
             <Head title="Verify email" />
-            <p className="muted">
+            <p className="text-muted-foreground">
                 We sent a verification link to{' '}
                 <strong className="break-all">{user?.email}</strong>. Open the
                 link in your email to continue.

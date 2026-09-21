@@ -23,26 +23,28 @@ export default function SharedTransferPage({
             <Head title={transfer.title}>
                 <meta name="robots" content="noindex, nofollow" />
             </Head>
-            <main>
-                <section className="recipient-card">
-                    <div className="flex flex-col gap-3.5 max-[720px]:gap-3">
-                        <div className="sender-identity leading-[1.3]">
-                            <span className="avatar min-[721px]:size-9">
+            <main className="flex flex-1 justify-center px-5 py-6 md:items-center md:px-10 md:pb-2">
+                <section className="flex w-full max-w-xl min-w-0 flex-col gap-6 md:gap-7 md:rounded-xl md:border md:bg-background md:p-10">
+                    <div className="flex flex-col gap-3 md:gap-3.5">
+                        <div className="flex items-center gap-2.5 text-sm leading-snug text-muted-foreground">
+                            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground md:size-9 md:text-sm">
                                 {initials(transfer.sender.name)}
                             </span>
                             <span>
-                                <strong>{transfer.sender.name}</strong>
-                                <span className="sender-separator"> · </span>
-                                <span className="sender-organization">
+                                <strong className="text-foreground">
+                                    {transfer.sender.name}
+                                </strong>
+                                <span className="hidden md:inline"> · </span>
+                                <span className="block md:inline">
                                     Mediamax Communication
                                 </span>
                             </span>
                         </div>
-                        <h1 className="text-pretty wrap-anywhere">
+                        <h1 className="text-3xl leading-tight text-pretty wrap-anywhere">
                             {transfer.title}
                         </h1>
                         {transfer.message && (
-                            <p className="text-[15px] leading-[1.55] wrap-anywhere whitespace-pre-wrap text-[#3B4552]">
+                            <p className="text-base wrap-anywhere whitespace-pre-wrap text-muted-foreground">
                                 {transfer.message}
                             </p>
                         )}
@@ -54,7 +56,11 @@ export default function SharedTransferPage({
                     <ul className="border-y border-border">
                         {transfer.files.map((file) => (
                             <li key={file.id}>
-                                <FileRow name={file.name} size={file.size}>
+                                <FileRow
+                                    name={file.name}
+                                    size={file.size}
+                                    variant="recipient"
+                                >
                                     <FileDownload
                                         token={transfer.token}
                                         fileId={file.id}
@@ -64,7 +70,7 @@ export default function SharedTransferPage({
                             </li>
                         ))}
                     </ul>
-                    <p className="muted text-center text-[13px]">
+                    <p className="text-center text-sm text-muted-foreground">
                         {transfer.files.length}{' '}
                         {transfer.files.length === 1 ? 'file' : 'files'} ·
                         available until {date(transfer.expires_at)}

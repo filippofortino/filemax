@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { bytes, date } from '@/lib/format';
 import type { Team, Transfer } from '@/lib/types';
+import { cn } from '@/lib/utils';
 import { destroy, index, update } from '@/routes/transfers';
 export default function Show({
     transfer,
@@ -46,10 +47,10 @@ export default function Show({
     return (
         <Shell active="transfers">
             <Head title={transfer.title} />
-            <main className="page-content owner-detail">
+            <main className="mx-auto w-full max-w-6xl px-5 py-7 md:px-10 md:py-8">
                 <Link
                     href={index()}
-                    className="mb-6 inline-flex items-center gap-1.5 text-[13px] font-semibold"
+                    className="mb-6 inline-flex items-center gap-1.5 text-sm font-semibold"
                 >
                     <HugeiconsIcon
                         icon={ArrowLeft01Icon}
@@ -58,11 +59,11 @@ export default function Show({
                     />
                     My transfers
                 </Link>
-                <div className="page-heading detail-heading">
-                    <div className="detail-title-row">
-                        <h1>{transfer.title}</h1>
+                <div className="mb-6 flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <h1 className="wrap-anywhere">{transfer.title}</h1>
                         <span
-                            className="detail-visibility"
+                            className="inline-flex min-h-7 items-center gap-1.5 rounded-full bg-primary/10 px-3 text-sm font-semibold text-primary"
                             title={
                                 transfer.visibility === 'public'
                                     ? 'Anyone with the link. No account needed.'
@@ -83,25 +84,25 @@ export default function Show({
                                 : 'Public link'}
                         </span>
                         {!transfer.available && (
-                            <span className="status inactive">
+                            <span className="inline-flex items-center gap-1 rounded-full border bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
                                 {transfer.revoked_at ? 'Deleted' : 'Expired'}
                             </span>
                         )}
                     </div>
-                    <p className="muted">
+                    <p className="text-muted-foreground">
                         Created {date(transfer.created_at)} · Expires{' '}
                         {date(transfer.expires_at)} · {transfer.files_count}{' '}
                         {transfer.files_count === 1 ? 'file' : 'files'} ·{' '}
                         {bytes(transfer.total_size)}
                     </p>
                 </div>
-                <div className="detail-grid">
-                    <section className="detail-panel">
+                <div className="grid grid-cols-1 items-start gap-7 md:grid-cols-3 md:gap-10">
+                    <section className="flex min-w-0 flex-col gap-7 md:col-span-2">
                         {transfer.url && <CopyLink url={transfer.url} />}
                         {transfer.visibility === 'teams' && (
-                            <section className="detail-sharing">
+                            <section className="flex flex-col gap-2">
                                 <div className="flex items-center justify-between gap-3">
-                                    <h2 className="detail-section-title">
+                                    <h2 className="font-sans text-sm font-semibold tracking-normal">
                                         Shared with
                                     </h2>
                                     {transfer.visibility === 'teams' &&
@@ -126,6 +127,7 @@ export default function Show({
                                                     <Button
                                                         variant="link"
                                                         size="sm"
+                                                        className="h-auto min-h-0 p-0 text-sm"
                                                     >
                                                         Change teams
                                                     </Button>
@@ -144,7 +146,7 @@ export default function Show({
                                                         </DialogDescription>
                                                     </DialogHeader>
                                                     <form
-                                                        className="form-stack"
+                                                        className="flex flex-col gap-5"
                                                         onSubmit={(event) => {
                                                             event.preventDefault();
                                                             sharing.patch(
@@ -181,7 +183,7 @@ export default function Show({
                                                             ).join(' ')}
                                                         </ErrorMessage>
                                                         {teams.length === 0 && (
-                                                            <p className="muted">
+                                                            <p className="text-muted-foreground">
                                                                 You have no
                                                                 current team
                                                                 memberships. Ask
@@ -220,14 +222,16 @@ export default function Show({
                                         )}
                                 </div>
                                 {transfer.teams.length ? (
-                                    <div className="detail-shared-teams">
+                                    <div className="flex flex-wrap gap-2">
                                         {transfer.teams.map((team) => (
                                             <span
                                                 key={team.id}
-                                                className="detail-team"
+                                                className="inline-flex flex-wrap items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-2 text-sm"
                                             >
-                                                <strong>{team.name}</strong>
-                                                <span>
+                                                <strong className="wrap-anywhere">
+                                                    {team.name}
+                                                </strong>
+                                                <span className="text-xs text-muted-foreground">
                                                     {team.users_count} members
                                                 </span>
                                             </span>
@@ -239,33 +243,39 @@ export default function Show({
                                         recipient access.
                                     </ErrorMessage>
                                 )}
-                                <p className="muted text-[13px]">
+                                <p className="text-sm text-muted-foreground">
                                     Members sign in to download. The link alone
                                     is not enough.
                                 </p>
                             </section>
                         )}
-                        <section className="detail-message">
-                            <h2 className="detail-section-title">Message</h2>
+                        <section className="flex flex-col gap-2">
+                            <h2 className="font-sans text-sm font-semibold tracking-normal">
+                                Message
+                            </h2>
                             {transfer.message ? (
-                                <p>{transfer.message}</p>
+                                <p className="rounded-lg bg-muted px-4 py-3 text-base wrap-anywhere whitespace-pre-wrap">
+                                    {transfer.message}
+                                </p>
                             ) : (
-                                <p className="detail-no-message">No message.</p>
+                                <p className="text-muted-foreground italic">
+                                    No message.
+                                </p>
                             )}
                         </section>
                         <section>
-                            <div className="detail-files-heading">
-                                <h2 className="detail-section-title">
+                            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
+                                <h2 className="font-sans text-sm font-semibold tracking-normal">
                                     Files
                                     {transfer.files.length > 4 && !allFiles && (
-                                        <span className="muted font-normal">
+                                        <span className="font-normal text-muted-foreground">
                                             {' '}
                                             · showing 4 of{' '}
                                             {transfer.files.length}
                                         </span>
                                     )}
                                 </h2>
-                                <span className="muted text-[13px]">
+                                <span className="text-sm text-muted-foreground">
                                     download clicks per file
                                 </span>
                             </div>
@@ -277,17 +287,19 @@ export default function Show({
                                             key={file.id}
                                             name={file.original_name}
                                             size={file.size}
+                                            variant="owner"
                                         >
                                             {transfer.available && (
                                                 <FileDownload
                                                     token={transfer.token}
                                                     fileId={file.id}
                                                     name={file.original_name}
+                                                    variant="owner"
                                                     onDownload={refresh}
                                                 />
                                             )}
                                             <span
-                                                className="detail-click-count"
+                                                className="min-w-3 text-right text-sm tabular-nums"
                                                 title="Download-button actions"
                                             >
                                                 {file.download_count || '—'}
@@ -297,7 +309,7 @@ export default function Show({
                             </div>
                             {transfer.files.length > 4 && (
                                 <Button
-                                    className="detail-show-files"
+                                    className="mt-3 h-auto min-h-0 p-0 text-sm"
                                     variant="link"
                                     onClick={() => setAllFiles(!allFiles)}
                                 >
@@ -308,27 +320,31 @@ export default function Show({
                             )}
                         </section>
                     </section>
-                    <aside className="detail-sidebar">
-                        <div className="detail-activity">
+                    <aside className="flex min-w-0 flex-col gap-4">
+                        <div className="flex flex-col gap-3.5 rounded-lg border p-5">
                             <h2
-                                className="detail-section-title muted"
+                                className="font-sans text-sm font-semibold tracking-normal text-muted-foreground"
                                 title="Counts download-button clicks, including your own."
                             >
                                 Downloads
                             </h2>
-                            <div className="detail-download-total">
+                            <div className="flex items-baseline gap-2">
                                 <strong
-                                    className={`download-stat${transfer.download_count === 0 ? ' muted' : ''}`}
+                                    className={cn(
+                                        'font-heading text-4xl leading-none font-bold tracking-tight',
+                                        transfer.download_count === 0 &&
+                                            'text-muted-foreground',
+                                    )}
                                 >
                                     {transfer.download_count}
                                 </strong>
                                 {transfer.download_count > 0 && (
-                                    <span className="muted text-[13px]">
+                                    <span className="text-sm text-muted-foreground">
                                         total
                                     </span>
                                 )}
                             </div>
-                            <div className="detail-activity-dates">
+                            <div className="flex flex-col gap-1.5 border-t pt-2.5 text-sm text-muted-foreground">
                                 <p>
                                     {transfer.first_opened_at
                                         ? `First opened ${date(transfer.first_opened_at)}`
@@ -348,11 +364,13 @@ export default function Show({
                                 )}
                             </div>
                         </div>
-                        <div className="detail-actions flex flex-col gap-2">
+                        <div className="flex flex-col gap-2">
                             {transfer.available && (
                                 <DownloadAll
                                     token={transfer.token}
                                     totalSize={transfer.total_size}
+                                    variant="outline"
+                                    size="default"
                                     onDownload={refresh}
                                 />
                             )}
@@ -414,7 +432,7 @@ export default function Show({
                                     </DialogContent>
                                 </Dialog>
                             )}
-                            <p className="muted px-1 pt-1 text-center text-[12px]">
+                            <p className="px-1 pt-1 text-center text-xs text-muted-foreground">
                                 {transfer.revoked_at
                                     ? 'This link is no longer available.'
                                     : 'Deleting stops new access immediately. Downloads already started may finish.'}

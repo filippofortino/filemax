@@ -69,7 +69,7 @@ export function PasskeyButton({
                       : 'Sign in with passkey'}
             </Button>
             {!isSupported && (
-                <p className="muted text-sm">
+                <p className="text-sm text-muted-foreground">
                     Passkeys aren’t supported in this browser. You can use your
                     password.
                 </p>

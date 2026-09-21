@@ -67,11 +67,15 @@ it('shows denied and expired states without disclosing the file list', function 
     $user->teams()->attach(Team::factory()->create(['name' => 'Mediamax']));
     $this->actingAs($user);
 
-    visit(route('shared.show', $transfer->token))->resize(1280, 940)
+    $page = visit(route('shared.show', $transfer->token))->resize(1280, 940)
         ->assertSee("You don't have access to these files")
         ->assertSee('Creative')
         ->assertDontSee('private-file.pdf')
         ->screenshot(filename: 'filemax-recipient-denied')
+        ->resize(390, 844)
+        ->screenshot(filename: 'filemax-recipient-denied-phone');
+    expect($page->script('document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+    $page
         ->click('Switch account')
         ->assertSee('Sign in')
         ->assertNoJavascriptErrors();

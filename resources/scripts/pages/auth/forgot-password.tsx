@@ -12,15 +12,17 @@ export default function ForgotPassword() {
             footer={<Link href={login()}>Back to sign in</Link>}
         >
             <Head title="Reset password" />
-            <Form action={email()} className="form-stack">
+            <Form action={email()} className="flex flex-col gap-5">
                 {({ errors, processing }) => (
                     <>
                         <div className="flex flex-col gap-2">
-                            <label className="field-label" htmlFor="email">
+                            <label
+                                className="text-sm font-semibold"
+                                htmlFor="email"
+                            >
                                 Company email
                             </label>
                             <input
-                                className="field"
                                 id="email"
                                 name="email"
                                 type="email"

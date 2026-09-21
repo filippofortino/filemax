@@ -16,7 +16,7 @@ it('uses the current XSRF cookie only for same-origin upload requests', function
     $page->script(<<<'JS'
 () => {
     const data = new DataTransfer(); data.items.add(new File(['hello'], 'csrf.txt'));
-    document.querySelector('.upload-grid').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
     const fetch = window.fetch;
     window.jsonCsrfChecks = [];
     window.uploadHeaders = {};
@@ -68,7 +68,7 @@ it('recovers a failed multi-file upload while preserving finished files and shar
     data.items.add(new File(['hello'], 'Brief_Campagna_Q4.pdf'));
     data.items.add(new File([new Uint8Array(1024)], 'Lenergy_Spot30s_v3.mp4'));
     data.items.add(new File(['visual'], 'Keyvisual_Autunno_2026.psd'));
-    document.querySelector('.upload-grid').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
     const original = XMLHttpRequest.prototype.send;
     let sent = 0;
     window.uploadPutCount = 0;
@@ -83,7 +83,16 @@ it('recovers a failed multi-file upload while preserving finished files and shar
 }
 JS);
     $page->assertSee('Lenergy_Spot30s_v3.mp4')->screenshot(filename: 'upload-teams-selected');
-    $page->press('Create transfer')->assertSee('Uploading…');
+
+    foreach ([390, 768] as $width) {
+        $page->resize($width, 940);
+        expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+        $page->screenshot(filename: 'upload-'.$width);
+    }
+
+    $page->resize(1280, 940)->press('Create transfer')->assertSee('Uploading…')
+        ->assertVisible('progress[aria-label="Overall upload progress"]')
+        ->assertVisible('progress[aria-label="Uploading Lenergy_Spot30s_v3.mp4"]');
     $page->screenshot(filename: 'upload-progress');
     $page->script('() => new Promise(resolve => { const timer = setInterval(() => { if (window.failUpload) { clearInterval(timer); window.failUpload(); resolve(true); } }, 20); })');
     $page->assertSee('A little interruption')->assertSee('Some files could not be uploaded.');
@@ -109,7 +118,7 @@ it('keeps upload cancellation disabled until the draft has been revoked', functi
     $page->script(<<<'JS'
 () => {
     const data = new DataTransfer(); data.items.add(new File(['hello'], 'cancel.txt'));
-    document.querySelector('.upload-grid').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
     const send = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.send = function(body) { if (body instanceof Blob) return; return send.call(this, body); };
     const fetch = window.fetch;
@@ -140,7 +149,7 @@ it('asks before leaving an unfinished upload and respects the choice', function 
     const data = new DataTransfer();
     data.items.add(new File(['finished'], 'finished.txt'));
     data.items.add(new File(['pending'], 'pending.txt'));
-    document.querySelector('.upload-grid').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
     const send = XMLHttpRequest.prototype.send;
     let uploads = 0;
     XMLHttpRequest.prototype.send = function(body) {
@@ -187,7 +196,7 @@ it('guards navigation while the upload draft is being created', function (): voi
     $page->script(<<<'JS'
 () => {
     const data = new DataTransfer(); data.items.add(new File(['hello'], 'draft.txt'));
-    document.querySelector('.upload-grid').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
     const fetch = window.fetch;
     window.fetch = async (url, options) => {
         if (options?.method === 'POST' && new URL(url, location.href).pathname === '/transfers') {
@@ -220,7 +229,7 @@ it('can repair sharing after losing membership during an upload', function (): v
     $page->script(<<<'JS'
 () => {
     const data = new DataTransfer(); data.items.add(new File(['hello'], 'repair.txt'));
-    document.querySelector('.upload-grid').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
     const send = XMLHttpRequest.prototype.send;
     window.uploadPutCount = 0;
     XMLHttpRequest.prototype.send = function(body) {

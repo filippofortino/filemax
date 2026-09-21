@@ -20,18 +20,20 @@ export default function ResetPassword({
             <Head title="Choose password" />
             <Form
                 action={update()}
-                className="form-stack"
+                className="flex flex-col gap-5"
                 resetOnSuccess={['password', 'password_confirmation']}
             >
                 {({ errors, processing }) => (
                     <>
                         <input type="hidden" name="token" value={token} />
                         <div className="flex flex-col gap-2">
-                            <label className="field-label" htmlFor="email">
+                            <label
+                                className="text-sm font-semibold"
+                                htmlFor="email"
+                            >
                                 Company email
                             </label>
                             <input
-                                className="field"
                                 id="email"
                                 name="email"
                                 type="email"
@@ -44,11 +46,13 @@ export default function ResetPassword({
                             <ErrorMessage>{errors.token}</ErrorMessage>
                         </div>
                         <div className="flex flex-col gap-2">
-                            <label className="field-label" htmlFor="password">
+                            <label
+                                className="text-sm font-semibold"
+                                htmlFor="password"
+                            >
                                 New password
                             </label>
                             <input
-                                className="field"
                                 id="password"
                                 name="password"
                                 type="password"
@@ -61,13 +65,12 @@ export default function ResetPassword({
                         </div>
                         <div className="flex flex-col gap-2">
                             <label
-                                className="field-label"
+                                className="text-sm font-semibold"
                                 htmlFor="password_confirmation"
                             >
                                 Confirm new password
                             </label>
                             <input
-                                className="field"
                                 id="password_confirmation"
                                 name="password_confirmation"
                                 type="password"

@@ -36,9 +36,9 @@ export default function AccessDenied({
             <Head title="Access required">
                 <meta name="robots" content="noindex, nofollow" />
             </Head>
-            <main>
-                <section className="recipient-card unavailable-card">
-                    <span className="round-icon">
+            <main className="flex flex-1 items-center justify-center px-5 py-6 md:px-10 md:pb-2">
+                <section className="flex w-full max-w-xl min-w-0 flex-col items-center gap-4 text-center md:rounded-xl md:border md:bg-background md:px-10 md:py-11">
+                    <span className="inline-flex size-16 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                         <HugeiconsIcon
                             icon={LockKeyIcon}
                             size={28}
@@ -47,7 +47,7 @@ export default function AccessDenied({
                         />
                     </span>
                     <h1>You don&apos;t have access to these files</h1>
-                    <p className="max-w-[420px] text-[15px] leading-[1.55] text-[#3B4552]">
+                    <p className="max-w-md text-base text-muted-foreground">
                         {sender.name} shared this transfer with selected teams.
                         You&apos;re signed in as{' '}
                         <span className="break-all">{auth.user?.email}</span>,{' '}
@@ -56,11 +56,13 @@ export default function AccessDenied({
                             : 'which doesn’t currently have access.'}
                     </p>
                     <div className="flex flex-wrap items-center justify-center gap-2 rounded-lg bg-muted px-3.5 py-2.5">
-                        <span className="muted text-[13px]">Your teams:</span>
+                        <span className="text-sm text-muted-foreground">
+                            Your teams:
+                        </span>
                         {own_teams.length ? (
                             <TeamBadges teams={own_teams} />
                         ) : (
-                            <span className="muted text-[13px]">
+                            <span className="text-sm text-muted-foreground">
                                 No teams assigned
                             </span>
                         )}
@@ -83,7 +85,7 @@ export default function AccessDenied({
                             <Link href={home()}>Go to Filemax</Link>
                         </Button>
                     </div>
-                    <p className="muted pt-1 text-[13px]">
+                    <p className="pt-1 text-sm text-muted-foreground">
                         Signed in as the wrong account?{' '}
                         <Link
                             href={switchAccount()}

@@ -19,12 +19,9 @@ export default function Unavailable({
             <Head title="Link unavailable">
                 <meta name="robots" content="noindex, nofollow" />
             </Head>
-            <main>
-                <section
-                    className="recipient-card unavailable-card"
-                    style={{ maxWidth: 520 }}
-                >
-                    <span className="round-icon">
+            <main className="flex flex-1 items-center justify-center px-5 py-6 md:px-10 md:pb-2">
+                <section className="flex w-full max-w-lg min-w-0 flex-col items-center gap-4 text-center md:rounded-xl md:border md:bg-background md:px-10 md:py-11">
+                    <span className="inline-flex size-16 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                         <HugeiconsIcon
                             icon={Clock01Icon}
                             size={28}
@@ -33,7 +30,7 @@ export default function Unavailable({
                         />
                     </span>
                     <h1>This link is no longer available</h1>
-                    <p className="max-w-[380px] text-[15px] leading-[1.55] text-[#3B4552]">
+                    <p className="max-w-sm text-base text-muted-foreground">
                         {explanation} Ask whoever sent it to share the files
                         again.
                     </p>

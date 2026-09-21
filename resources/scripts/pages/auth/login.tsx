@@ -21,18 +21,20 @@ export default function Login() {
             <Head title="Sign in" />
             <Form
                 action={store()}
-                className="form-stack"
+                className="flex flex-col gap-5"
                 resetOnSuccess={['password']}
             >
                 {({ errors, processing }) => (
                     <>
                         <div className="flex flex-col gap-4">
                             <div className="flex flex-col gap-2">
-                                <label className="field-label" htmlFor="email">
+                                <label
+                                    className="text-sm font-semibold"
+                                    htmlFor="email"
+                                >
                                     Email
                                 </label>
                                 <input
-                                    className="field"
                                     id="email"
                                     name="email"
                                     type="email"
@@ -46,20 +48,19 @@ export default function Login() {
                             <div className="flex flex-col gap-2">
                                 <div className="flex items-baseline justify-between">
                                     <label
-                                        className="field-label"
+                                        className="text-sm font-semibold"
                                         htmlFor="password"
                                     >
                                         Password
                                     </label>
                                     <Link
                                         href={request()}
-                                        className="text-[13px] font-medium"
+                                        className="text-sm font-medium"
                                     >
                                         Forgot password?
                                     </Link>
                                 </div>
                                 <input
-                                    className="field"
                                     id="password"
                                     name="password"
                                     type="password"

@@ -48,6 +48,9 @@ it('saves team changes only on confirmation and keeps delete dialog keyboard foc
 
     expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
     $page->screenshot(fullPage: false, filename: 'history-tablet');
+    $page->resize(390, 844)->assertSee('Master spot + visual approvato');
+    expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+    $page->screenshot(fullPage: false, filename: 'history-phone');
     $page->resize(1280, 940);
 
     $page->click('nav[aria-label="Filter transfers"] a:has-text("Public links")')->assertSee('Shooting Villa Borbone — selezione')->assertDontSee('Master spot + visual approvato');
@@ -56,6 +59,16 @@ it('saves team changes only on confirmation and keeps delete dialog keyboard foc
 
     $page->click('a:has-text("Master spot + visual approvato")')->assertSee('First opened')->assertSee('Change teams');
     $page->screenshot(fullPage: false, filename: 'detail-teams');
+    $page->resize(768, 940)->assertSee('Download all');
+    expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+    $page->screenshot(fullPage: false, filename: 'detail-tablet-narrow');
+    $page->resize(900, 940)->assertSee('Download all');
+    expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+    $page->screenshot(fullPage: false, filename: 'detail-tablet');
+    $page->resize(390, 844)->assertSee('Lenergy_Spot30s_v3.mp4');
+    expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+    $page->screenshot(fullPage: false, filename: 'detail-phone');
+    $page->resize(1280, 940);
 
     $page->press('Change teams')->assertSee('Save changes');
     $page->screenshot(fullPage: false, filename: 'dialog-change-teams');

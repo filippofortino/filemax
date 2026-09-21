@@ -19,11 +19,15 @@ export function DownloadAll({
     totalSize,
     disabled = false,
     onDownload,
+    variant = 'default',
+    size = 'lg',
 }: {
     token: string;
     totalSize: number;
     disabled?: boolean;
     onDownload?: () => void;
+    variant?: 'default' | 'outline';
+    size?: 'default' | 'lg';
 }) {
     const [busy, setBusy] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -86,7 +90,8 @@ export function DownloadAll({
         <div className="flex w-full flex-col gap-2">
             <Button
                 type="button"
-                size="lg"
+                size={size}
+                variant={variant}
                 className="w-full"
                 onClick={start}
                 disabled={disabled || busy}
@@ -109,7 +114,10 @@ export function DownloadAll({
                         max={100}
                         aria-label="Preparing download archive"
                     />
-                    <p role="status" className="muted text-center text-xs">
+                    <p
+                        role="status"
+                        className="text-center text-xs text-muted-foreground"
+                    >
                         Preparing your ZIP. Large transfers can take a few
                         minutes.
                     </p>
@@ -125,11 +133,13 @@ export function FileDownload({
     fileId,
     name,
     onDownload,
+    variant = 'default',
 }: {
     token: string;
     fileId: string;
     name: string;
     onDownload?: () => void;
+    variant?: 'default' | 'owner';
 }) {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
@@ -168,8 +178,8 @@ export function FileDownload({
         <span className="flex max-w-40 shrink-0 flex-col items-end gap-1">
             <Button
                 type="button"
-                variant="outline"
-                size="icon"
+                variant={variant === 'owner' ? 'ghost' : 'outline'}
+                size={variant === 'owner' ? 'icon-sm' : 'icon'}
                 onClick={start}
                 disabled={busy}
                 aria-label={`Download ${name}`}

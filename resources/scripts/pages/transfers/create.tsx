@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { bytes, date } from '@/lib/format';
 import { request, uploadPart } from '@/lib/http';
 import type { Team, Transfer, TransferFile } from '@/lib/types';
+import { cn } from '@/lib/utils';
 import { home } from '@/routes';
 import { destroy, show, store, update } from '@/routes/transfers';
 import { complete, finalize, remove, sign } from '@/routes/transfers/uploads';
@@ -328,10 +329,10 @@ export default function Create({ teams }: { teams: Team[] }) {
         return (
             <Shell>
                 <Head title="Your link is ready" />
-                <main className="center-stage dotted">
-                    <section className="ready-card">
+                <main className="flex flex-1 items-center justify-center bg-muted px-5 py-6 md:p-10">
+                    <section className="flex w-full max-w-2xl flex-col gap-6 rounded-xl border bg-background px-5 py-7 md:p-10">
                         <div className="flex flex-col items-center gap-3.5 text-center">
-                            <span className="round-icon">
+                            <span className="inline-flex size-18 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
                                 <HugeiconsIcon
                                     icon={Tick02Icon}
                                     size={30}
@@ -339,7 +340,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                 />
                             </span>
                             <h1 className="text-4xl">Your link is ready</h1>
-                            <p className="muted">
+                            <p className="text-muted-foreground">
                                 {ready.files.length} files ·{' '}
                                 {bytes(ready.total_size)} · expires{' '}
                                 {date(ready.expires_at)}
@@ -347,18 +348,18 @@ export default function Create({ teams }: { teams: Team[] }) {
                         </div>
                         <CopyLink url={ready.url} />
                         {ready.visibility === 'teams' ? (
-                            <div className="notice flex flex-col gap-2">
+                            <div className="flex flex-col gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-slate-700">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <strong>Shared with</strong>
                                     <TeamBadges teams={ready.teams} />
                                 </div>
-                                <p className="text-[13px]">
+                                <p className="text-sm">
                                     Only signed-in, verified members of one of
                                     these teams can download.
                                 </p>
                             </div>
                         ) : (
-                            <p className="notice">
+                            <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-slate-700">
                                 Anyone with the link. No account needed.
                             </p>
                         )}
@@ -400,8 +401,8 @@ export default function Create({ teams }: { teams: Team[] }) {
     return (
         <Shell>
             <Head title="New transfer" />
-            <div
-                className="upload-grid"
+            <main
+                className="grid flex-1 grid-cols-1 md:grid-cols-2"
                 onDragEnter={(event) => {
                     drag(event);
                     if (event.dataTransfer.types.includes('Files')) {
@@ -422,7 +423,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                     addFiles(event.dataTransfer.files);
                 }}
             >
-                <section className="upload-files dotted">
+                <section className="flex min-w-0 flex-col gap-6 border-b bg-muted px-5 py-6 md:border-r md:border-b-0 md:p-8 lg:p-10">
                     <input
                         ref={picker}
                         type="file"
@@ -436,8 +437,8 @@ export default function Create({ teams }: { teams: Team[] }) {
                         }}
                     />
                     {!entries.length ? (
-                        <div className="drop-empty">
-                            <span className="round-icon">
+                        <div className="flex min-h-72 flex-1 flex-col items-center justify-center gap-4 text-center md:min-h-80">
+                            <span className="inline-flex size-18 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
                                 <HugeiconsIcon
                                     icon={Upload01Icon}
                                     size={32}
@@ -445,8 +446,12 @@ export default function Create({ teams }: { teams: Team[] }) {
                                     aria-hidden="true"
                                 />
                             </span>
-                            <h1>Drop files here</h1>
-                            <p>Anywhere on this page works.</p>
+                            <h1 className="text-4xl md:text-5xl">
+                                Drop files here
+                            </h1>
+                            <p className="text-base text-muted-foreground">
+                                Anywhere on this page works.
+                            </p>
                             <Button
                                 variant="outline"
                                 onClick={() => picker.current?.click()}
@@ -456,9 +461,9 @@ export default function Create({ teams }: { teams: Team[] }) {
                         </div>
                     ) : (
                         <>
-                            <div className="upload-progress">
+                            <div className="flex flex-col gap-3 rounded-xl border bg-background p-6">
                                 <div className="flex items-baseline justify-between gap-3">
-                                    <h1 className="text-[28px]">
+                                    <h1 className="text-3xl">
                                         {busy
                                             ? 'Uploading…'
                                             : hasDraft
@@ -472,7 +477,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                               : 'Ready to send'}
                                     </h1>
                                     {hasDraft && (
-                                        <strong className="font-heading text-[28px] text-primary">
+                                        <strong className="font-heading text-3xl text-primary">
                                             {percentage}%
                                         </strong>
                                     )}
@@ -484,7 +489,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                             value={percentage}
                                             max={100}
                                         />
-                                        <div className="muted flex justify-between gap-2 text-[13px]">
+                                        <div className="flex justify-between gap-2 text-sm text-muted-foreground">
                                             <span>
                                                 {bytes(loaded)} of{' '}
                                                 {bytes(totalSize)}
@@ -501,7 +506,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                         </div>
                                     </>
                                 ) : (
-                                    <p className="muted">
+                                    <p className="text-muted-foreground">
                                         {entries.length} files ·{' '}
                                         {bytes(totalSize)}
                                     </p>
@@ -510,15 +515,16 @@ export default function Create({ teams }: { teams: Team[] }) {
                             <div className="flex flex-col gap-2">
                                 {entries.map((entry) => (
                                     <div
-                                        className="upload-file"
+                                        className="overflow-hidden rounded-lg border bg-background px-3"
                                         key={entry.key}
                                     >
                                         <FileRow
                                             name={entry.file.name}
                                             size={entry.file.size}
+                                            variant="upload"
                                         >
                                             {entry.status === 'done' ? (
-                                                <span className="flex items-center gap-1 text-[13px] font-semibold text-[#1a7f4b]">
+                                                <span className="flex items-center gap-1 text-sm font-semibold text-emerald-700">
                                                     <HugeiconsIcon
                                                         icon={Tick02Icon}
                                                         size={16}
@@ -527,11 +533,11 @@ export default function Create({ teams }: { teams: Team[] }) {
                                                     Done
                                                 </span>
                                             ) : entry.status === 'failed' ? (
-                                                <span className="text-[13px] text-destructive">
+                                                <span className="text-sm text-destructive">
                                                     Failed
                                                 </span>
                                             ) : entry.status === 'uploading' ? (
-                                                <span className="text-[13px] text-primary">
+                                                <span className="text-sm text-primary">
                                                     {entry.file.size
                                                         ? Math.min(
                                                               100,
@@ -546,7 +552,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                                     %
                                                 </span>
                                             ) : hasDraft ? (
-                                                <span className="muted text-[13px]">
+                                                <span className="text-sm text-muted-foreground">
                                                     Waiting
                                                 </span>
                                             ) : null}
@@ -571,13 +577,13 @@ export default function Create({ teams }: { teams: Team[] }) {
                                                 )}
                                         </FileRow>
                                         {entry.error && (
-                                            <p className="error-message pb-3">
+                                            <p className="pb-3 text-sm leading-normal wrap-anywhere text-destructive">
                                                 {entry.error}
                                             </p>
                                         )}
                                         {entry.status === 'uploading' && (
                                             <progress
-                                                className="!h-[3px]"
+                                                className="h-1"
                                                 aria-label={`Uploading ${entry.file.name}`}
                                                 value={entry.loaded}
                                                 max={Math.max(
@@ -598,7 +604,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                 </Button>
                             )}
                             {hasDraft && (
-                                <p className="muted text-center text-[13px]">
+                                <p className="text-center text-sm text-muted-foreground">
                                     Keep this tab open until the upload
                                     finishes.
                                 </p>
@@ -607,7 +613,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                     )}
                 </section>
                 <form
-                    className="transfer-form"
+                    className="flex min-w-0 flex-col gap-6 px-5 py-7 md:px-8 md:py-9 lg:gap-7 lg:px-16 lg:py-12"
                     onSubmit={(event) => {
                         event.preventDefault();
                         void send();
@@ -617,20 +623,24 @@ export default function Create({ teams }: { teams: Team[] }) {
                     {hasDraft ? (
                         <>
                             <div className="flex flex-col gap-2">
-                                <span className="field-label">Title</span>
-                                <div className="rounded-md border bg-muted px-3.5 py-3 text-[15px]">
+                                <span className="text-sm font-semibold">
+                                    Title
+                                </span>
+                                <div className="rounded-md border bg-muted px-3.5 py-3 text-base">
                                     {title || entries[0]?.file.name}
                                 </div>
                             </div>
                             <div className="flex flex-col gap-2">
-                                <span className="field-label">Message</span>
-                                <div className="rounded-md border bg-muted px-3.5 py-3 text-[15px] whitespace-pre-wrap">
+                                <span className="text-sm font-semibold">
+                                    Message
+                                </span>
+                                <div className="rounded-md border bg-muted px-3.5 py-3 text-base whitespace-pre-wrap">
                                     {message || 'No message'}
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
                                 <div className="flex flex-col gap-2.5">
-                                    <span className="field-label">
+                                    <span className="text-sm font-semibold">
                                         Who can download
                                     </span>
                                     {visibility === 'teams' ? (
@@ -650,7 +660,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                             />
                                         )
                                     ) : (
-                                        <span className="notice flex w-fit items-center gap-2">
+                                        <span className="flex w-fit items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-slate-700">
                                             <HugeiconsIcon
                                                 icon={Globe02Icon}
                                                 size={18}
@@ -661,10 +671,10 @@ export default function Create({ teams }: { teams: Team[] }) {
                                     )}
                                 </div>
                                 <div className="flex flex-col gap-2.5">
-                                    <span className="field-label">
+                                    <span className="text-sm font-semibold">
                                         Link expires
                                     </span>
-                                    <span className="rounded-md border bg-muted px-3.5 py-3 text-[15px]">
+                                    <span className="rounded-md border bg-muted px-3.5 py-3 text-base">
                                         {expiry} {expiry === 1 ? 'day' : 'days'}
                                     </span>
                                 </div>
@@ -672,10 +682,13 @@ export default function Create({ teams }: { teams: Team[] }) {
                         </>
                     ) : (
                         <>
-                            <div className="field">
-                                <label htmlFor="transfer-title">
+                            <div className="flex flex-col gap-2">
+                                <label
+                                    className="text-sm font-semibold"
+                                    htmlFor="transfer-title"
+                                >
                                     Title{' '}
-                                    <span className="muted font-normal">
+                                    <span className="font-normal text-muted-foreground">
                                         (optional)
                                     </span>
                                 </label>
@@ -690,10 +703,13 @@ export default function Create({ teams }: { teams: Team[] }) {
                                     disabled={busy || hasDraft}
                                 />
                             </div>
-                            <div className="field">
-                                <label htmlFor="transfer-message">
+                            <div className="flex flex-col gap-2">
+                                <label
+                                    className="text-sm font-semibold"
+                                    htmlFor="transfer-message"
+                                >
                                     Message{' '}
-                                    <span className="muted font-normal">
+                                    <span className="font-normal text-muted-foreground">
                                         (optional)
                                     </span>
                                 </label>
@@ -709,10 +725,10 @@ export default function Create({ teams }: { teams: Team[] }) {
                                 />
                             </div>
                             <fieldset className="flex flex-col gap-2.5">
-                                <legend className="field-label mb-2.5">
+                                <legend className="mb-2.5 text-sm font-semibold">
                                     Who can download
                                 </legend>
-                                <div className="visibility-options">
+                                <div className="grid grid-cols-2 gap-3">
                                     {(
                                         [
                                             {
@@ -730,7 +746,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                         ] as const
                                     ).map((option) => (
                                         <label
-                                            className="visibility-option"
+                                            className="flex cursor-pointer flex-col gap-2 rounded-lg border border-input p-4 has-checked:border-primary has-checked:bg-primary/5 has-checked:ring-1 has-checked:ring-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary has-disabled:cursor-not-allowed"
                                             key={option.value}
                                         >
                                             <span className="flex items-center justify-between">
@@ -769,13 +785,24 @@ export default function Create({ teams }: { teams: Team[] }) {
                                                 />
                                             </span>
                                             <span>
-                                                <strong>{option.label}</strong>
-                                                <p>{option.text}</p>
+                                                <strong
+                                                    className={cn(
+                                                        'text-base',
+                                                        visibility ===
+                                                            option.value &&
+                                                            'text-primary',
+                                                    )}
+                                                >
+                                                    {option.label}
+                                                </strong>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {option.text}
+                                                </p>
                                             </span>
                                         </label>
                                     ))}
                                 </div>
-                                <p className="muted text-[13px]">
+                                <p className="text-sm text-muted-foreground">
                                     {teams.length
                                         ? `You belong to ${teams.length} ${teams.length === 1 ? 'team' : 'teams'}: ${teams.map((team) => team.name).join(', ')}.`
                                         : 'No team memberships yet. You can share public links, or ask an admin to add you to a team.'}
@@ -789,7 +816,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                             disabled={busy}
                                         />
                                         {!selectedTeams.length && (
-                                            <p className="muted text-[13px]">
+                                            <p className="text-sm text-muted-foreground">
                                                 Select at least one team.
                                             </p>
                                         )}
@@ -797,14 +824,14 @@ export default function Create({ teams }: { teams: Team[] }) {
                                 )}
                             </fieldset>
                             <fieldset>
-                                <legend className="field-label mb-2.5">
+                                <legend className="mb-2.5 text-sm font-semibold">
                                     Link expires
                                 </legend>
-                                <div className="expiry-options">
+                                <div className="flex flex-wrap gap-2">
                                     {[1, 7, 14, 30].map((days) => (
                                         <label
                                             key={days}
-                                            className="expiry-option"
+                                            className="inline-flex h-10 cursor-pointer items-center rounded-full border border-input px-3 has-checked:border-primary has-checked:bg-primary/5 has-checked:font-semibold has-checked:text-primary has-checked:ring-1 has-checked:ring-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary has-disabled:cursor-not-allowed"
                                         >
                                             <input
                                                 type="radio"
@@ -818,7 +845,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                         </label>
                                     ))}
                                 </div>
-                                <p className="muted mt-2.5 text-[13px]">
+                                <p className="mt-2.5 text-sm text-muted-foreground">
                                     Available until{' '}
                                     {date(availableUntil.toISOString())}.
                                 </p>
@@ -828,7 +855,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                     <div className="flex flex-col gap-3">
                         <ErrorMessage>{error}</ErrorMessage>
                         {error && hasDraft && (
-                            <p className="notice text-[13px]">
+                            <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-slate-700">
                                 <HugeiconsIcon
                                     className="mr-1 inline"
                                     icon={Alert02Icon}
@@ -842,7 +869,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                         <Button
                             size="lg"
                             type="submit"
-                            className={busy && hasDraft ? 'hidden' : undefined}
+                            className={cn(busy && hasDraft && 'hidden')}
                             disabled={
                                 busy ||
                                 entries.length === 0 ||
@@ -867,7 +894,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                 Cancel upload
                             </Button>
                         )}
-                        <p className="muted text-center text-[13px]">
+                        <p className="text-center text-sm text-muted-foreground">
                             {!entries.length
                                 ? 'Add at least one file to continue'
                                 : busy
@@ -877,9 +904,11 @@ export default function Create({ teams }: { teams: Team[] }) {
                     </div>
                 </form>
                 {dragging && !hasDraft && (
-                    <div className="drop-overlay">Drop to add your files</div>
+                    <div className="pointer-events-none fixed inset-3 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-accent/95 p-6 text-center font-heading text-4xl">
+                        Drop to add your files
+                    </div>
                 )}
-            </div>
+            </main>
         </Shell>
     );
 }
