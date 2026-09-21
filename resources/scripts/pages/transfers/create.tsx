@@ -749,7 +749,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                             className="flex cursor-pointer flex-col gap-2 rounded-lg border border-input p-4 has-checked:border-primary has-checked:bg-primary/5 has-checked:ring-1 has-checked:ring-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary has-disabled:cursor-not-allowed"
                                             key={option.value}
                                         >
-                                            <span className="flex items-center justify-between">
+                                            <span className="flex items-center justify-between has-checked:text-primary">
                                                 <HugeiconsIcon
                                                     icon={option.icon}
                                                     size={22}
