@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Jobs\PrepareTransferArchive;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Services\TransferStorage;
@@ -52,6 +53,49 @@ final class TransferDownloadController
         ]);
     }
 
+    public function all(Request $request, string $token): JsonResponse
+    {
+        $prepare = false;
+        $transfer = DB::transaction(function () use ($request, $token, &$prepare): Transfer {
+            $transfer = $this->authorized($request, $token, true);
+            $transfer->increment('download_count', 1, ['last_downloaded_at' => now()]);
+
+            if (! in_array($transfer->archive_status, ['pending', 'processing', 'ready'], true)) {
+                $transfer->forceFill(['archive_status' => 'pending', 'archive_progress' => 0, 'archive_requested_at' => now()])->save();
+                $prepare = true;
+            }
+
+            return $transfer;
+        }, attempts: 5);
+
+        if ($prepare) {
+            dispatch(new PrepareTransferArchive($transfer->id));
+        }
+
+        return $this->archiveResponse($transfer->refresh());
+    }
+
+    public function archive(Request $request, string $token): JsonResponse
+    {
+        return $this->archiveResponse($this->authorized($request, $token));
+    }
+
+    public function archiveDownload(Request $request, string $token, TransferStorage $storage): Response
+    {
+        $transfer = $this->authorized($request, $token);
+        abort_unless($transfer->archive_status === 'ready' && $transfer->archive_path, 409);
+        $name = (Str::slug($transfer->displayTitle()) ?: 'filemax-transfer').'.zip';
+
+        if ($storage->isRemote()) {
+            return redirect()->away($storage->disk()->temporaryUrl($transfer->archive_path, now()->addMinutes(5)->min($transfer->expires_at), [
+                'ResponseContentDisposition' => $this->disposition($name),
+                'ResponseContentType' => 'application/zip',
+            ]));
+        }
+
+        return $storage->disk()->download($transfer->archive_path, $name, ['Content-Type' => 'application/zip', 'Cache-Control' => 'private, no-store']);
+    }
+
     private function authorized(Request $request, string $token, bool $lock = false): Transfer
     {
         $transfer = Transfer::query()->where('token', $token)->when($lock, fn ($query) => $query->lockForUpdate())->firstOrFail();
@@ -59,6 +103,15 @@ final class TransferDownloadController
         Gate::forUser($request->user())->authorize('download', $transfer);
 
         return $transfer;
+    }
+
+    private function archiveResponse(Transfer $transfer): JsonResponse
+    {
+        return response()->json([
+            'status' => $transfer->archive_status,
+            'progress' => $transfer->archive_progress,
+            'url' => $transfer->archive_status === 'ready' ? route('shared.archive.download', $transfer->token) : null,
+        ])->header('Cache-Control', 'no-store');
     }
 
     private function disposition(string $name): string

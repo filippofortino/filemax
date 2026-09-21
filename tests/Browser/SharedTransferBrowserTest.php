@@ -27,6 +27,7 @@ it('renders the public recipient at desktop and phone sizes without horizontal o
     $page = visit(route('shared.show', $transfer->token))->resize(1280, 940)
         ->assertSee('Spot autunno — materiali finali')
         ->assertSee('3 files · available until 25 Sept 2026')
+        ->assertSee('Download all')
         ->assertNoJavascriptErrors();
     $page->script('document.fonts.ready');
     $page->screenshot(filename: 'filemax-recipient-desktop');
@@ -35,7 +36,7 @@ it('renders the public recipient at desktop and phone sizes without horizontal o
     expect($transfer->refresh()->download_count)->toBe(0);
 });
 
-it('starts individual file downloads through the recipient controls', function (): void {
+it('starts individual and all file downloads through the recipient controls', function (): void {
     Storage::fake('local');
     config(['filemax.disk' => 'local']);
     $transfer = Transfer::factory()->create(['title' => 'Browser download']);
@@ -46,9 +47,13 @@ it('starts individual file downloads through the recipient controls', function (
         ->click('[aria-label="Download sample.txt"]')
         ->waitForEvent('networkidle')
         ->assertEnabled('[aria-label="Download sample.txt"]')
+        ->press('Download all · 4 B')
+        ->waitForEvent('networkidle')
+        ->assertEnabled('Download all · 4 B')
         ->assertNoJavascriptErrors();
 
-    expect($transfer->refresh()->download_count)->toBe(1)
+    expect($transfer->refresh()->download_count)->toBe(2)
+        ->and($transfer->archive_status)->toBe('ready')
         ->and($file->refresh()->download_count)->toBe(1);
 });
 

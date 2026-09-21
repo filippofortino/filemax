@@ -2,10 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Jobs\PrepareTransferArchive;
 use App\Models\Team;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
+use App\Services\TransferStorage;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -52,7 +59,7 @@ it('counts every authorized individual action exactly once and never counts byte
 
 it('redirects restricted guests back through login and keeps denied props private', function (): void {
     $transfer = Transfer::factory()->create(['visibility' => 'teams', 'message' => 'secret message']);
-    $file = TransferFile::factory()->for($transfer)->create(['original_name' => 'secret.pdf']);
+    TransferFile::factory()->for($transfer)->create(['original_name' => 'secret.pdf']);
     $team = Team::factory()->create();
     $transfer->teams()->attach($team);
     $url = route('shared.show', $transfer->token);
@@ -68,7 +75,7 @@ it('redirects restricted guests back through login and keeps denied props privat
         ->missing('transfer')
         ->missing('files')
         ->missing('message'));
-    $this->postJson(route('shared.files.download', [$transfer->token, $file]))->assertForbidden();
+    $this->postJson(route('shared.download', $transfer->token))->assertForbidden();
     expect($transfer->refresh()->first_opened_at)->toBeNull()->and($transfer->download_count)->toBe(0);
 });
 
@@ -126,3 +133,100 @@ it('caps signed file links at transfer expiry and rechecks membership on local r
     $this->get($url)->assertForbidden();
     expect($transfer->refresh()->download_count)->toBe(1);
 });
+
+it('builds archives with safe unique names and counts bundles independently of file clicks', function (): void {
+    $transfer = Transfer::factory()->create();
+    foreach (['../report.txt', 'report.txt', 'report (2).txt', 'folder\\REPORT.txt'] as $position => $name) {
+        $file = TransferFile::factory()->for($transfer)->create(['original_name' => $name, 'position' => $position]);
+        Storage::disk('local')->put($file->path, 'test');
+    }
+
+    $response = $this->postJson(route('shared.download', $transfer->token))->assertOk()->assertJsonPath('status', 'ready')->assertJsonPath('progress', 100);
+    $this->getJson(route('shared.archive', $transfer->token))->assertOk();
+    $this->get($response->json('url'))->assertOk()->assertDownload();
+    $transfer->refresh();
+    $zip = new ZipArchive;
+    expect($zip->open(Storage::disk('local')->path($transfer->archive_path)))->toBeTrue();
+    $names = [];
+    for ($index = 0; $index < $zip->numFiles; $index++) {
+        $names[] = $zip->getNameIndex($index);
+        expect($zip->getFromIndex($index))->toBe('test');
+    }
+
+    $zip->close();
+    expect($names)->toBe(['report.txt', 'report (2).txt', 'report (2) (2).txt', 'REPORT (3).txt']);
+    $this->postJson(route('shared.download', $transfer->token))->assertOk();
+    expect($transfer->refresh()->download_count)->toBe(2)->and($transfer->files()->sum('download_count'))->toBe(0);
+});
+
+it('rechecks access while archives prepare and when they are retrieved', function (): void {
+    Queue::fake([PrepareTransferArchive::class]);
+    $transfer = Transfer::factory()->create(['visibility' => 'teams']);
+    $file = TransferFile::factory()->for($transfer)->create();
+    Storage::disk('local')->put($file->path, 'test');
+    $team = Team::factory()->create();
+    $transfer->teams()->attach($team);
+    $user = User::factory()->create();
+    $user->teams()->attach($team);
+    $this->actingAs($user)->postJson(route('shared.download', $transfer->token))->assertOk()->assertJsonPath('status', 'pending');
+    Queue::assertPushed(PrepareTransferArchive::class, 1);
+    $user->teams()->detach();
+    new PrepareTransferArchive($transfer->id)->handle(resolve(TransferStorage::class));
+    $this->getJson(route('shared.archive', $transfer->token))->assertForbidden();
+    $this->get(route('shared.archive.download', $transfer->token))->assertForbidden();
+    expect($transfer->refresh()->download_count)->toBe(1);
+});
+
+it('marks failed archives for a recoverable explicit retry', function (): void {
+    $transfer = Transfer::factory()->create(['archive_status' => 'processing']);
+    $file = TransferFile::factory()->for($transfer)->create();
+    $job = new PrepareTransferArchive($transfer->id);
+    $job->failed(new RuntimeException('Worker failed.'));
+
+    expect($transfer->refresh()->archive_status)->toBe('failed');
+    Storage::disk('local')->put($file->path, 'test');
+    $this->postJson(route('shared.download', $transfer->token))->assertOk()->assertJsonPath('status', 'ready');
+});
+
+it('counts a download once when an archive worker updates SQLite during authorization', function (bool $individual): void {
+    $database = tempnam(sys_get_temp_dir(), 'filemax-download-');
+    $originalConnection = DB::getDefaultConnection();
+    $configuration = array_replace(config('database.connections.sqlite'), [
+        'database' => $database,
+        'journal_mode' => 'WAL',
+        'busy_timeout' => 50,
+    ]);
+    config(['database.connections.download_test' => $configuration, 'database.connections.download_writer' => $configuration]);
+    DB::setDefaultConnection('download_test');
+
+    try {
+        Artisan::call('migrate', ['--database' => 'download_test', '--force' => true]);
+        $transfer = Transfer::factory()->create(['archive_status' => 'processing']);
+        $file = TransferFile::factory()->for($transfer)->create();
+        $authorizationReads = 0;
+
+        DB::listen(function (QueryExecuted $query) use ($transfer, &$authorizationReads): void {
+            if ($query->connectionName === 'download_test' && str_starts_with($query->sql, 'select * from "transfers" where "token"')) {
+                $authorizationReads++;
+                if ($authorizationReads === 1) {
+                    DB::connection('download_writer')->table('transfers')->where('id', $transfer->id)->update(['archive_progress' => 40]);
+                }
+            }
+        });
+
+        $url = $individual
+            ? route('shared.files.download', [$transfer->token, $file])
+            : route('shared.download', $transfer->token);
+        $this->postJson($url)->assertOk();
+
+        expect($authorizationReads)->toBe(2)
+            ->and($transfer->refresh()->download_count)->toBe(1)
+            ->and($transfer->archive_progress)->toBe(40)
+            ->and($file->refresh()->download_count)->toBe($individual ? 1 : 0);
+    } finally {
+        DB::purge('download_test');
+        DB::purge('download_writer');
+        DB::setDefaultConnection($originalConnection);
+        File::delete([$database, $database.'-wal', $database.'-shm']);
+    }
+})->with(['individual' => true, 'all files' => false]);

@@ -32,6 +32,10 @@ use Illuminate\Support\Str;
  * @property ?CarbonInterface $last_downloaded_at
  * @property ?CarbonInterface $revoked_at
  * @property ?CarbonInterface $purged_at
+ * @property ?string $archive_status
+ * @property ?string $archive_path
+ * @property int $archive_progress
+ * @property ?CarbonInterface $archive_requested_at
  * @property CarbonInterface $created_at
  * @property CarbonInterface $updated_at
  * @property-read User $user
@@ -39,7 +43,7 @@ use Illuminate\Support\Str;
  * @property-read Collection<int, Team> $teams
  */
 #[Guarded(['id'])]
-#[Hidden(['token'])]
+#[Hidden(['token', 'archive_path'])]
 final class Transfer extends Model
 {
     /** @use HasFactory<TransferFactory> */
@@ -95,6 +99,8 @@ final class Transfer extends Model
             'last_downloaded_at' => 'datetime',
             'revoked_at' => 'datetime',
             'purged_at' => 'datetime',
+            'archive_requested_at' => 'datetime',
+            'archive_progress' => 'integer',
         ];
     }
 }

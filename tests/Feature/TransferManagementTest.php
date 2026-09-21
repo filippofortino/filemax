@@ -7,6 +7,7 @@ use App\Models\Team;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -72,6 +73,24 @@ it('revokes immediately and queues idempotent physical deletion', function (): v
     $this->deleteJson(route('transfers.destroy', $transfer))->assertOk();
     expect($transfer->refresh()->revoked_at->equalTo($revokedAt))->toBeTrue();
     Queue::assertPushed(PurgeTransfer::class);
+});
+
+it('revokes and changes sharing immediately while an archive holds the byte lock', function (): void {
+    Queue::fake();
+    $transfer = Transfer::factory()->create(['visibility' => 'teams']);
+    $teams = Team::factory()->count(2)->create();
+    $transfer->user->teams()->attach($teams);
+    $transfer->teams()->attach($teams[0]);
+    $lock = Cache::lock('transfer-bytes:'.$transfer->id, 3700);
+    $lock->get();
+    try {
+        $this->actingAs($transfer->user)->patchJson(route('transfers.update', $transfer), ['team_ids' => [$teams[1]->id]])->assertOk();
+        expect($transfer->teams()->pluck('teams.id')->all())->toBe([$teams[1]->id]);
+        $this->deleteJson(route('transfers.destroy', $transfer))->assertOk();
+        expect($transfer->refresh()->isAvailable())->toBeFalse();
+    } finally {
+        $lock->release();
+    }
 });
 
 it('preserves a title consisting of zero', function (): void {

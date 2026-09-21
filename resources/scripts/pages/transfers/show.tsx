@@ -7,7 +7,7 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
-import { FileDownload } from '@/components/downloads';
+import { DownloadAll, FileDownload } from '@/components/downloads';
 import {
     CopyLink,
     ErrorMessage,
@@ -349,6 +349,13 @@ export default function Show({
                             </div>
                         </div>
                         <div className="detail-actions flex flex-col gap-2">
+                            {transfer.available && (
+                                <DownloadAll
+                                    token={transfer.token}
+                                    totalSize={transfer.total_size}
+                                    onDownload={refresh}
+                                />
+                            )}
                             {!transfer.revoked_at && (
                                 <Dialog
                                     open={deleteOpen}

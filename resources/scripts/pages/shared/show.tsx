@@ -1,5 +1,5 @@
 import { Head } from '@inertiajs/react';
-import { FileDownload } from '@/components/downloads';
+import { DownloadAll, FileDownload } from '@/components/downloads';
 import { FileRow, Shell } from '@/components/filemax';
 import { date, initials } from '@/lib/format';
 
@@ -47,6 +47,10 @@ export default function SharedTransferPage({
                             </p>
                         )}
                     </div>
+                    <DownloadAll
+                        token={transfer.token}
+                        totalSize={transfer.total_size}
+                    />
                     <ul className="border-y border-border">
                         {transfer.files.map((file) => (
                             <li key={file.id}>
