@@ -13,14 +13,12 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class SharedTransferController
 {
-    public function show(Request $request, string $token): Response
+    public function show(Request $request, Transfer $transfer): Response
     {
-        $transfer = Transfer::query()->where('token', $token)->first();
-
-        if (! $transfer || ! $transfer->isAvailable()) {
+        if (! $transfer->isAvailable()) {
             return Inertia::render('shared/unavailable', [
-                'reason' => $transfer?->revoked_at ? 'deleted' : ($transfer?->expires_at?->lte(now()) ? 'expired' : 'unavailable'),
-            ])->toResponse($request)->setStatusCode($transfer ? 410 : 404);
+                'reason' => $transfer->revoked_at ? 'deleted' : ($transfer->expires_at?->lte(now()) ? 'expired' : 'unavailable'),
+            ])->toResponse($request)->setStatusCode(410);
         }
 
         if ($transfer->visibility === 'teams' && ! $request->user()) {
@@ -28,12 +26,12 @@ final class SharedTransferController
         }
 
         if (! Gate::forUser($request->user())->allows('download', $transfer)) {
-            $request->session()->put('url.intended', route('shared.show', $token));
+            $request->session()->put('url.intended', route('shared.show', $transfer->token));
 
             return Inertia::render('shared/denied', [
                 'sender' => $transfer->user()->first(['name', 'email']),
-                'token' => $token,
-                'url' => route('shared.show', $token),
+                'token' => $transfer->token,
+                'url' => route('shared.show', $transfer->token),
                 'own_teams' => $request->user()?->teams()->get(['teams.id', 'teams.name'])->map->only(['id', 'name']) ?? [],
                 'requires_verification' => ! $request->user()?->hasVerifiedEmail(),
             ])->toResponse($request)->setStatusCode(403);

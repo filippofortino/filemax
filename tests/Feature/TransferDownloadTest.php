@@ -109,7 +109,10 @@ it('blocks expiry, deletion, missing tokens and foreign file ids without countin
     Storage::disk('local')->put($file->path, 'test');
 
     $this->postJson(route('shared.files.download', [$transfer->token, $foreign]))->assertNotFound();
-    $this->get(route('shared.show', 'missing'))->assertNotFound();
+    $this->get(route('shared.show', 'missing'))->assertNotFound()->assertInertia(fn (Assert $page): Assert => $page
+        ->component('shared/unavailable', false)
+        ->where('reason', 'unavailable'));
+    $this->get(route('shared.show', $transfer->id))->assertNotFound();
     $transfer->update(['expires_at' => now()]);
     $this->postJson(route('shared.files.download', [$transfer->token, $file]))->assertGone();
     $this->get(route('shared.show', $transfer->token))->assertGone();
