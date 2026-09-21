@@ -8,7 +8,8 @@ it('shows the sign in form to guests', function (): void {
     visit('/')->assertSee('Sign in')->assertSee('Create an account')->assertNoJavascriptErrors();
 });
 
-it('welcomes verified staff', function (): void {
+it('shows the new transfer form to verified staff', function (): void {
     $this->actingAs(User::factory()->create());
-    visit('/')->assertSee('Welcome')->assertNoJavascriptErrors();
+    visit('/')->assertSee('Drop files here')->assertSee('Transfer details')
+        ->assertSee('7 days')->assertDontSee('Once downloaded')->assertNoJavascriptErrors();
 });

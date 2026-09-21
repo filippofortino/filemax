@@ -39,7 +39,7 @@ it('signs in and signs out through the account menu', function (): void {
         ->fill('email', $user->email)
         ->fill('password', 'password')
         ->press('form button[data-slot="button"]')
-        ->assertSee('Welcome')
+        ->assertSee('Transfer details')
         ->click('[aria-label="Account menu"]')
         ->click('Sign out')
         ->assertSee('Forgot password?')

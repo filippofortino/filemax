@@ -28,4 +28,10 @@ final class Team extends Model
     {
         return $this->belongsToMany(User::class);
     }
+
+    /** @return BelongsToMany<Transfer, $this> */
+    public function transfers(): BelongsToMany
+    {
+        return $this->belongsToMany(Transfer::class);
+    }
 }
