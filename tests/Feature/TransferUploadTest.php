@@ -49,6 +49,11 @@ it('uploads privately and publishes idempotently using actual bytes', function (
     expect($second->json('transfer.expires_at'))->toBe($first->json('transfer.expires_at'));
     expect(Storage::disk('local')->get(TransferFile::query()->findOrFail($fileId)->path))->toBe('hello');
     expect(Transfer::query()->findOrFail($id)->expires_at->toDateTimeString())->toBe(now()->addDays(7)->toDateTimeString());
+    $this->postJson(route('transfers.uploads.sign', [$id, $fileId, 1]))->assertConflict();
+    putTransferPart($id, $fileId, 'retry')->assertConflict();
+    $this->postJson(route('transfers.uploads.complete', [$id, $fileId]))->assertConflict();
+    $this->deleteJson(route('transfers.uploads.remove', [$id, $fileId]))->assertConflict();
+    expect(Storage::disk('local')->get(TransferFile::query()->findOrFail($fileId)->path))->toBe('hello');
 });
 
 it('keeps completed files and valid parts after a failed middle file', function (): void {
@@ -103,15 +108,32 @@ it('revalidates memberships when publishing without losing completed bytes', fun
     $this->postJson(route('transfers.uploads.finalize', $id))->assertOk();
 });
 
-it('blocks completion and publication after cancellation', function (): void {
+it('blocks upload changes and publication after cancellation', function (): void {
     Queue::fake();
     $response = $this->postJson(route('transfers.store'), transferUploadPayload())->assertCreated();
     $id = $response->json('transfer.id');
     $fileId = $response->json('transfer.files.0.id');
     putTransferPart($id, $fileId, 'hello')->assertOk();
     $this->deleteJson(route('transfers.destroy', $id))->assertOk();
+    $this->postJson(route('transfers.uploads.sign', [$id, $fileId, 1]))->assertGone();
+    putTransferPart($id, $fileId, 'retry')->assertGone();
     $this->postJson(route('transfers.uploads.complete', [$id, $fileId]))->assertGone();
+    $this->deleteJson(route('transfers.uploads.remove', [$id, $fileId]))->assertGone();
     $this->postJson(route('transfers.uploads.finalize', $id))->assertGone();
+});
+
+it('requires ownership for every upload resource', function (): void {
+    $transfer = Transfer::factory()->uploading()->create();
+    $file = TransferFile::factory()->for($transfer)->create(['status' => 'uploading']);
+
+    $this->postJson(route('transfers.uploads.sign', [$transfer, $file, 1]))->assertForbidden();
+    putTransferPart($transfer->id, $file->id, 'test')->assertForbidden();
+    $this->postJson(route('transfers.uploads.complete', [$transfer, $file]))->assertForbidden();
+    $this->deleteJson(route('transfers.uploads.remove', [$transfer, $file]))->assertForbidden();
+    $this->postJson(route('transfers.uploads.finalize', $transfer))->assertForbidden();
+
+    expect($file->fresh())->not->toBeNull();
+    expect($transfer->refresh()->status)->toBe('uploading');
 });
 
 it('rejects foreign file identifiers and forged byte sizes', function (): void {
@@ -119,6 +141,9 @@ it('rejects foreign file identifiers and forged byte sizes', function (): void {
     $id = $response->json('transfer.id');
     $foreign = TransferFile::factory()->create();
     $this->postJson(route('transfers.uploads.sign', [$id, $foreign, 1]))->assertNotFound();
+    putTransferPart($id, $foreign->id, 'test')->assertNotFound();
+    $this->postJson(route('transfers.uploads.complete', [$id, $foreign]))->assertNotFound();
+    $this->deleteJson(route('transfers.uploads.remove', [$id, $foreign]))->assertNotFound();
     putTransferPart($id, $response->json('transfer.files.0.id'), 'too many bytes')->assertUnprocessable();
 });
 

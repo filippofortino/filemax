@@ -2,13 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\TransferUploadController;
-
 arch()->preset()->php();
 arch()->preset()->strict();
-arch()->preset()->laravel()->ignoring([
-    TransferUploadController::class,
-]);
+arch()->preset()->laravel();
 arch()->preset()->security()->ignoring([
     'assert',
 ]);
