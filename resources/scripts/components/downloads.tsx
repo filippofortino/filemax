@@ -150,7 +150,7 @@ export function FileDownload({
         setError('');
         try {
             const result = await request<{ url: string }>(
-                downloadFile.url({ token, file: fileId }),
+                downloadFile.url({ transfer: token, file: fileId }),
                 csrf_token,
                 'POST',
                 undefined,

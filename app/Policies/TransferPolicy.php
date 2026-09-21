@@ -6,6 +6,7 @@ namespace App\Policies;
 
 use App\Models\Transfer;
 use App\Models\User;
+use Illuminate\Auth\Access\Response;
 
 final class TransferPolicy
 {
@@ -29,10 +30,10 @@ final class TransferPolicy
         return $this->view($user, $transfer);
     }
 
-    public function download(?User $user, Transfer $transfer): bool
+    public function download(?User $user, Transfer $transfer): bool|Response
     {
         if (! $transfer->isAvailable()) {
-            return false;
+            return Response::denyWithStatus(410);
         }
 
         if ($transfer->visibility === 'public') {

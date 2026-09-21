@@ -209,7 +209,7 @@ it('counts a download once when an archive worker updates SQLite during authoriz
         $authorizationReads = 0;
 
         DB::listen(function (QueryExecuted $query) use ($transfer, &$authorizationReads): void {
-            if ($query->connectionName === 'download_test' && str_starts_with($query->sql, 'select * from "transfers" where "token"')) {
+            if ($query->connectionName === 'download_test' && $query->connection->transactionLevel() > 0 && str_starts_with($query->sql, 'select * from "transfers" where "transfers"."id"')) {
                 $authorizationReads++;
                 if ($authorizationReads === 1) {
                     DB::connection('download_writer')->table('transfers')->where('id', $transfer->id)->update(['archive_progress' => 40]);
