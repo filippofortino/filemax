@@ -10,7 +10,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.5.0",
-        "aws/aws-sdk-php": "^3.395",
+        "aws/aws-sdk-php": "^3.395.7",
         "inertiajs/inertia-laravel": "^3.3.4",
         "laravel/fortify": "^1.39",
         "laravel/framework": "^13.32.0",
