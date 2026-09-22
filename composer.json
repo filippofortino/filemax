@@ -11,9 +11,11 @@
     "require": {
         "php": "^8.5.0",
         "inertiajs/inertia-laravel": "^3.3.4",
+        "laravel/fortify": "^1.39",
         "laravel/framework": "^13.32.0",
         "laravel/octane": "^2.19.1",
         "laravel/wayfinder": "^0.1.21",
+        "league/flysystem-aws-s3-v3": "^3.35",
         "nunomaduro/essentials": "^1.2.0"
     },
     "require-dev": {
@@ -57,7 +59,7 @@
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "bunx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"bun run dev\" --names=server,queue,logs,vite --kill-others"
+            "bunx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=3 --timeout=3600\" \"php artisan pail --timeout=0\" \"bun run dev\" --names=server,queue,logs,vite --kill-others"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

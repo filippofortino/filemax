@@ -1,0 +1,251 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Models\Team;
+use App\Models\Transfer;
+use App\Models\User;
+use Illuminate\Support\Facades\Storage;
+
+it('uses the current XSRF cookie only for same-origin upload requests', function (bool $external): void {
+    Storage::fake('local');
+    config(['filemax.disk' => 'local']);
+    $this->actingAs(User::factory()->create());
+    $page = visit('/')->assertSee('Browse files');
+    $page->script('window.externalUpload = '.($external ? 'true' : 'false'));
+    $page->script(<<<'JS'
+() => {
+    const data = new DataTransfer(); data.items.add(new File(['hello'], 'csrf.txt'));
+    document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    const fetch = window.fetch;
+    window.jsonCsrfChecks = [];
+    window.uploadHeaders = {};
+    window.fetch = async (url, options) => {
+        const cookie = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/)?.[1];
+        window.jsonCsrfChecks.push(Boolean(cookie) && options.headers['X-XSRF-TOKEN'] === decodeURIComponent(cookie) && !options.headers['X-CSRF-TOKEN']);
+        const response = await fetch(url, options);
+        const body = await response.clone().json();
+        if ('completed' in body) {
+            document.cookie = 'XSRF-TOKEN=rotated%2Btoken; path=/';
+            if (window.externalUpload) return Response.json({...body, url: 'https://uploads.example.test/object'});
+        }
+        return response;
+    };
+    const setHeader = XMLHttpRequest.prototype.setRequestHeader;
+    XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
+        window.uploadHeaders[name] = value;
+        return setHeader.call(this, name, value);
+    };
+    const send = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function(body) {
+        if (body instanceof Blob) { this.dispatchEvent(new ProgressEvent('error')); return; }
+        return send.call(this, body);
+    };
+}
+JS);
+    $page->press('Create transfer')->assertSee('Some files could not be uploaded.')->assertNoJavascriptErrors();
+
+    expect($page->script('() => window.jsonCsrfChecks.length > 0 && window.jsonCsrfChecks.every(Boolean)'))->toBeTrue()
+        ->and($page->script("() => window.uploadHeaders['X-CSRF-TOKEN'] ?? null"))->toBeNull()
+        ->and($page->script("() => window.uploadHeaders['X-XSRF-TOKEN'] ?? null"))->toBe($external ? null : 'rotated+token');
+})->with(['local upload' => false, 'object storage upload' => true]);
+
+it('recovers a failed multi-file upload while preserving finished files and sharing', function (): void {
+    Storage::fake('local');
+    config(['filemax.disk' => 'local']);
+    $user = User::factory()->create(['name' => 'Filippo Fortino']);
+    $team = Team::factory()->create(['name' => 'Mediamax']);
+    $user->teams()->attach($team);
+    $this->actingAs($user);
+    $page = visit('/')->resize(1280, 940)->assertSee('Drop files here');
+    $page->script('() => document.fonts.ready');
+    $page->screenshot(filename: 'upload-empty');
+    $page->fill('#transfer-title', 'Spot autunno — materiali finali')->fill('#transfer-message', 'Ciao Marco, qui i materiali approvati.');
+    $page->click('Specific teams')->click('[aria-label="Choose teams"]')->check('[aria-label="Mediamax"]')->keys('#team-search', 'Escape');
+    $page->script(<<<'JS'
+() => {
+    const data = new DataTransfer();
+    data.items.add(new File(['hello'], 'Brief_Campagna_Q4.pdf'));
+    data.items.add(new File([new Uint8Array(1024)], 'Lenergy_Spot30s_v3.mp4'));
+    data.items.add(new File(['visual'], 'Keyvisual_Autunno_2026.psd'));
+    document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    const original = XMLHttpRequest.prototype.send;
+    let sent = 0;
+    window.uploadPutCount = 0;
+    XMLHttpRequest.prototype.send = function(body) {
+        if (body instanceof Blob) {
+            window.uploadPutCount++;
+            sent++;
+            if (sent === 2) { window.failUpload = () => this.dispatchEvent(new ProgressEvent('error')); return; }
+        }
+        return original.call(this, body);
+    };
+}
+JS);
+    $page->assertSee('Lenergy_Spot30s_v3.mp4')->screenshot(filename: 'upload-teams-selected');
+
+    foreach ([390, 768] as $width) {
+        $page->resize($width, 940);
+        expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+        $page->screenshot(filename: 'upload-'.$width);
+    }
+
+    $page->resize(1280, 940)->press('Create transfer')->assertSee('Uploading…')
+        ->assertVisible('progress[aria-label="Overall upload progress"]')
+        ->assertVisible('progress[aria-label="Uploading Lenergy_Spot30s_v3.mp4"]');
+    $page->screenshot(filename: 'upload-progress');
+    $page->script('() => new Promise(resolve => { const timer = setInterval(() => { if (window.failUpload) { clearInterval(timer); window.failUpload(); resolve(true); } }, 20); })');
+    $page->assertSee('A little interruption')->assertSee('Some files could not be uploaded.');
+    $page->screenshot(filename: 'upload-failed');
+    expect(Transfer::query()->sole()->status)->toBe('uploading');
+    $page->press('Retry and create link')->assertSee('Your link is ready')->assertNoJavascriptErrors();
+    $page->screenshot(filename: 'upload-ready');
+    expect($page->script('() => window.uploadPutCount'))->toBe(4);
+    $transfer = Transfer::query()->sole();
+    expect($transfer->status)->toBe('ready')->and($transfer->teams()->sole()->id)->toBe($team->id);
+    expect($transfer->files()->count())->toBe(3);
+    expect(Storage::disk('local')->size($transfer->files()->where('position', 1)->sole()->path))->toBe(1024);
+    $page->click('View transfer')->assertSee('Downloads')->assertSee('Not opened yet')->assertSee('No download clicks yet.');
+    $page->screenshot(filename: 'transfer-detail-unopened');
+    $page->click('My transfers')->assertSee('1 transfers')->assertSee('Spot autunno');
+    $page->screenshot(filename: 'transfer-history');
+});
+
+it('keeps upload cancellation disabled until the draft has been revoked', function (): void {
+    Storage::fake('local');
+    $this->actingAs(User::factory()->create());
+    $page = visit('/')->assertSee('Browse files');
+    $page->script(<<<'JS'
+() => {
+    const data = new DataTransfer(); data.items.add(new File(['hello'], 'cancel.txt'));
+    document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    const send = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function(body) { if (body instanceof Blob) return; return send.call(this, body); };
+    const fetch = window.fetch;
+    window.fetch = async (url, options) => {
+        if (options?.method === 'DELETE') { await new Promise(resolve => { window.releaseDelete = resolve; }); }
+        return fetch(url, options);
+    };
+    window.leavePrompts = 0;
+    window.confirm = () => { window.leavePrompts++; return false; };
+}
+JS);
+    $page->press('Create transfer')->assertSee('Cancel upload')->press('Cancel upload');
+    expect($page->script('() => document.querySelector("button[type=submit]").disabled'))->toBeTrue();
+    $page->script('() => window.releaseDelete()');
+    $page->assertSee('Drop files here')->assertNoJavascriptErrors();
+    expect(Transfer::query()->sole()->revoked_at)->not->toBeNull();
+    $page->click('My transfers')->assertSee('No transfers yet');
+    expect($page->script('() => window.leavePrompts'))->toBe(0);
+});
+
+it('asks before leaving an unfinished upload and respects the choice', function (bool $leave): void {
+    Storage::fake('local');
+    config(['filemax.disk' => 'local']);
+    $this->actingAs(User::factory()->create());
+    $page = visit('/')->assertSee('Browse files');
+    $page->script(<<<'JS'
+() => {
+    const data = new DataTransfer();
+    data.items.add(new File(['finished'], 'finished.txt'));
+    data.items.add(new File(['pending'], 'pending.txt'));
+    document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    const send = XMLHttpRequest.prototype.send;
+    let uploads = 0;
+    XMLHttpRequest.prototype.send = function(body) {
+        if (body instanceof Blob && ++uploads === 2) {
+            window.resumeUpload = () => send.call(this, body);
+            return;
+        }
+        return send.call(this, body);
+    };
+    window.leavePrompts = 0;
+    window.allowNavigation = false;
+    window.confirm = () => { window.leavePrompts++; return window.allowNavigation; };
+}
+JS);
+    $page->press('Create transfer')->assertSee('Done')->assertSee('Cancel upload');
+    expect(Transfer::query()->sole()->files()->where('status', 'ready')->count())->toBe(1);
+
+    if ($leave) {
+        $page->script('() => { window.allowNavigation = true; }');
+    }
+
+    $page->click('My transfers');
+    expect($page->script('() => window.leavePrompts'))->toBe(1);
+
+    if ($leave) {
+        $page->assertSee('No transfers yet')->click('nav a:has-text("New transfer")')->assertSee('Drop files here')->assertDontSee('finished.txt');
+        expect(Transfer::query()->sole()->status)->toBe('uploading');
+    } else {
+        $page->assertSee('Cancel upload')->assertSee('finished.txt')->assertSee('pending.txt');
+        $page->script('() => window.resumeUpload()');
+        $page->assertSee('Your link is ready')->click('View transfer')->assertSee('Downloads');
+        expect(Transfer::query()->sole()->status)->toBe('ready');
+    }
+
+    expect($page->script('() => window.leavePrompts'))->toBe(1);
+    $page->assertNoJavascriptErrors();
+})->with(['stay' => false, 'leave' => true]);
+
+it('guards navigation while the upload draft is being created', function (): void {
+    Storage::fake('local');
+    config(['filemax.disk' => 'local']);
+    $this->actingAs(User::factory()->create());
+    $page = visit('/')->assertSee('Browse files');
+    $page->script(<<<'JS'
+() => {
+    const data = new DataTransfer(); data.items.add(new File(['hello'], 'draft.txt'));
+    document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    const fetch = window.fetch;
+    window.fetch = async (url, options) => {
+        if (options?.method === 'POST' && new URL(url, location.href).pathname === '/transfers') {
+            await new Promise(resolve => { window.resumeDraft = resolve; });
+        }
+        return fetch(url, options);
+    };
+    window.leavePrompts = 0;
+    window.confirm = () => { window.leavePrompts++; return false; };
+}
+JS);
+    $page->press('Create transfer')->assertSee('Uploading…')->click('My transfers')->assertSee('Uploading…')->assertSee('draft.txt');
+    expect($page->script('() => window.leavePrompts'))->toBe(1);
+    expect(Transfer::query()->count())->toBe(0);
+
+    $page->script('() => window.resumeDraft()');
+    $page->assertSee('Your link is ready')->click('Send another')->assertSee('Drop files here')->assertNoJavascriptErrors();
+    expect($page->script('() => window.leavePrompts'))->toBe(1);
+    expect(Transfer::query()->sole()->status)->toBe('ready');
+});
+
+it('can repair sharing after losing membership during an upload', function (): void {
+    Storage::fake('local');
+    $user = User::factory()->create();
+    $oldTeam = Team::factory()->create(['name' => 'Old team']);
+    $newTeam = Team::factory()->create(['name' => 'New team']);
+    $user->teams()->attach([$oldTeam->id, $newTeam->id]);
+    $this->actingAs($user);
+    $page = visit('/')->click('Specific teams')->click('[aria-label="Choose teams"]')->check('[aria-label="Old team"]')->keys('#team-search', 'Escape');
+    $page->script(<<<'JS'
+() => {
+    const data = new DataTransfer(); data.items.add(new File(['hello'], 'repair.txt'));
+    document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+    const send = XMLHttpRequest.prototype.send;
+    window.uploadPutCount = 0;
+    XMLHttpRequest.prototype.send = function(body) {
+        if (body instanceof Blob) { window.uploadPutCount++; window.resumeUpload = () => send.call(this, body); return; }
+        return send.call(this, body);
+    };
+    window.leavePrompts = 0;
+    window.confirm = () => { window.leavePrompts++; return false; };
+}
+JS);
+    $page->press('Create transfer')->assertSee('Uploading…');
+    $user->teams()->detach($oldTeam);
+    $page->script('() => new Promise(resolve => { const timer = setInterval(() => { if (window.resumeUpload) { clearInterval(timer); window.resumeUpload(); resolve(true); } }, 20); })');
+    $page->assertSee('Ready to finish')->assertSee('Select at least one');
+    $page->click('[aria-label="Choose teams"]')->check('[aria-label="New team"]')->keys('#team-search', 'Escape')->press('Retry and create link')->assertSee('Your link is ready')->assertNoJavascriptErrors();
+    expect(Transfer::query()->sole()->teams()->sole()->id)->toBe($newTeam->id);
+    expect($page->script('() => window.uploadPutCount'))->toBe(1);
+    expect($page->script('() => window.leavePrompts'))->toBe(0);
+});

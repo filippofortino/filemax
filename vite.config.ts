@@ -71,12 +71,19 @@ export default defineConfig({
             input: ['resources/scripts/app.tsx'],
             refresh: true,
             fonts: [
-                bunny('Instrument Sans', {
-                    weights: [400, 500, 600],
+                bunny('DM Sans', {
+                    weights: [400, 500, 600, 700],
+                    preload: [{ weight: 400 }],
+                    optimizedFallbacks: false,
+                }),
+                bunny('Bricolage Grotesque', {
+                    weights: [400, 500, 700],
+                    preload: [{ weight: 700 }],
+                    optimizedFallbacks: false,
                 }),
             ],
         }),
-        inertia(),
+        inertia({ ssr: { sourcemap: false } }),
         react(),
         tailwindcss(),
         wayfinder({

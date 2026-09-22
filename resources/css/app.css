@@ -1,8 +1,112 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
-@source '../**/*.blade.php';
-@source '../**/*.js';
-@source '../**/*.vue';
 @source '../scripts/**/*.{ts,tsx}';
+
+@theme inline {
+    --font-sans: 'DM Sans', system-ui, sans-serif;
+    --font-heading: 'Bricolage Grotesque', system-ui, sans-serif;
+    --color-background: var(--color-white);
+    --color-foreground: var(--color-slate-900);
+    --color-primary: #2140e0;
+    --color-primary-foreground: var(--color-white);
+    --color-muted: var(--color-slate-100);
+    --color-muted-foreground: var(--color-slate-600);
+    --color-border: var(--color-slate-200);
+    --color-input: var(--color-slate-300);
+    --color-ring: var(--color-primary);
+    --color-popover: var(--color-white);
+    --color-popover-foreground: var(--color-slate-900);
+    --color-card: var(--color-white);
+    --color-card-foreground: var(--color-slate-900);
+    --color-accent: var(--color-blue-50);
+    --color-accent-foreground: var(--color-primary);
+    --color-destructive: var(--color-red-700);
+    --color-secondary: var(--color-slate-100);
+    --color-secondary-foreground: var(--color-slate-900);
+}
+
+@layer base {
+    *,
+    ::before,
+    ::after {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background font-sans text-sm text-foreground;
+    }
+
+    button:not(:disabled),
+    summary {
+        @apply cursor-pointer;
+    }
+
+    a {
+        @apply text-primary hover:text-primary/90;
+    }
+
+    h1,
+    h2,
+    h3 {
+        @apply font-heading font-bold tracking-tight wrap-anywhere;
+    }
+
+    h1 {
+        @apply text-3xl;
+    }
+
+    h2 {
+        @apply text-2xl;
+    }
+
+    h3 {
+        @apply text-lg;
+    }
+
+    input:not([type='checkbox']):not([type='radio']):not([type='file']):not(
+            [type='hidden']
+        ),
+    select,
+    textarea {
+        @apply h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-base text-foreground placeholder:text-slate-400 disabled:bg-muted disabled:text-muted-foreground aria-invalid:border-destructive;
+    }
+
+    textarea {
+        @apply h-auto min-h-24 resize-y py-3;
+    }
+
+    input[type='checkbox'],
+    input[type='radio'] {
+        @apply size-4 shrink-0 accent-primary;
+    }
+
+    :focus-visible {
+        @apply outline-2 outline-offset-2 outline-ring;
+    }
+
+    progress {
+        @apply h-2 w-full appearance-none overflow-hidden rounded-full border-0 bg-slate-200;
+    }
+
+    progress::-webkit-progress-bar {
+        @apply bg-slate-200;
+    }
+
+    progress::-webkit-progress-value {
+        @apply rounded-full bg-primary;
+    }
+
+    progress::-moz-progress-bar {
+        @apply rounded-full bg-primary;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        @apply animate-none! transition-none!;
+    }
+}
