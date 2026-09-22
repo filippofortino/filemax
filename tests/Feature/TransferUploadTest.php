@@ -196,13 +196,13 @@ function fakeRemoteTransferStorage(array $results): MockInterface&AwsS3V3Adapter
     return $disk;
 }
 
-it('signs direct multipart requests and verifies provider-listed bytes before completion', function (): void {
+it('signs direct multipart requests and verifies provider-listed bytes before completion', function (int|string $partSize): void {
     $transfer = Transfer::factory()->uploading()->create(['user_id' => auth()->id()]);
     $file = TransferFile::factory()->for($transfer)->create(['status' => 'uploading', 'size' => 5]);
     $disk = fakeRemoteTransferStorage([
         new Result(['UploadId' => 'upload-1']),
         new Result(['Parts' => [], 'IsTruncated' => false]),
-        new Result(['Parts' => [['PartNumber' => 1, 'Size' => 5, 'ETag' => 'etag-1']], 'IsTruncated' => false]),
+        new Result(['Parts' => [['PartNumber' => 1, 'Size' => $partSize, 'ETag' => 'etag-1']], 'IsTruncated' => false]),
         new Result(),
     ]);
     $signed = $this->postJson(route('transfers.uploads.sign', [$transfer, $file, 1]))->assertOk()->assertJsonPath('completed', false);
@@ -214,7 +214,7 @@ it('signs direct multipart requests and verifies provider-listed bytes before co
     $disk->shouldReceive('deleteDirectory')->andReturn(true);
     $this->postJson(route('transfers.uploads.complete', [$transfer, $file]))->assertOk()->assertJsonPath('file.status', 'ready');
     expect($file->refresh()->upload_id)->toBeNull();
-});
+})->with(['integer size' => 5, 'string size' => '5']);
 
 it('keeps the upload identifier after a provider error so retry does not orphan parts', function (): void {
     $transfer = Transfer::factory()->uploading()->create(['user_id' => auth()->id()]);
@@ -222,21 +222,32 @@ it('keeps the upload identifier after a provider error so retry does not orphan 
     fakeRemoteTransferStorage([
         new Result(['UploadId' => 'upload-retry']),
         new S3Exception('Private provider diagnostics', new Command('ListParts')),
-        new Result(['Parts' => [['PartNumber' => 1, 'Size' => 5, 'ETag' => 'etag-1']], 'IsTruncated' => false]),
+        new Result(['Parts' => [['PartNumber' => 1, 'Size' => '5', 'ETag' => 'etag-1']], 'IsTruncated' => false]),
     ]);
     $this->postJson(route('transfers.uploads.sign', [$transfer, $file, 1]))->assertStatus(503)->assertDontSee('Private provider diagnostics');
     expect($file->refresh()->upload_id)->toBe('upload-retry');
     $this->postJson(route('transfers.uploads.sign', [$transfer, $file, 1]))->assertOk()->assertJsonPath('completed', true);
 });
 
-it('rejects wrong provider part sizes and respects provider part limits', function (): void {
+it('rejects wrong provider part sizes and respects provider part limits', function (int|string $partSize): void {
     $transfer = Transfer::factory()->uploading()->create(['user_id' => auth()->id()]);
     $file = TransferFile::factory()->for($transfer)->create(['status' => 'uploading', 'size' => 5, 'upload_id' => 'upload-1']);
-    $disk = fakeRemoteTransferStorage([new Result(['Parts' => [['PartNumber' => 1, 'Size' => 4, 'ETag' => 'wrong-size']], 'IsTruncated' => false])]);
+    $disk = fakeRemoteTransferStorage([new Result(['Parts' => [['PartNumber' => 1, 'Size' => $partSize, 'ETag' => 'wrong-size']], 'IsTruncated' => false])]);
     $disk->shouldReceive('exists')->with($file->path)->andReturn(false);
     $this->postJson(route('transfers.uploads.complete', [$transfer, $file]))->assertUnprocessable();
     $storage = resolve(TransferStorage::class);
     $size = 5492189429760;
     expect((int) ceil($size / $storage->partSize($size)))->toBeLessThanOrEqual(10000);
     expect(fn () => $storage->partSize($size + 1))->toThrow(ValidationException::class);
-});
+})->with(['integer size' => 4, 'string size' => '4']);
+
+it('rejects malformed provider part sizes without completing the upload', function (mixed $partSize): void {
+    $transfer = Transfer::factory()->uploading()->create(['user_id' => auth()->id()]);
+    $file = TransferFile::factory()->for($transfer)->create(['status' => 'uploading', 'size' => 5, 'upload_id' => 'upload-1']);
+    $disk = fakeRemoteTransferStorage([new Result(['Parts' => [['PartNumber' => 1, 'Size' => $partSize, 'ETag' => 'etag-1']], 'IsTruncated' => false])]);
+    $disk->shouldReceive('exists')->with($file->path)->andReturn(false);
+
+    $this->postJson(route('transfers.uploads.complete', [$transfer, $file]))->assertStatus(503);
+    expect($file->refresh()->status)->toBe('uploading')
+        ->and($file->upload_id)->toBe('upload-1');
+})->with(['5bytes', '5.5', '5e0', '-5', '9223372036854775808', null, true, 5.5]);

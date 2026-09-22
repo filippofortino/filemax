@@ -256,6 +256,10 @@ final class TransferStorage
 
         $parts = [];
         foreach ($rawParts as $part) {
+            if (is_array($part) && is_string($part['Size'] ?? null)) {
+                $part['Size'] = filter_var($part['Size'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+            }
+
             throw_if(! is_array($part) || ! is_int($part['PartNumber'] ?? null) || ! is_int($part['Size'] ?? null) || ! is_string($part['ETag'] ?? null), TransferStorageException::class, 'Storage returned an invalid upload part.');
 
             $parts[] = ['PartNumber' => $part['PartNumber'], 'Size' => $part['Size'], 'ETag' => $part['ETag']];
