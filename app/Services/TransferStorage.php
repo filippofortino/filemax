@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Psr\Http\Message\StreamInterface;
+use Throwable;
 
 final class TransferStorage
 {
@@ -44,6 +46,124 @@ final class TransferStorage
     public function disk(): FilesystemAdapter
     {
         return Storage::disk(Config::string('filemax.disk', 'local'));
+    }
+
+    /** @return resource */
+    public function readStream(TransferFile $file): mixed
+    {
+        if ($this->isRemote()) {
+            $body = $this->client()->getObject($this->archiveObjectArguments($file->path) + ['@http' => ['stream' => true]])['Body'];
+            throw_unless($body instanceof StreamInterface, TransferStorageException::class, 'Could not read a transfer file.');
+            $stream = $body->detach();
+        } else {
+            $stream = $this->disk()->readStream($file->path);
+        }
+
+        throw_unless(is_resource($stream), TransferStorageException::class, 'Could not read a transfer file.');
+
+        return $stream;
+    }
+
+    public function abortArchiveUploads(string $path): void
+    {
+        if (! $this->isRemote()) {
+            return;
+        }
+
+        $object = $this->archiveObjectArguments($path);
+        $arguments = ['Bucket' => $object['Bucket'], 'Prefix' => $object['Key']];
+
+        do {
+            $result = $this->client()->listMultipartUploads($arguments);
+            $uploads = $result['Uploads'] ?? [];
+            throw_unless(is_array($uploads), TransferStorageException::class, 'Storage returned invalid archive uploads.');
+
+            foreach ($uploads as $upload) {
+                throw_unless(is_array($upload) && is_string($upload['Key'] ?? null) && is_string($upload['UploadId'] ?? null), TransferStorageException::class, 'Storage returned an invalid archive upload.');
+
+                if ($upload['Key'] === $object['Key']) {
+                    $this->abortArchiveUpload($object + ['UploadId' => $upload['UploadId']]);
+                }
+            }
+
+            $more = ($result['IsTruncated'] ?? false) === true;
+            if ($more) {
+                $key = $result['NextKeyMarker'];
+                $uploadId = $result['NextUploadIdMarker'];
+                throw_unless(is_string($key) && is_string($uploadId) && [$key, $uploadId] !== [$arguments['KeyMarker'] ?? null, $arguments['UploadIdMarker'] ?? null], TransferStorageException::class, 'Storage returned invalid archive pagination.');
+                $arguments['KeyMarker'] = $key;
+                $arguments['UploadIdMarker'] = $uploadId;
+            }
+        } while ($more);
+    }
+
+    /** @param callable(callable(string): void): void $write */
+    public function writeArchive(string $path, int $maximumSize, callable $write): void
+    {
+        if (! $this->isRemote()) {
+            $this->writeLocalArchive($path, $write);
+
+            return;
+        }
+
+        $partSize = max(16777216, $this->partSize($maximumSize));
+        $this->abortArchiveUploads($path);
+        $object = $this->archiveObjectArguments($path);
+        $buffer = fopen('php://memory', 'w+b');
+        throw_unless(is_resource($buffer), TransferStorageException::class, 'Could not allocate the archive buffer.');
+        $uploadId = null;
+
+        try {
+            $uploadId = $this->client()->createMultipartUpload($object + ['ContentType' => 'application/zip'])['UploadId'];
+            throw_unless(is_string($uploadId) && $uploadId !== '', TransferStorageException::class, 'Storage did not return an archive upload identifier.');
+            $parts = [];
+            $buffered = 0;
+            $written = 0;
+
+            $upload = function () use ($object, $uploadId, $buffer, &$parts, &$buffered): void {
+                rewind($buffer);
+                $number = count($parts) + 1;
+                throw_if($number > 10000, TransferStorageException::class, 'The archive exceeds the multipart upload limit.');
+                $etag = $this->client()->uploadPart($object + ['UploadId' => $uploadId, 'PartNumber' => $number, 'ContentLength' => $buffered, 'Body' => $buffer])['ETag'];
+                throw_unless(is_string($etag) && $etag !== '', TransferStorageException::class, 'Storage did not return an archive part ETag.');
+                $parts[] = ['PartNumber' => $number, 'ETag' => $etag];
+                throw_unless(ftruncate($buffer, 0) && rewind($buffer), TransferStorageException::class, 'Could not reset the archive buffer.');
+                $buffered = 0;
+            };
+
+            $write(function (string $bytes) use ($buffer, $partSize, $maximumSize, &$buffered, &$written, $upload): void {
+                $length = mb_strlen($bytes, '8bit');
+                $written += $length;
+                throw_if($written > $maximumSize, TransferStorageException::class, 'The archive exceeds its expected size.');
+
+                for ($offset = 0; $offset < $length; $offset += $size) {
+                    $size = min($partSize - $buffered, $length - $offset);
+                    throw_if(fwrite($buffer, mb_substr($bytes, $offset, $size, '8bit')) !== $size, TransferStorageException::class, 'Could not write to the archive buffer.');
+                    $buffered += $size;
+                    if ($buffered === $partSize) {
+                        $upload();
+                    }
+                }
+            });
+
+            if ($buffered > 0 || $parts === []) {
+                $upload();
+            }
+
+            $this->client()->completeMultipartUpload($object + ['UploadId' => $uploadId, 'MultipartUpload' => ['Parts' => $parts]]);
+        } catch (Throwable $throwable) {
+            if (is_string($uploadId) && $uploadId !== '') {
+                try {
+                    $this->abortArchiveUpload($object + ['UploadId' => $uploadId]);
+                } catch (Throwable $cleanupException) {
+                    report($cleanupException);
+                }
+            }
+
+            throw $throwable;
+        } finally {
+            fclose($buffer);
+        }
     }
 
     public function partSize(int $size): int
@@ -167,6 +287,45 @@ final class TransferStorage
         }
 
         throw_unless($this->disk()->deleteDirectory($this->partDirectory($file)), TransferStorageException::class, 'Could not remove upload parts.');
+    }
+
+    /** @param callable(callable(string): void): void $write */
+    private function writeLocalArchive(string $path, callable $write): void
+    {
+        throw_unless($this->disk()->makeDirectory(dirname($path)), TransferStorageException::class, 'Could not create the archive directory.');
+        $stream = fopen($this->disk()->path($path), 'wb');
+        throw_unless(is_resource($stream), TransferStorageException::class, 'Could not create the archive.');
+
+        try {
+            $write(function (string $bytes) use ($stream): void {
+                throw_if(fwrite($stream, $bytes) !== mb_strlen($bytes, '8bit'), TransferStorageException::class, 'Could not write the archive.');
+            });
+        } catch (Throwable $throwable) {
+            $this->disk()->delete($path);
+
+            throw $throwable;
+        } finally {
+            fclose($stream);
+        }
+    }
+
+    /** @param array{Bucket: string, Key: string, UploadId: string} $arguments */
+    private function abortArchiveUpload(array $arguments): void
+    {
+        try {
+            $this->client()->abortMultipartUpload($arguments);
+        } catch (S3Exception $s3Exception) {
+            throw_if($s3Exception->getAwsErrorCode() !== 'NoSuchUpload', $s3Exception);
+        }
+    }
+
+    /** @return array{Bucket: string, Key: string} */
+    private function archiveObjectArguments(string $path): array
+    {
+        $bucket = $this->disk()->getConfig()['bucket'];
+        throw_unless(is_string($bucket), TransferStorageException::class, 'Configure a private storage bucket before uploading.');
+
+        return ['Bucket' => $bucket, 'Key' => $this->disk()->path($path)];
     }
 
     private function completeLocal(TransferFile $file): void

@@ -6,9 +6,12 @@ namespace App\Jobs;
 
 use App\Models\Transfer;
 use App\Services\TransferStorage;
+use DateTimeInterface;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Attributes\MaxExceptions;
+use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\Attributes\UniqueFor;
 use Illuminate\Support\Facades\Cache;
@@ -16,17 +19,29 @@ use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
-#[Tries(3)]
-#[UniqueFor(3700)]
+#[MaxExceptions(3)]
+#[Timeout(3600)]
+#[Tries(0)]
+#[UniqueFor(11100)]
 final class PurgeTransfer implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
-    public function __construct(public string $transferId) {}
+    private DateTimeInterface $retryDeadline;
+
+    public function __construct(public string $transferId)
+    {
+        $this->retryDeadline = now()->addHours(2);
+    }
 
     public function uniqueId(): string
     {
         return $this->transferId;
+    }
+
+    public function retryUntil(): DateTimeInterface
+    {
+        return $this->retryDeadline ??= now()->addHours(2);
     }
 
     /** @return list<int> */
@@ -40,7 +55,7 @@ final class PurgeTransfer implements ShouldBeUnique, ShouldQueue
         $lock = Cache::lock('transfer-bytes:'.$this->transferId, 3700);
 
         if (! $lock->get()) {
-            $this->release(10);
+            $this->release(60);
 
             return;
         }
@@ -65,7 +80,10 @@ final class PurgeTransfer implements ShouldBeUnique, ShouldQueue
                 throw_unless($storage->disk()->delete($file->path), RuntimeException::class, 'Could not delete a transfer file.');
             }
 
-            throw_unless($storage->disk()->delete($transfer->archive_path ?: 'archives/'.$transfer->id.'.zip'), RuntimeException::class, 'Could not delete the transfer archive.');
+            $archivePath = $transfer->archive_path ?: 'archives/'.$transfer->id.'.zip';
+            $storage->abortArchiveUploads($archivePath);
+
+            throw_unless($storage->disk()->delete($archivePath), RuntimeException::class, 'Could not delete the transfer archive.');
 
             throw_unless(Storage::disk('local')->deleteDirectory('uploads/'.$transfer->id), RuntimeException::class, 'Could not delete temporary upload parts.');
 

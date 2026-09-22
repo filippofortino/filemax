@@ -6,7 +6,13 @@ use App\Jobs\PurgeTransfer;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Services\TransferStorage;
+use Aws\CommandInterface;
+use Aws\MockHandler;
+use Aws\Result;
+use Aws\S3\S3Client;
+use Illuminate\Filesystem\AwsS3V3Adapter;
 use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -104,12 +110,101 @@ it('does not mark a partially failed purge complete and can retry it safely', fu
     expect($transfer->refresh()->purged_at)->not->toBeNull();
 });
 
-it('recovers stalled archives and removes disposable old temporary files', function (): void {
+it('allows archive recovery through the four hour stale boundary', function (string $status): void {
+    $recent = Transfer::factory()->create(['archive_status' => $status, 'archive_progress' => 25, 'archive_requested_at' => now()->subHours(3)]);
+    $boundary = Transfer::factory()->create(['archive_status' => $status, 'archive_progress' => 50, 'archive_requested_at' => now()->subHours(4)]);
+    $ready = Transfer::factory()->create(['archive_status' => 'ready', 'archive_progress' => 100, 'archive_requested_at' => now()->subHours(5)]);
+
+    $this->artisan('filemax:cleanup')->assertSuccessful();
+
+    expect($recent->refresh()->archive_status)->toBe($status)
+        ->and($recent->archive_progress)->toBe(25)
+        ->and($boundary->refresh()->archive_status)->toBe('failed')
+        ->and($boundary->archive_progress)->toBe(0)
+        ->and($ready->refresh()->archive_status)->toBe('ready');
+})->with(['pending', 'processing']);
+
+it('removes disposable legacy temporary files after two hours', function (): void {
     $transfer = Transfer::factory()->create(['archive_status' => 'processing', 'archive_requested_at' => now()->subHours(3)]);
     $directory = storage_path('app/archive-tmp/test-stale-'.$transfer->id);
     File::ensureDirectoryExists($directory);
     File::put($directory.'/partial.zip', 'incomplete');
     touch($directory, now()->subHours(3)->timestamp);
     $this->artisan('filemax:cleanup')->assertSuccessful();
-    expect($transfer->refresh()->archive_status)->toBe('failed')->and(File::exists($directory))->toBeFalse();
+    expect($transfer->refresh()->archive_status)->toBe('processing')->and(File::exists($directory))->toBeFalse();
 });
+
+it('waits for an active byte lock while preserving its original cleanup retry deadline', function (): void {
+    $transfer = Transfer::factory()->create(['revoked_at' => now()]);
+    $lock = Cache::lock('transfer-bytes:'.$transfer->id, 3700);
+    expect($lock->get())->toBeTrue();
+    $job = new PurgeTransfer($transfer->id)->withFakeQueueInteractions();
+    $deadline = $job->retryUntil()->getTimestamp();
+
+    try {
+        $this->travel(30)->minutes();
+        $job->handle(resolve(TransferStorage::class));
+
+        $job->assertReleased(60)->assertNotFailed();
+        expect($transfer->refresh()->purged_at)->toBeNull()
+            ->and($job->retryUntil()->getTimestamp())->toBe($deadline)
+            ->and(Cache::lock('transfer-bytes:'.$transfer->id, 3700)->get())->toBeFalse();
+    } finally {
+        $lock->release();
+    }
+
+    $job->handle(resolve(TransferStorage::class));
+    expect($transfer->refresh()->purged_at)->not->toBeNull();
+});
+
+it('aborts abandoned archive uploads under the byte lock before finishing a purge', function (bool $abortFails): void {
+    $transfer = Transfer::factory()->create(['revoked_at' => now(), 'archive_path' => $abortFails ? null : 'archives/custom.zip']);
+    $archivePath = $transfer->archive_path ?: 'archives/'.$transfer->id.'.zip';
+    $key = 'tenant/'.$archivePath;
+    $handler = new MockHandler([
+        function (CommandInterface $command) use ($transfer, $key): Result {
+            expect($command->getName())->toBe('ListMultipartUploads')
+                ->and($command['Prefix'])->toBe($key)
+                ->and(Cache::lock('transfer-bytes:'.$transfer->id, 3700)->get())->toBeFalse();
+
+            return new Result(['Uploads' => [['Key' => $key, 'UploadId' => 'abandoned-archive']], 'IsTruncated' => false]);
+        },
+        function (CommandInterface $command) use ($key, $abortFails): Result {
+            expect($command->getName())->toBe('AbortMultipartUpload')
+                ->and($command['Key'])->toBe($key)
+                ->and($command['UploadId'])->toBe('abandoned-archive');
+
+            throw_if($abortFails, RuntimeException::class, 'Could not abort the archive upload.');
+
+            return new Result;
+        },
+    ]);
+    $client = new S3Client([
+        'version' => 'latest',
+        'region' => 'auto',
+        'credentials' => ['key' => 'test', 'secret' => 'test'],
+        'endpoint' => 'https://r2.example.com',
+        'handler' => $handler,
+    ]);
+    $disk = Mockery::mock(AwsS3V3Adapter::class);
+    $disk->shouldReceive('getClient')->andReturn($client);
+    $disk->shouldReceive('getConfig')->andReturn(['bucket' => 'private-filemax']);
+    $disk->shouldReceive('path')->with($archivePath)->andReturn($key);
+    $disk->shouldReceive('delete')->with($archivePath)->times($abortFails ? 0 : 1)->andReturnTrue();
+    Storage::set('r2', $disk);
+    config(['filemax.disk' => 'r2']);
+    $job = new PurgeTransfer($transfer->id);
+
+    if ($abortFails) {
+        expect(fn () => $job->handle(resolve(TransferStorage::class)))->toThrow(RuntimeException::class, 'Could not abort the archive upload.');
+        expect($transfer->refresh()->purged_at)->toBeNull();
+    } else {
+        $job->handle(resolve(TransferStorage::class));
+        expect($transfer->refresh()->purged_at)->not->toBeNull();
+    }
+
+    expect(count($handler))->toBe(0);
+    $lock = Cache::lock('transfer-bytes:'.$transfer->id, 3700);
+    expect($lock->get())->toBeTrue();
+    $lock->release();
+})->with([false, true]);

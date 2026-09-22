@@ -17,6 +17,7 @@
         "laravel/octane": "^2.19.1",
         "laravel/wayfinder": "^0.1.21",
         "league/flysystem-aws-s3-v3": "^3.35.3",
+        "maennchen/zipstream-php": "^3.2.2",
         "nunomaduro/essentials": "^1.2.0"
     },
     "require-dev": {
