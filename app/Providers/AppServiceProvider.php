@@ -6,9 +6,17 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 
 final class AppServiceProvider extends ServiceProvider
 {
+    public function boot(): void
+    {
+        Password::defaults(fn (): ?Password => $this->app->isProduction()
+            ? Password::min(12)->mixedCase()->numbers()->symbols()
+            : null);
+    }
+
     public function register(): void
     {
         $disk = 'filesystems.disks.'.Config::string('filemax.disk', 'local');

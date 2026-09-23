@@ -19,7 +19,7 @@ final class CreateNewUser implements CreatesNewUsers
         $validated = Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email:filter', 'max:255', 'ends_with:@mediamaxcommunication.it', Rule::unique(User::class)],
-            'password' => ['required', 'string', 'confirmed', Password::min(8)],
+            'password' => ['required', 'string', 'confirmed', Password::defaults()],
         ])->validate();
 
         return User::query()->create($validated);

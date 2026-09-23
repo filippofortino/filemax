@@ -8,6 +8,12 @@ export type User = {
 };
 export type SharedProps = {
     auth: { user: User | null };
+    passwordRequirements: {
+        min: number;
+        mixedCase: boolean;
+        numbers: boolean;
+        symbols: boolean;
+    };
     status?: string;
     [key: string]: unknown;
 };

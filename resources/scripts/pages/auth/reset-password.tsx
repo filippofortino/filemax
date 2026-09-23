@@ -1,6 +1,8 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head, Link, usePage } from '@inertiajs/react';
 import { AuthLayout, ErrorMessage } from '@/components/filemax';
 import { Button } from '@/components/ui/button';
+import { passwordHint } from '@/lib/format';
+import type { SharedProps } from '@/lib/types';
 import { login } from '@/routes';
 import { update } from '@/routes/password';
 
@@ -11,10 +13,12 @@ export default function ResetPassword({
     token: string;
     email: string;
 }) {
+    const { passwordRequirements } = usePage<SharedProps>().props;
+
     return (
         <AuthLayout
             title="Choose a new password"
-            description="Use at least 8 characters to keep your account secure."
+            description={passwordHint(passwordRequirements)}
             footer={<Link href={login()}>Back to sign in</Link>}
         >
             <Head title="Choose password" />
@@ -58,7 +62,7 @@ export default function ResetPassword({
                                 type="password"
                                 autoComplete="new-password"
                                 required
-                                minLength={8}
+                                minLength={passwordRequirements.min}
                                 aria-invalid={!!errors.password}
                             />
                             <ErrorMessage>{errors.password}</ErrorMessage>
@@ -76,7 +80,7 @@ export default function ResetPassword({
                                 type="password"
                                 autoComplete="new-password"
                                 required
-                                minLength={8}
+                                minLength={passwordRequirements.min}
                             />
                         </div>
                         <Button

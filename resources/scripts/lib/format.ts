@@ -1,3 +1,17 @@
+import type { SharedProps } from '@/lib/types';
+
+export function passwordHint(
+    requirements: SharedProps['passwordRequirements'],
+): string {
+    const includes = [
+        requirements.mixedCase && 'uppercase and lowercase letters',
+        requirements.numbers && 'a number',
+        requirements.symbols && 'a symbol',
+    ].filter((requirement): requirement is string => Boolean(requirement));
+
+    return `At least ${requirements.min} characters${includes.length ? `, including ${new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(includes)}` : ''}.`;
+}
+
 export function bytes(value: number): string {
     if (!value) return '0 B';
     const unit = Math.min(Math.floor(Math.log(value) / Math.log(1000)), 5);
