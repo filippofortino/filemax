@@ -30,7 +30,7 @@ final class TransferArchiveController
         }, attempts: 5);
 
         if ($prepare) {
-            dispatch(new PrepareTransferArchive($transfer->id));
+            dispatch(new PrepareTransferArchive($transfer->id, $transfer->archive_requested_at?->format('Y-m-d H:i:s')));
         }
 
         return $this->archiveResponse($transfer->refresh());

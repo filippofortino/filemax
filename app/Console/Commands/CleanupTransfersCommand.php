@@ -30,7 +30,7 @@ final class CleanupTransfersCommand extends Command
         });
 
         Transfer::query()->whereIn('archive_status', ['pending', 'processing'])
-            ->where('archive_requested_at', '<=', now()->subHours(2))
+            ->where('archive_requested_at', '<=', now()->subHours(4))
             ->update(['archive_status' => 'failed', 'archive_progress' => 0]);
 
         $temporaryDirectory = storage_path('app/archive-tmp');

@@ -140,7 +140,7 @@ it('caps signed file links at transfer expiry and rechecks membership on local r
 
 it('builds archives with safe unique names and counts bundles independently of file clicks', function (): void {
     $transfer = Transfer::factory()->create();
-    foreach (['../report.txt', 'report.txt', 'report (2).txt', 'folder\\REPORT.txt'] as $position => $name) {
+    foreach (['../report.txt', 'report.txt', 'report (2).txt', 'folder\\REPORT.txt', 'report?.txt', 'report*.txt'] as $position => $name) {
         $file = TransferFile::factory()->for($transfer)->create(['original_name' => $name, 'position' => $position]);
         Storage::disk('local')->put($file->path, 'test');
     }
@@ -158,7 +158,7 @@ it('builds archives with safe unique names and counts bundles independently of f
     }
 
     $zip->close();
-    expect($names)->toBe(['report.txt', 'report (2).txt', 'report (2) (2).txt', 'REPORT (3).txt']);
+    expect($names)->toBe(['report.txt', 'report (2).txt', 'report (2) (2).txt', 'REPORT (3).txt', 'report_.txt', 'report_ (2).txt']);
     $this->postJson(route('shared.download', $transfer->token))->assertOk();
     expect($transfer->refresh()->download_count)->toBe(2)->and($transfer->files()->sum('download_count'))->toBe(0);
 });
