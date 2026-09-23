@@ -124,6 +124,7 @@ test('failed avatar storage preserves the previous profile', function (): void {
     $user = User::factory()->create(['avatar_path' => 'avatars/original.webp']);
     $disk = Storage::disk();
     $disk->put($user->avatar_path, 'original');
+
     $failedDisk = Mockery::mock(FilesystemAdapter::class);
     $failedDisk->shouldReceive('put')->andReturnFalse();
     Storage::partialMock()->shouldReceive('disk')->andReturn($failedDisk);

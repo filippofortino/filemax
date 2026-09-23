@@ -61,12 +61,12 @@ final class UpdateUserProfileInformation implements UpdatesUserProfileInformatio
 
                 return $oldPath !== $profile->avatar_path ? $oldPath : null;
             });
-        } catch (Throwable $exception) {
+        } catch (Throwable $throwable) {
             if ($path !== null) {
                 $this->deleteAvatar($path);
             }
 
-            throw $exception;
+            throw $throwable;
         }
 
         if ($oldPath !== null) {
@@ -79,11 +79,9 @@ final class UpdateUserProfileInformation implements UpdatesUserProfileInformatio
     private function deleteAvatar(string $path): void
     {
         try {
-            if (! Storage::delete($path)) {
-                report(new RuntimeException('An unused profile photo could not be deleted.'));
-            }
-        } catch (Throwable $exception) {
-            report($exception);
+            report_unless(Storage::delete($path), new RuntimeException('An unused profile photo could not be deleted.'));
+        } catch (Throwable $throwable) {
+            report($throwable);
         }
     }
 }
