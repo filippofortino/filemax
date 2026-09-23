@@ -75,7 +75,7 @@ test('passkey relying party and allowed origins come from the configured applica
 test('guests cannot manage passkeys or confirm their identity', function (): void {
     [$passkey] = filemaxPasskey(User::factory()->create());
 
-    $this->get(route('account.passkeys'))->assertRedirect(route('login'));
+    $this->get(route('account.settings'))->assertRedirect(route('login'));
     $this->getJson(route('passkey.registration-options'))->assertUnauthorized();
     $this->postJson(route('passkey.store'), [])->assertUnauthorized();
     $this->deleteJson(route('passkey.destroy', $passkey))->assertUnauthorized();
@@ -91,7 +91,7 @@ test('passkey management requires a currently eligible verified account', functi
     [$passkey] = filemaxPasskey($user);
     $this->actingAs($user)->withSession(['auth.password_confirmed_at' => now()->timestamp]);
 
-    $this->getJson(route('account.passkeys'))->assertForbidden();
+    $this->getJson(route('account.settings'))->assertForbidden();
     $this->getJson(route('passkey.registration-options'))->assertForbidden();
     $this->postJson(route('passkey.store'), [])->assertForbidden();
     $this->deleteJson(route('passkey.destroy', $passkey))->assertForbidden();
@@ -107,7 +107,7 @@ test('password confirmation permits management for three hours and lists only sa
     filemaxPasskey(User::factory()->create());
     $this->actingAs($user);
 
-    $this->get(route('account.passkeys'))->assertRedirect(route('password.confirm'));
+    $this->get(route('account.settings'))->assertOk();
     $this->getJson(route('passkey.registration-options'))->assertStatus(423);
     $this->postJson(route('passkey.store'), [])->assertStatus(423);
     $this->deleteJson(route('passkey.destroy', $passkey))->assertStatus(423);
@@ -116,8 +116,8 @@ test('password confirmation permits management for three hours and lists only sa
     $this->postJson(route('password.confirm.store'), ['password' => 'password'])
         ->assertCreated()->assertSessionHas('auth.password_confirmed_at', now()->timestamp);
 
-    $this->get(route('account.passkeys'))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
-        ->component('auth/passkeys')
+    $this->get(route('account.settings'))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
+        ->component('account/settings')
         ->has('passkeys', 1)
         ->where('passkeys.0.id', $passkey->id)
         ->where('passkeys.0.name', 'My laptop')
@@ -133,6 +133,7 @@ test('password confirmation permits management for three hours and lists only sa
     $this->travel(3)->hours();
     $this->getJson(route('passkey.registration-options'))->assertOk();
     $this->travel(1)->seconds();
+    $this->get(route('account.settings'))->assertOk();
     $this->getJson(route('passkey.registration-options'))->assertStatus(423);
     $this->postJson(route('passkey.store'), [])->assertStatus(423);
     $this->deleteJson(route('passkey.destroy', $passkey))->assertStatus(423);
@@ -156,6 +157,48 @@ test('an existing passkey can confirm identity for management', function (): voi
     $this->postJson(route('passkey.confirm'), [
         'credential' => filemaxPasskeyAssertion($passkey, $privateKey, $options['challenge']),
     ])->assertUnprocessable()->assertJsonValidationErrors('credential');
+});
+
+test('expired passkey management returns to settings after confirming identity', function (bool $json, bool $withPasskey): void {
+    $user = User::factory()->create();
+    [$passkey, $privateKey] = filemaxPasskey($user);
+    $this->actingAs($user)->withSession([
+        'auth.password_confirmed_at' => now()->subHours(4)->timestamp,
+        'url.intended' => '/t/stale-transfer',
+    ]);
+
+    $response = $json
+        ? $this->getJson(route('passkey.registration-options'))
+        : $this->get(route('passkey.registration-options'));
+    $response->assertSessionHas('url.intended', route('account.settings'));
+
+    if ($json) {
+        $response->assertStatus(423);
+    } else {
+        $response->assertRedirect(route('password.confirm'));
+    }
+
+    if ($withPasskey) {
+        $options = $this->getJson(route('passkey.confirm-options'))->assertOk()->json('options');
+        $this->postJson(route('passkey.confirm'), [
+            'credential' => filemaxPasskeyAssertion($passkey, $privateKey, $options['challenge']),
+        ])->assertOk()->assertJsonPath('redirect', route('account.settings'));
+    } else {
+        $this->post(route('password.confirm.store'), ['password' => 'password'])
+            ->assertRedirect(route('account.settings'));
+    }
+
+    $this->getJson(route('passkey.registration-options'))->assertOk()->assertSessionMissing('url.intended');
+})->with(['JSON request' => true, 'browser request' => false])->with(['passkey' => true, 'password' => false]);
+
+test('confirmed passkey management preserves unrelated intended destinations', function (): void {
+    $this->actingAs(User::factory()->create())->withSession([
+        'auth.password_confirmed_at' => now()->timestamp,
+        'url.intended' => '/t/another-transfer',
+    ]);
+
+    $this->getJson(route('passkey.registration-options'))->assertOk()
+        ->assertSessionHas('url.intended', '/t/another-transfer');
 });
 
 test('another accounts passkey cannot confirm identity', function (): void {
@@ -197,6 +240,22 @@ test('password reset retains existing passkeys', function (): void {
         'password' => 'changed-password',
         'password_confirmation' => 'changed-password',
     ])->assertRedirect(route('login'));
+
+    expect(Hash::check('changed-password', $user->refresh()->password))->toBeTrue()
+        ->and($passkey->refresh()->credential)->toBe($credential);
+    $this->assertModelExists($passkey);
+});
+
+test('changing the account password retains existing passkeys', function (): void {
+    $user = User::factory()->create();
+    [$passkey] = filemaxPasskey($user);
+    $credential = $passkey->credential;
+
+    $this->actingAs($user)->put(route('user-password.update'), [
+        'current_password' => 'password',
+        'password' => 'changed-password',
+        'password_confirmation' => 'changed-password',
+    ])->assertSessionHasNoErrors()->assertSessionHas('status', 'password-updated');
 
     expect(Hash::check('changed-password', $user->refresh()->password))->toBeTrue()
         ->and($passkey->refresh()->credential)->toBe($credential);

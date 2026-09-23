@@ -5,7 +5,7 @@ import { usePasskeyVerify } from '@laravel/passkeys/react';
 import { ErrorMessage } from '@/components/filemax';
 import { Button } from '@/components/ui/button';
 import { home } from '@/routes';
-import { passkeys } from '@/routes/account';
+import { settings } from '@/routes/account';
 import { confirm, confirmOptions, login, loginOptions } from '@/routes/passkey';
 
 export function PasskeyFeedback({ error }: { error: string | null }) {
@@ -43,7 +43,7 @@ export function PasskeyButton({
         },
         onSuccess: ({ redirect }) =>
             window.location.assign(
-                redirect ?? (confirmation ? passkeys.url() : home.url()),
+                redirect ?? (confirmation ? settings.url() : home.url()),
             ),
     });
 

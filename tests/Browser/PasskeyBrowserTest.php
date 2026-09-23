@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Models\User;
 
-it('opens passkey management from the account menu with keyboard and confirms the password', function (): void {
+it('opens settings with keyboard and confirms identity only when adding a passkey', function (): void {
     $user = User::factory()->create();
 
     visit('/login')->resize(1280, 940)
@@ -13,13 +13,17 @@ it('opens passkey management from the account menu with keyboard and confirms th
         ->press('form button[data-slot="button"]')
         ->assertSee('Transfer details')
         ->keys('[aria-label="Account menu"]', 'Enter')
-        ->keys('a[href$="/account/passkeys"]', 'Enter')
+        ->keys('a[href$="/account/settings"]', 'Enter')
+        ->assertSee('Profile')
+        ->assertSee('You haven’t added any passkeys yet.')
+        ->fill('#passkey-name', 'Work MacBook')
+        ->keys('#passkey-name', 'Enter')
         ->assertSee('Confirm it’s you')
         ->fill('password', 'password')
         ->keys('#password', 'Enter')
         ->assertSee('You haven’t added any passkeys yet.')
-        ->assertSee('Add a passkey')
-        ->assertDisabled('form button[data-slot="button"]')
+        ->assertSee('Add passkey')
+        ->assertDisabled('#passkey-form button')
         ->assertNoJavascriptErrors();
 });
 
@@ -27,7 +31,7 @@ it('keeps a cancelled named passkey registration recoverable on mobile', functio
     $user = User::factory()->create();
     $this->actingAs($user)->withSession(['auth.password_confirmed_at' => now()->timestamp]);
 
-    $page = visit('/account/passkeys')->resize(390, 844)
+    $page = visit('/account/settings')->resize(390, 844)
         ->assertSee('You haven’t added any passkeys yet.');
     $page->script(<<<'JS'
 () => {
@@ -43,11 +47,11 @@ it('keeps a cancelled named passkey registration recoverable on mobile', functio
 JS);
 
     $page->fill('#passkey-name', 'Work MacBook')
-        ->assertEnabled('form button[data-slot="button"]')
+        ->assertEnabled('#passkey-form button')
         ->keys('#passkey-name', 'Enter')
         ->assertSee('The passkey operation was cancelled.')
         ->assertSee('You haven’t added any passkeys yet.')
-        ->assertEnabled('form button[data-slot="button"]')
+        ->assertEnabled('#passkey-form button')
         ->assertNoJavascriptErrors();
 
     expect($page->text('[role="alert"]'))->toContain('The passkey operation was cancelled.');

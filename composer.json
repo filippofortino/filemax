@@ -12,6 +12,7 @@
         "php": "^8.5.0",
         "aws/aws-sdk-php": "^3.395.7",
         "inertiajs/inertia-laravel": "^3.3.4",
+        "intervention/image": "^4.0",
         "laravel/fortify": "^1.39",
         "laravel/framework": "^13.32.0",
         "laravel/octane": "^2.19.1",

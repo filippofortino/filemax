@@ -4,25 +4,26 @@ import {
     File01Icon,
     FileZipIcon,
     Image01Icon,
-    Key01Icon,
     Logout01Icon,
+    Settings01Icon,
     Tick02Icon,
     Video01Icon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Link, usePage } from '@inertiajs/react';
 import { useState, type ReactNode } from 'react';
+import { Avatar } from '@/components/avatar';
 import { Button } from '@/components/ui/button';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { bytes, initials } from '@/lib/format';
+import { bytes } from '@/lib/format';
 import type { SharedProps, Team } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { home, logout } from '@/routes';
-import { passkeys } from '@/routes/account';
+import { settings } from '@/routes/account';
 import { index as teams } from '@/routes/teams';
 import { index as transfers } from '@/routes/transfers';
 
@@ -157,9 +158,10 @@ export function Shell({
                                         >
                                             {user.name.split(' ')[0]}
                                         </span>
-                                        <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-xs font-bold text-primary">
-                                            {initials(user.name)}
-                                        </span>
+                                        <Avatar
+                                            name={user.name}
+                                            url={user.avatar_url}
+                                        />
                                     </button>
                                 </PopoverTrigger>
                                 <PopoverContent
@@ -172,15 +174,15 @@ export function Shell({
                                     </span>
                                     {user.email_verified_at && (
                                         <Link
-                                            href={passkeys()}
+                                            href={settings()}
                                             className="flex items-center gap-2"
                                         >
                                             <HugeiconsIcon
-                                                icon={Key01Icon}
+                                                icon={Settings01Icon}
                                                 size={18}
                                                 aria-hidden="true"
                                             />
-                                            Passkeys
+                                            Settings
                                         </Link>
                                     )}
                                     <Link
