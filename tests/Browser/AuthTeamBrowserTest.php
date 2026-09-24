@@ -11,6 +11,8 @@ it('registers an eligible account and asks the user to verify their email', func
     Notification::fake();
 
     $page = visit('/register')->resize(1280, 940)
+        ->assertSee('At least 8 characters.')
+        ->assertAttribute('#password', 'minlength', '8')
         ->fill('name', 'Alice Test')
         ->fill('email', 'alice@mediamaxcommunication.it')
         ->fill('password', 'a-good-password')

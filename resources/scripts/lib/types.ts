@@ -3,11 +3,18 @@ export type User = {
     id: string;
     name: string;
     email: string;
+    avatar_url: string | null;
     is_admin: boolean;
     email_verified_at: string | null;
 };
 export type SharedProps = {
     auth: { user: User | null };
+    passwordRequirements: {
+        min: number;
+        mixedCase: boolean;
+        numbers: boolean;
+        symbols: boolean;
+    };
     status?: string;
     [key: string]: unknown;
 };

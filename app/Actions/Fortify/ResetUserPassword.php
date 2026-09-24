@@ -16,7 +16,7 @@ final class ResetUserPassword implements ResetsUserPasswords
     {
         /** @var array{password: string} $validated */
         $validated = Validator::make($input, [
-            'password' => ['required', 'string', 'confirmed', Password::min(8)],
+            'password' => ['required', 'string', 'confirmed', Password::defaults()],
         ])->validate();
 
         $user->forceFill($validated)->save();

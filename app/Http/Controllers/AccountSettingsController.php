@@ -9,11 +9,11 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Laravel\Passkeys\Passkey;
 
-final class AccountPasskeyController
+final class AccountSettingsController
 {
     public function index(Request $request): Response
     {
-        return Inertia::render('auth/passkeys', [
+        return Inertia::render('account/settings', [
             'passkeys' => ($request->user() ?? abort(403))->passkeys()->latest()->get()
                 ->map(fn (Passkey $passkey): array => [
                     'id' => $passkey->id,

@@ -46,7 +46,7 @@ final class SharedTransferController
                 'token' => $transfer->token,
                 'title' => $transfer->displayTitle(),
                 'message' => $transfer->message,
-                'sender' => $transfer->user->only(['name', 'email']),
+                'sender' => [...$transfer->user->only(['name', 'email']), 'avatar_url' => $transfer->user->avatarUrl()],
                 'files' => $transfer->files->map(fn (TransferFile $file): array => [
                     'id' => $file->id,
                     'name' => $file->original_name,

@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
@@ -22,6 +23,7 @@ use Laravel\Fortify\PasskeyAuthenticatable;
  * @property-read string $id
  * @property-read string $name
  * @property-read string $email
+ * @property-read string|null $avatar_path
  * @property-read bool $is_admin
  * @property-read CarbonInterface|null $email_verified_at
  * @property-read string $password
@@ -32,6 +34,7 @@ use Laravel\Fortify\PasskeyAuthenticatable;
 #[Hidden([
     'password',
     'remember_token',
+    'avatar_path',
 ])]
 #[Fillable(['name', 'email', 'password'])]
 final class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
@@ -44,7 +47,7 @@ final class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     use PasskeyAuthenticatable;
 
     /** @var array<string, mixed> */
-    protected $attributes = ['is_admin' => false];
+    protected $attributes = ['is_admin' => false, 'avatar_path' => null];
 
     public static function booted(): void
     {
@@ -64,6 +67,11 @@ final class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return Str::afterLast(Str::lower($this->email), '@') === 'mediamaxcommunication.it';
     }
 
+    public function avatarUrl(): ?string
+    {
+        return $this->avatar_path === null ? null : Storage::temporaryUrl($this->avatar_path, now()->addHour());
+    }
+
     /**
      * @return array<string, string>
      */
@@ -73,6 +81,7 @@ final class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'id' => 'string',
             'name' => 'string',
             'email' => 'string',
+            'avatar_path' => 'string',
             'is_admin' => 'boolean',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',

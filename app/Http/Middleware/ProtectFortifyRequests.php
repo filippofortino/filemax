@@ -38,7 +38,7 @@ final class ProtectFortifyRequests
             Validator::make($request->only('password'), ['password' => ['required', 'string']])->validate();
         }
 
-        if ($request->user() && $request->routeIs('verification.*', 'passkey.confirm*', 'passkey.registration-options', 'passkey.store', 'passkey.destroy')) {
+        if ($request->user() && $request->routeIs('verification.*', 'passkey.confirm*', 'passkey.registration-options', 'passkey.store', 'passkey.destroy', 'user-password.update', 'user-profile-information.update')) {
             abort_unless($request->user()->isEligible(), 403);
 
             if (! $request->routeIs('verification.*')) {
@@ -46,6 +46,13 @@ final class ProtectFortifyRequests
             }
         }
 
-        return $next($request);
+        $response = $next($request);
+
+        if ($request->routeIs('passkey.registration-options', 'passkey.store', 'passkey.destroy')
+            && ($response->getStatusCode() === 423 || $response->isRedirect(route('password.confirm')))) {
+            $request->session()->put('url.intended', route('account.settings'));
+        }
+
+        return $response;
     }
 }

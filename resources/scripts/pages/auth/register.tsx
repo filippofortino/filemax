@@ -1,10 +1,14 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head, Link, usePage } from '@inertiajs/react';
 import { AuthLayout, ErrorMessage } from '@/components/filemax';
 import { Button } from '@/components/ui/button';
+import { passwordHint } from '@/lib/format';
+import type { SharedProps } from '@/lib/types';
 import { login } from '@/routes';
 import { store } from '@/routes/register';
 
 export default function Register() {
+    const { passwordRequirements } = usePage<SharedProps>().props;
+
     return (
         <AuthLayout
             title="Create your account"
@@ -71,11 +75,17 @@ export default function Register() {
                                 name="password"
                                 type="password"
                                 autoComplete="new-password"
-                                placeholder="At least 8 characters"
-                                minLength={8}
+                                minLength={passwordRequirements.min}
                                 required
                                 aria-invalid={!!errors.password}
+                                aria-describedby="password-requirements"
                             />
+                            <p
+                                id="password-requirements"
+                                className="text-sm text-muted-foreground"
+                            >
+                                {passwordHint(passwordRequirements)}
+                            </p>
                             <ErrorMessage>{errors.password}</ErrorMessage>
                         </div>
                         <div className="flex flex-col gap-2">
@@ -90,7 +100,7 @@ export default function Register() {
                                 name="password_confirmation"
                                 type="password"
                                 autoComplete="new-password"
-                                minLength={8}
+                                minLength={passwordRequirements.min}
                                 required
                             />
                         </div>

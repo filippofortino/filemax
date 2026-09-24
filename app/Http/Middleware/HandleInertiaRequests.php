@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Validation\Rules\Password;
 use Inertia\Middleware;
 
 final class HandleInertiaRequests extends Middleware
@@ -39,7 +41,11 @@ final class HandleInertiaRequests extends Middleware
     {
         return [
             ...parent::share($request),
-            'auth' => ['user' => fn (): ?array => $request->user()?->only(['id', 'name', 'email', 'is_admin', 'email_verified_at'])],
+            'auth' => ['user' => fn (): ?array => $request->user() ? [
+                ...$request->user()->only(['id', 'name', 'email', 'is_admin', 'email_verified_at']),
+                'avatar_url' => $request->user()->avatarUrl(),
+            ] : null],
+            'passwordRequirements' => fn (): array => Arr::only(Password::defaults()->appliedRules(), ['min', 'mixedCase', 'numbers', 'symbols']),
             'status' => fn (): mixed => $request->session()->get('status'),
         ];
     }

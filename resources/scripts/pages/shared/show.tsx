@@ -1,13 +1,14 @@
 import { Head } from '@inertiajs/react';
+import { Avatar } from '@/components/avatar';
 import { DownloadAll, FileDownload } from '@/components/downloads';
 import { FileRow, Shell } from '@/components/filemax';
-import { date, initials } from '@/lib/format';
+import { date } from '@/lib/format';
 
 type SharedTransfer = {
     token: string;
     title: string;
     message: string | null;
-    sender: { name: string; email: string };
+    sender: { name: string; email: string; avatar_url: string | null };
     files: { id: string; name: string; size: number; mime_type: string }[];
     total_size: number;
     expires_at: string;
@@ -27,9 +28,11 @@ export default function SharedTransferPage({
                 <section className="flex w-full max-w-xl min-w-0 flex-col gap-6 md:gap-7 md:rounded-xl md:border md:bg-background md:p-10">
                     <div className="flex flex-col gap-3 md:gap-3.5">
                         <div className="flex items-center gap-2.5 text-sm leading-snug text-muted-foreground">
-                            <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground md:size-9 md:text-sm">
-                                {initials(transfer.sender.name)}
-                            </span>
+                            <Avatar
+                                name={transfer.sender.name}
+                                url={transfer.sender.avatar_url}
+                                className="border-transparent bg-muted font-semibold text-foreground md:size-9 md:text-sm"
+                            />
                             <span>
                                 <strong className="text-foreground">
                                     {transfer.sender.name}
