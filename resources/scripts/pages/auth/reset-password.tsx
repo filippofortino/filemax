@@ -84,6 +84,7 @@ export default function ResetPassword({
                             />
                         </div>
                         <Button
+                            type="submit"
                             className="w-full"
                             size="lg"
                             disabled={processing}

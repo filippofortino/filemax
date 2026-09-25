@@ -9,7 +9,7 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Head, Link } from '@inertiajs/react';
 import { Shell, TeamBadges } from '@/components/filemax';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { bytes, date } from '@/lib/format';
 import type { Team, Transfer } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -36,20 +36,23 @@ export default function Index({ transfers, teams, filter, totals }: Props) {
         <Shell
             active="transfers"
             headerAction={
-                <Button
-                    asChild
-                    size="icon-sm"
-                    className="md:h-10 md:w-auto md:px-4"
+                <Link
+                    href={home()}
+                    aria-label="New transfer"
+                    className={cn(
+                        buttonVariants({
+                            size: 'icon-sm',
+                            className: 'md:h-10 md:w-auto md:px-4',
+                        }),
+                    )}
                 >
-                    <Link href={home()} aria-label="New transfer">
-                        <HugeiconsIcon
-                            icon={Add01Icon}
-                            size={16}
-                            aria-hidden="true"
-                        />
-                        <span className="hidden md:inline">New transfer</span>
-                    </Link>
-                </Button>
+                    <HugeiconsIcon
+                        icon={Add01Icon}
+                        size={16}
+                        aria-hidden="true"
+                    />
+                    <span className="hidden md:inline">New transfer</span>
+                </Link>
             }
         >
             <Head title="My transfers" />
@@ -138,16 +141,20 @@ export default function Index({ transfers, teams, filter, totals }: Props) {
                                 ? 'Drop some files on the New transfer page. Every link you create shows up here with its downloads and expiry.'
                                 : 'Try another filter, or create a transfer to share with this audience.'}
                         </p>
-                        <Button asChild className="mt-2">
-                            <Link href={home()} aria-label="Create a transfer">
-                                <HugeiconsIcon
-                                    icon={Add01Icon}
-                                    size={16}
-                                    aria-hidden="true"
-                                />
-                                New transfer
-                            </Link>
-                        </Button>
+                        <Link
+                            href={home()}
+                            aria-label="Create a transfer"
+                            className={cn(
+                                buttonVariants({ className: 'mt-2' }),
+                            )}
+                        >
+                            <HugeiconsIcon
+                                icon={Add01Icon}
+                                size={16}
+                                aria-hidden="true"
+                            />
+                            New transfer
+                        </Link>
                     </div>
                 ) : (
                     <div className="flex flex-col border-t">
@@ -253,34 +260,42 @@ export default function Index({ transfers, teams, filter, totals }: Props) {
                         aria-label="Pagination"
                         className="mt-6 flex items-center justify-between"
                     >
-                        <Button
-                            variant="outline"
-                            disabled={!transfers.links.prev}
-                            asChild={!!transfers.links.prev}
-                        >
-                            {transfers.links.prev ? (
-                                <Link href={transfers.links.prev}>
-                                    Previous
-                                </Link>
-                            ) : (
-                                'Previous'
-                            )}
-                        </Button>
+                        {transfers.links.prev ? (
+                            <Link
+                                href={transfers.links.prev}
+                                className={cn(
+                                    buttonVariants({
+                                        variant: 'outline',
+                                    }),
+                                )}
+                            >
+                                Previous
+                            </Link>
+                        ) : (
+                            <Button variant="outline" disabled>
+                                Previous
+                            </Button>
+                        )}
                         <span className="text-muted-foreground">
                             Page {transfers.meta.current_page} of{' '}
                             {transfers.meta.last_page}
                         </span>
-                        <Button
-                            variant="outline"
-                            disabled={!transfers.links.next}
-                            asChild={!!transfers.links.next}
-                        >
-                            {transfers.links.next ? (
-                                <Link href={transfers.links.next}>Next</Link>
-                            ) : (
-                                'Next'
-                            )}
-                        </Button>
+                        {transfers.links.next ? (
+                            <Link
+                                href={transfers.links.next}
+                                className={cn(
+                                    buttonVariants({
+                                        variant: 'outline',
+                                    }),
+                                )}
+                            >
+                                Next
+                            </Link>
+                        ) : (
+                            <Button variant="outline" disabled>
+                                Next
+                            </Button>
+                        )}
                     </nav>
                 )}
             </main>

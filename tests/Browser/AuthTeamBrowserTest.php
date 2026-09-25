@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 
 it('registers an eligible account and asks the user to verify their email', function (): void {
@@ -28,6 +30,31 @@ it('registers an eligible account and asks the user to verify their email', func
     $user = User::query()->sole();
     expect($user->hasVerifiedEmail())->toBeFalse();
     Notification::assertSentTo($user, VerifyEmail::class);
+
+    $page->press('Resend verification email')->assertSee('A new verification link has been sent')->assertNoJavascriptErrors();
+    Notification::assertSentToTimes($user, VerifyEmail::class, 2);
+});
+
+it('requests and resets a password by clicking the form buttons', function (): void {
+    $user = User::factory()->create();
+    Notification::fake();
+
+    visit('/forgot-password')
+        ->fill('email', $user->email)
+        ->press('Send reset link')
+        ->assertSee('If that account exists, a password reset link has been sent.')
+        ->assertNoJavascriptErrors();
+
+    $notification = Notification::sent($user, ResetPassword::class)->sole();
+
+    visit(route('password.reset', ['token' => $notification->token, 'email' => $user->email]))
+        ->fill('password', 'new-browser-password')
+        ->fill('password_confirmation', 'new-browser-password')
+        ->press('Reset password')
+        ->assertSee('Forgot password?')
+        ->assertNoJavascriptErrors();
+
+    expect(Hash::check('new-browser-password', $user->refresh()->password))->toBeTrue();
 });
 
 it('signs in and signs out through the account menu', function (): void {
@@ -69,4 +96,16 @@ it('lets an admin add and remove a registered member in the teams interface', fu
         ->assertNoJavascriptErrors();
 
     expect($team->users()->count())->toBe(0);
+
+    $page->fill('#name-'.$team->id, 'Creative Studio Updated')
+        ->press('Rename')
+        ->assertSee('Team renamed.')
+        ->fill('#team-name', 'Production')
+        ->press('Create team')
+        ->assertSee('Team created.')
+        ->assertSee('Production')
+        ->assertNoJavascriptErrors();
+
+    expect($team->refresh()->name)->toBe('Creative Studio Updated');
+    expect(Team::query()->where('name', 'Production')->exists())->toBeTrue();
 });

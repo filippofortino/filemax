@@ -145,24 +145,22 @@ export function Shell({
                     ) : (
                         user && (
                             <Popover>
-                                <PopoverTrigger asChild>
-                                    <button
-                                        className="flex items-center gap-2.5 text-muted-foreground"
-                                        aria-label="Account menu"
+                                <PopoverTrigger
+                                    className="flex items-center gap-2.5 text-muted-foreground"
+                                    aria-label="Account menu"
+                                >
+                                    <span
+                                        className={cn(
+                                            'hidden md:inline',
+                                            headerAction && 'md:hidden',
+                                        )}
                                     >
-                                        <span
-                                            className={cn(
-                                                'hidden md:inline',
-                                                headerAction && 'md:hidden',
-                                            )}
-                                        >
-                                            {user.name.split(' ')[0]}
-                                        </span>
-                                        <Avatar
-                                            name={user.name}
-                                            url={user.avatar_url}
-                                        />
-                                    </button>
+                                        {user.name.split(' ')[0]}
+                                    </span>
+                                    <Avatar
+                                        name={user.name}
+                                        url={user.avatar_url}
+                                    />
                                 </PopoverTrigger>
                                 <PopoverContent
                                     align="end"
@@ -319,24 +317,22 @@ export function TeamPicker({
     return (
         <div className="flex min-w-0 flex-col gap-2.5">
             <Popover>
-                <PopoverTrigger asChild>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full flex-wrap justify-between gap-y-1 py-2 whitespace-normal"
-                        aria-label="Choose teams"
-                        disabled={disabled}
-                    >
-                        Choose teams
-                        <span>
-                            {availableSelection.length
-                                ? `${availableSelection.length} selected`
-                                : 'Select at least one'}
-                        </span>
-                    </Button>
+                <PopoverTrigger
+                    render={<Button variant="outline" />}
+                    type="button"
+                    className="w-full flex-wrap justify-between gap-y-1 py-2 whitespace-normal"
+                    aria-label="Choose teams"
+                    disabled={disabled}
+                >
+                    Choose teams
+                    <span>
+                        {availableSelection.length
+                            ? `${availableSelection.length} selected`
+                            : 'Select at least one'}
+                    </span>
                 </PopoverTrigger>
                 <PopoverContent
-                    className="w-(--radix-popover-trigger-width) max-w-(--radix-popover-content-available-width) min-w-64 p-2"
+                    className="w-(--anchor-width) max-w-(--available-width) min-w-64 p-2"
                     align="start"
                 >
                     <label className="sr-only" htmlFor="team-search">

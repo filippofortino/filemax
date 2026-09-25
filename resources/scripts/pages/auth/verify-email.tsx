@@ -25,7 +25,12 @@ export default function VerifyEmail() {
             </p>
             <Form action={send()}>
                 {({ processing }) => (
-                    <Button className="w-full" size="lg" disabled={processing}>
+                    <Button
+                        type="submit"
+                        className="w-full"
+                        size="lg"
+                        disabled={processing}
+                    >
                         {processing ? 'Sending…' : 'Resend verification email'}
                     </Button>
                 )}

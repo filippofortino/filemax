@@ -65,7 +65,7 @@ export default function Teams({
                                     />
                                     <ErrorMessage>{errors.name}</ErrorMessage>
                                 </div>
-                                <Button disabled={processing}>
+                                <Button type="submit" disabled={processing}>
                                     {processing ? 'Creating…' : 'Create team'}
                                 </Button>
                             </>
@@ -132,7 +132,11 @@ function TeamCard({ team, users }: { team: ManagedTeam; users: Member[] }) {
                                 />
                                 <ErrorMessage>{errors.name}</ErrorMessage>
                             </div>
-                            <Button variant="outline" disabled={processing}>
+                            <Button
+                                type="submit"
+                                variant="outline"
+                                disabled={processing}
+                            >
                                 {processing ? 'Saving…' : 'Rename'}
                             </Button>
                         </>
@@ -162,6 +166,7 @@ function TeamCard({ team, users }: { team: ManagedTeam; users: Member[] }) {
                         >
                             {({ processing }) => (
                                 <Button
+                                    type="submit"
                                     variant="ghost"
                                     size="sm"
                                     disabled={processing}
@@ -211,6 +216,7 @@ function TeamCard({ team, users }: { team: ManagedTeam; users: Member[] }) {
                             <ErrorMessage>{errors.user_id}</ErrorMessage>
                         </div>
                         <Button
+                            type="submit"
                             disabled={processing || availableUsers.length === 0}
                         >
                             {processing ? 'Adding…' : 'Add member'}
