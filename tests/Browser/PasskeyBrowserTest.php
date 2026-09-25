@@ -49,13 +49,18 @@ JS);
     $page->fill('#passkey-name', 'Work MacBook')
         ->assertEnabled('#passkey-form button')
         ->press('Add passkey')
-        ->assertSee('The passkey operation was cancelled.')
+        ->assertSeeIn('[data-slot="toast"]', 'Passkey not added')
+        ->assertSeeIn('[data-slot="toast"]', 'The passkey operation was cancelled.')
         ->assertSee('You haven’t added any passkeys yet.')
         ->assertEnabled('#passkey-form button')
         ->assertNoJavascriptErrors();
 
-    expect($page->text('[role="alert"]'))->toContain('The passkey operation was cancelled.');
     expect($page->script('() => window.passkeyCreateCalls'))->toBe(1);
+    $page->press('[data-slot="toast"] button:has-text("Try again")')
+        ->assertSeeIn('[data-slot="toast"]', 'The passkey operation was cancelled.')
+        ->assertCount('[data-slot="toast"]', 1)
+        ->assertNoJavascriptErrors();
+    expect($page->script('() => window.passkeyCreateCalls'))->toBe(2);
     expect($page->script('() => document.querySelector("#passkey-name").value'))->toBe('Work MacBook');
     expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
     expect($user->passkeys()->count())->toBe(0);

@@ -5,8 +5,9 @@ import { usePasskeyRegister } from '@laravel/passkeys/react';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '@/components/avatar';
 import { ErrorMessage, Shell } from '@/components/filemax';
-import { PasskeyFeedback } from '@/components/passkey-button';
+import { sessionExpired } from '@/components/passkey-button';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/toast';
 import { date, passwordHint } from '@/lib/format';
 import type { SharedProps, User } from '@/lib/types';
 import { destroy, registrationOptions, store } from '@/routes/passkey';
@@ -21,8 +22,38 @@ type Passkey = {
     last_used_at: string | null;
 };
 
+function failed(
+    title: string,
+    retry: () => void,
+    description = 'Check your connection and try again.',
+    action = 'Try again',
+) {
+    toast.add({
+        id: title,
+        type: 'error',
+        title,
+        description,
+        timeout: 0,
+        priority: 'high',
+        actionProps: {
+            children: action,
+            onClick: () => {
+                toast.close(title);
+                retry();
+            },
+        },
+    });
+    return false;
+}
+
 export default function Settings({ passkeys }: { passkeys: Passkey[] }) {
     const { auth, passwordRequirements } = usePage<SharedProps>().props;
+    const passwordForm = useRef<HTMLFormElement>(null);
+    const password = useForm({
+        current_password: '',
+        password: '',
+        password_confirmation: '',
+    });
 
     return (
         <Shell active="account">
@@ -49,116 +80,142 @@ export default function Settings({ passkeys }: { passkeys: Passkey[] }) {
                                 Used when you sign in without a passkey.
                             </p>
                         </div>
-                        <Form
+                        <form
+                            ref={passwordForm}
                             id="password-form"
-                            action={updatePassword()}
-                            errorBag="updatePassword"
-                            options={{ preserveScroll: true }}
-                            resetOnSuccess
                             className="flex flex-col gap-5"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                password.put(updatePassword.url(), {
+                                    errorBag: 'updatePassword',
+                                    preserveScroll: true,
+                                    onSuccess: () => {
+                                        password.reset();
+                                        toast.add({
+                                            title: 'Password updated',
+                                            description:
+                                                'You’re signed out everywhere else.',
+                                        });
+                                    },
+                                    onNetworkError: () =>
+                                        failed('Password not updated', () =>
+                                            passwordForm.current?.requestSubmit(),
+                                        ),
+                                });
+                            }}
                         >
-                            {({ errors, processing, recentlySuccessful }) => (
-                                <>
-                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                        <div className="flex flex-col gap-2">
-                                            <label
-                                                htmlFor="password-current"
-                                                className="text-sm font-semibold"
-                                            >
-                                                Current password
-                                            </label>
-                                            <input
-                                                id="password-current"
-                                                name="current_password"
-                                                type="password"
-                                                autoComplete="current-password"
-                                                required
-                                                aria-invalid={
-                                                    !!errors.current_password
-                                                }
-                                            />
-                                            <ErrorMessage>
-                                                {errors.current_password}
-                                            </ErrorMessage>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                        <div className="flex flex-col gap-2">
-                                            <label
-                                                htmlFor="password-new"
-                                                className="text-sm font-semibold"
-                                            >
-                                                New password
-                                            </label>
-                                            <input
-                                                id="password-new"
-                                                name="password"
-                                                type="password"
-                                                autoComplete="new-password"
-                                                minLength={
-                                                    passwordRequirements.min
-                                                }
-                                                required
-                                                aria-describedby="password-requirements"
-                                                aria-invalid={!!errors.password}
-                                            />
-                                            <ErrorMessage>
-                                                {errors.password}
-                                            </ErrorMessage>
-                                        </div>
-                                        <div className="flex flex-col gap-2">
-                                            <label
-                                                htmlFor="password-repeat"
-                                                className="text-sm font-semibold"
-                                            >
-                                                Repeat new password
-                                            </label>
-                                            <input
-                                                id="password-repeat"
-                                                name="password_confirmation"
-                                                type="password"
-                                                autoComplete="new-password"
-                                                minLength={
-                                                    passwordRequirements.min
-                                                }
-                                                required
-                                                aria-invalid={
-                                                    !!errors.password_confirmation
-                                                }
-                                            />
-                                            <ErrorMessage>
-                                                {errors.password_confirmation}
-                                            </ErrorMessage>
-                                        </div>
-                                    </div>
-                                    <p
-                                        id="password-requirements"
-                                        className="text-sm text-muted-foreground"
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="flex flex-col gap-2">
+                                    <label
+                                        htmlFor="password-current"
+                                        className="text-sm font-semibold"
                                     >
-                                        {passwordHint(passwordRequirements)}{' '}
-                                        Changing it keeps your passkeys and
-                                        signs you out everywhere else.
-                                    </p>
-                                    <Button
-                                        type="submit"
-                                        className="self-start"
-                                        disabled={processing}
+                                        Current password
+                                    </label>
+                                    <input
+                                        id="password-current"
+                                        name="current_password"
+                                        type="password"
+                                        autoComplete="current-password"
+                                        required
+                                        value={password.data.current_password}
+                                        onChange={(event) =>
+                                            password.setData(
+                                                'current_password',
+                                                event.target.value,
+                                            )
+                                        }
+                                        aria-invalid={
+                                            !!password.errors.current_password
+                                        }
+                                    />
+                                    <ErrorMessage>
+                                        {password.errors.current_password}
+                                    </ErrorMessage>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="flex flex-col gap-2">
+                                    <label
+                                        htmlFor="password-new"
+                                        className="text-sm font-semibold"
                                     >
-                                        {processing
-                                            ? 'Updating…'
-                                            : 'Update password'}
-                                    </Button>
-                                    {recentlySuccessful && (
-                                        <p
-                                            role="status"
-                                            className="text-sm text-muted-foreground"
-                                        >
-                                            Password updated.
-                                        </p>
-                                    )}
-                                </>
-                            )}
-                        </Form>
+                                        New password
+                                    </label>
+                                    <input
+                                        id="password-new"
+                                        name="password"
+                                        type="password"
+                                        autoComplete="new-password"
+                                        minLength={passwordRequirements.min}
+                                        required
+                                        value={password.data.password}
+                                        onChange={(event) =>
+                                            password.setData(
+                                                'password',
+                                                event.target.value,
+                                            )
+                                        }
+                                        aria-describedby="password-requirements"
+                                        aria-invalid={
+                                            !!password.errors.password
+                                        }
+                                    />
+                                    <ErrorMessage>
+                                        {password.errors.password}
+                                    </ErrorMessage>
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <label
+                                        htmlFor="password-repeat"
+                                        className="text-sm font-semibold"
+                                    >
+                                        Repeat new password
+                                    </label>
+                                    <input
+                                        id="password-repeat"
+                                        name="password_confirmation"
+                                        type="password"
+                                        autoComplete="new-password"
+                                        minLength={passwordRequirements.min}
+                                        required
+                                        value={
+                                            password.data.password_confirmation
+                                        }
+                                        onChange={(event) =>
+                                            password.setData(
+                                                'password_confirmation',
+                                                event.target.value,
+                                            )
+                                        }
+                                        aria-invalid={
+                                            !!password.errors
+                                                .password_confirmation
+                                        }
+                                    />
+                                    <ErrorMessage>
+                                        {password.errors.password_confirmation}
+                                    </ErrorMessage>
+                                </div>
+                            </div>
+                            <p
+                                id="password-requirements"
+                                className="text-sm text-muted-foreground"
+                            >
+                                {passwordHint(passwordRequirements)} Changing it
+                                keeps your passkeys and signs you out everywhere
+                                else.
+                            </p>
+                            <Button
+                                type="submit"
+                                className="self-start"
+                                disabled={password.processing}
+                            >
+                                {password.processing
+                                    ? 'Updating…'
+                                    : 'Update password'}
+                            </Button>
+                        </form>
                     </section>
                     <Passkeys passkeys={passkeys} />
                 </div>
@@ -168,6 +225,7 @@ export default function Settings({ passkeys }: { passkeys: Passkey[] }) {
 }
 
 function Profile({ user }: { user: User }) {
+    const profileForm = useRef<HTMLFormElement>(null);
     const photoInput = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<string | null>(null);
     const profile = useForm({
@@ -199,6 +257,7 @@ function Profile({ user }: { user: User }) {
                 </p>
             </div>
             <form
+                ref={profileForm}
                 id="profile-form"
                 className="flex flex-col gap-5"
                 onSubmit={(event) => {
@@ -212,7 +271,12 @@ function Profile({ user }: { user: User }) {
                             setPreview(null);
                             if (photoInput.current)
                                 photoInput.current.value = '';
+                            toast.add({ title: 'Profile saved' });
                         },
+                        onNetworkError: () =>
+                            failed('Profile not saved', () =>
+                                profileForm.current?.requestSubmit(),
+                            ),
                     });
                 }}
             >
@@ -350,30 +414,40 @@ function Profile({ user }: { user: User }) {
                 >
                     {profile.processing ? 'Saving…' : 'Save profile'}
                 </Button>
-                {profile.recentlySuccessful && (
-                    <p role="status" className="text-sm text-muted-foreground">
-                        Profile saved.
-                    </p>
-                )}
             </form>
         </section>
     );
 }
 
 function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
-    const { status } = usePage<SharedProps>().props;
+    const passkeyForm = useRef<HTMLFormElement>(null);
     const [name, setName] = useState('');
-    const [registered, setRegistered] = useState(false);
-    const { register, isLoading, isSupported, error } = usePasskeyRegister({
+    const { register, isLoading, isSupported } = usePasskeyRegister({
         routes: { options: registrationOptions.url(), submit: store.url() },
         onSuccess: () => {
             setName('');
-            setRegistered(true);
+            toast.add({
+                title: 'Passkey added',
+                description: 'You can now use it to sign in.',
+            });
             router.reload();
         },
         onError: (error) => {
             if (error.message === 'Password confirmation required.') {
                 router.visit(confirmPassword());
+            } else if (sessionExpired(error.message)) {
+                failed(
+                    'Passkey not added',
+                    () => window.location.reload(),
+                    'Your session expired. Reload this page and try again.',
+                    'Reload page',
+                );
+            } else {
+                failed(
+                    'Passkey not added',
+                    () => passkeyForm.current?.requestSubmit(),
+                    error.message,
+                );
             }
         },
     });
@@ -393,22 +467,12 @@ function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
                     recognize, such as “Work MacBook”.
                 </p>
             </div>
-            {(status === 'passkey-deleted' || registered) && (
-                <p
-                    className="rounded-lg border border-blue-200 bg-accent px-4 py-3 text-slate-700"
-                    role="status"
-                >
-                    {status === 'passkey-deleted'
-                        ? 'Passkey removed.'
-                        : 'Passkey added. You can now use it to sign in.'}
-                </p>
-            )}
             <form
+                ref={passkeyForm}
                 id="passkey-form"
                 className="flex flex-col gap-3 sm:flex-row sm:items-end"
                 onSubmit={(event) => {
                     event.preventDefault();
-                    setRegistered(false);
                     void register(name.trim());
                 }}
             >
@@ -443,7 +507,6 @@ function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
                     sign in with your password.
                 </p>
             )}
-            <PasskeyFeedback error={error} />
             {passkeys.length === 0 ? (
                 <p className="border-t py-6 text-center text-muted-foreground">
                     You haven’t added any passkeys yet.
@@ -476,7 +539,12 @@ function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
                             <Form
                                 action={destroy(passkey.id)}
                                 options={{ preserveScroll: true }}
-                                onSuccess={() => setRegistered(false)}
+                                onSuccess={() =>
+                                    toast.add({
+                                        title: 'Passkey removed',
+                                        description: `“${passkey.name}” can no longer sign you in.`,
+                                    })
+                                }
                             >
                                 {({ processing }) => (
                                     <Button

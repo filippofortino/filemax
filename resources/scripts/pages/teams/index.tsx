@@ -1,7 +1,7 @@
-import { Form, Head, usePage } from '@inertiajs/react';
+import { Form, Head } from '@inertiajs/react';
 import { ErrorMessage, Shell } from '@/components/filemax';
 import { Button } from '@/components/ui/button';
-import type { SharedProps, Team, User } from '@/lib/types';
+import type { Team, User } from '@/lib/types';
 import { store, update } from '@/routes/teams';
 import { destroy, store as addMember } from '@/routes/teams/members';
 
@@ -15,7 +15,6 @@ export default function Teams({
     teams: ManagedTeam[];
     users: Member[];
 }) {
-    const status = usePage<SharedProps>().props.status;
     return (
         <Shell active="teams">
             <Head title="Teams" />
@@ -26,14 +25,6 @@ export default function Teams({
                         Manage who can receive transfers shared with each team.
                     </p>
                 </div>
-                {status && (
-                    <p
-                        className="mb-6 rounded-lg border border-blue-200 bg-accent px-4 py-3 text-slate-700"
-                        role="status"
-                    >
-                        {status}
-                    </p>
-                )}
                 <section
                     className="mb-6 rounded-xl border bg-white p-6"
                     aria-labelledby="create-team-title"

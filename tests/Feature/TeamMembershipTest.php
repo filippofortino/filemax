@@ -25,17 +25,17 @@ test('verified admins can create rename and manage multiple memberships', functi
     $admin = User::factory()->admin()->create();
     $member = User::factory()->create();
     $other = Team::factory()->create();
-    $this->actingAs($admin)->post(route('teams.store'), ['name' => 'Design'])->assertRedirect(route('teams.index'));
+    $this->actingAs($admin)->post(route('teams.store'), ['name' => 'Design'])->assertRedirect(route('teams.index'))->assertInertiaFlash('toast.title', 'Team created');
     $team = Team::query()->where('name', 'Design')->sole();
-    $this->patch(route('teams.update', $team), ['name' => 'Creative'])->assertRedirect();
+    $this->patch(route('teams.update', $team), ['name' => 'Creative'])->assertRedirect()->assertInertiaFlash('toast.title', 'Team renamed');
     expect($team->refresh()->name)->toBe('Creative');
 
-    $this->post(route('teams.members.store', $team), ['user_id' => $member->id])->assertRedirect();
+    $this->post(route('teams.members.store', $team), ['user_id' => $member->id])->assertRedirect()->assertInertiaFlash('toast.title', 'Member added');
     $this->post(route('teams.members.store', $team), ['user_id' => $member->id])->assertRedirect();
     $this->post(route('teams.members.store', $other), ['user_id' => $member->id])->assertRedirect();
     expect($member->teams()->count())->toBe(2)->and($team->users()->count())->toBe(1);
 
-    $this->delete(route('teams.members.destroy', [$team, $member]))->assertRedirect();
+    $this->delete(route('teams.members.destroy', [$team, $member]))->assertRedirect()->assertInertiaFlash('toast.title', 'Member removed');
     expect($member->teams()->pluck('teams.id')->all())->toBe([$other->id]);
 });
 
