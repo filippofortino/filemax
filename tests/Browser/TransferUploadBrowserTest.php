@@ -57,7 +57,8 @@ it('recovers a failed multi-file upload while preserving finished files and shar
     $team = Team::factory()->create(['name' => 'Mediamax']);
     $user->teams()->attach($team);
     $this->actingAs($user);
-    $page = visit('/')->resize(1280, 940)->assertSee('Drop files here');
+    $page = visit('/')->withTimezone('Europe/Rome')->resize(1280, 940)->assertSee('Drop files here');
+    expect($page->script('() => document.body.innerText'))->toMatch('/Available until \d{1,2} \w+ \d{4}, \d{2}:\d{2}\./');
     $page->script('() => document.fonts.ready');
     $page->screenshot(filename: 'upload-empty');
     $page->fill('#transfer-title', 'Spot autunno — materiali finali')->fill('#transfer-message', 'Ciao Marco, qui i materiali approvati.');
@@ -99,6 +100,7 @@ JS);
     $page->screenshot(filename: 'upload-failed');
     expect(Transfer::query()->sole()->status)->toBe('uploading');
     $page->press('Retry and create link')->assertSee('Your link is ready')->assertNoJavascriptErrors();
+    expect($page->script('() => document.body.innerText'))->toMatch('/expires \d{1,2} \w+ \d{4}, \d{2}:\d{2}/');
     $page->screenshot(filename: 'upload-ready');
     expect($page->script('() => window.uploadPutCount'))->toBe(4);
     $transfer = Transfer::query()->sole();

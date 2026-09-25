@@ -25,7 +25,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { bytes, date } from '@/lib/format';
+import { bytes, date, dateTime } from '@/lib/format';
 import type { Team, Transfer } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { destroy, index, update } from '@/routes/transfers';
@@ -91,7 +91,7 @@ export default function Show({
                     </div>
                     <p className="text-muted-foreground">
                         Created {date(transfer.created_at)} · Expires{' '}
-                        {date(transfer.expires_at)} · {transfer.files_count}{' '}
+                        {dateTime(transfer.expires_at)} · {transfer.files_count}{' '}
                         {transfer.files_count === 1 ? 'file' : 'files'} ·{' '}
                         {bytes(transfer.total_size)}
                     </p>

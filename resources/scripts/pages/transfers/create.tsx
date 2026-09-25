@@ -18,7 +18,7 @@ import {
     TeamPicker,
 } from '@/components/filemax';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { bytes, date } from '@/lib/format';
+import { bytes, dateTime } from '@/lib/format';
 import { request, uploadPart } from '@/lib/http';
 import type { Team, Transfer, TransferFile } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -343,7 +343,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                             <p className="text-muted-foreground">
                                 {ready.files.length} files ·{' '}
                                 {bytes(ready.total_size)} · expires{' '}
-                                {date(ready.expires_at)}
+                                {dateTime(ready.expires_at)}
                             </p>
                         </div>
                         <CopyLink url={ready.url} />
@@ -850,7 +850,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                 </div>
                                 <p className="mt-2.5 text-sm text-muted-foreground">
                                     Available until{' '}
-                                    {date(availableUntil.toISOString())}.
+                                    {dateTime(availableUntil.toISOString())}.
                                 </p>
                             </fieldset>
                         </>
