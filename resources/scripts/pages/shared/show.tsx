@@ -2,7 +2,7 @@ import { Head } from '@inertiajs/react';
 import { Avatar } from '@/components/avatar';
 import { DownloadAll, FileDownload } from '@/components/downloads';
 import { FileRow, Shell } from '@/components/filemax';
-import { date } from '@/lib/format';
+import { dateTime } from '@/lib/format';
 
 type SharedTransfer = {
     token: string;
@@ -76,7 +76,7 @@ export default function SharedTransferPage({
                     <p className="text-center text-sm text-muted-foreground">
                         {transfer.files.length}{' '}
                         {transfer.files.length === 1 ? 'file' : 'files'} ·
-                        available until {date(transfer.expires_at)}
+                        available until {dateTime(transfer.expires_at)}
                     </p>
                 </section>
             </main>

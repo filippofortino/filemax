@@ -10,7 +10,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { Head, Link } from '@inertiajs/react';
 import { Shell, TeamBadges } from '@/components/filemax';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { bytes, date } from '@/lib/format';
+import { bytes, date, dateTime } from '@/lib/format';
 import type { Team, Transfer } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { home } from '@/routes';
@@ -242,7 +242,7 @@ export default function Index({ transfers, teams, filter, totals }: Props) {
                                     <span className="text-sm text-muted-foreground md:col-span-6 lg:col-span-2">
                                         {transfer.revoked_at
                                             ? 'Deleted'
-                                            : `${transfer.available ? 'Expires' : 'Expired'} ${date(transfer.expires_at)}`}
+                                            : `${transfer.available ? 'Expires' : 'Expired'} ${dateTime(transfer.expires_at)}`}
                                     </span>
                                 </div>
                                 <HugeiconsIcon

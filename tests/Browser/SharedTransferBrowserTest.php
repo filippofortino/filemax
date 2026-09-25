@@ -24,9 +24,9 @@ it('renders the public recipient at desktop and phone sizes without horizontal o
         TransferFile::factory()->for($transfer)->create(['original_name' => $name, 'size' => $size]);
     }
 
-    $page = visit(route('shared.show', $transfer->token))->resize(1280, 940)
+    $page = visit(route('shared.show', $transfer->token))->withTimezone('Europe/Rome')->resize(1280, 940)
         ->assertSee('Spot autunno — materiali finali')
-        ->assertSee('3 files · available until 25 Sept 2026')
+        ->assertSee('3 files · available until 25 Sept 2026, 14:00')
         ->assertSee('Download all')
         ->assertNoJavascriptErrors();
     $page->script('document.fonts.ready');

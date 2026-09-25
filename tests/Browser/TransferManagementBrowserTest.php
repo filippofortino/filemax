@@ -6,6 +6,7 @@ use App\Models\Team;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 
 it('shows an empty sender history and a working create action', function (): void {
     $this->actingAs(User::factory()->create(['name' => 'Filippo Fortino']));
@@ -34,6 +35,21 @@ it('uses links for available pages and disabled buttons at the pagination bounda
         ->assertMissing('nav[aria-label="Pagination"] a:has-text("Next")')
         ->click('nav[aria-label="Pagination"] a:has-text("Previous")')
         ->assertSee('Page 1 of 2')
+        ->assertNoJavascriptErrors();
+});
+
+it('shows the expiry date and time in the viewer timezone', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-09-20 12:00:00'));
+    $owner = User::factory()->create();
+    Transfer::factory()->for($owner)->create(['title' => 'Spot autunno', 'expires_at' => '2026-09-25 12:00:00']);
+    Transfer::factory()->for($owner)->create(['title' => 'Brandbook Mediamax', 'expires_at' => '2026-09-19 08:30:00']);
+    $this->actingAs($owner);
+
+    visit('/transfers')->withTimezone('Europe/Rome')
+        ->assertSee('Expires 25 Sept 2026, 14:00')
+        ->assertSee('Expired 19 Sept 2026, 10:30')
+        ->click('a:has-text("Spot autunno")')
+        ->assertSee('Expires 25 Sept 2026, 14:00')
         ->assertNoJavascriptErrors();
 });
 

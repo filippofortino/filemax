@@ -26,6 +26,17 @@ export function date(value: string | null): string {
           }).format(new Date(value))
         : '—';
 }
+export function dateTime(value: string | null): string {
+    return value
+        ? new Intl.DateTimeFormat('en-GB', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+          }).format(new Date(value))
+        : '—';
+}
 export function initials(name: string): string {
     return name
         .trim()
