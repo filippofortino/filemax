@@ -105,6 +105,7 @@ export default function Register() {
                             />
                         </div>
                         <Button
+                            type="submit"
                             className="w-full"
                             size="lg"
                             disabled={processing}

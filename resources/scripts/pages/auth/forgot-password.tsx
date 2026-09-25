@@ -34,6 +34,7 @@ export default function ForgotPassword() {
                             <ErrorMessage>{errors.email}</ErrorMessage>
                         </div>
                         <Button
+                            type="submit"
                             className="w-full"
                             size="lg"
                             disabled={processing}

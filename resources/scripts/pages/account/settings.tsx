@@ -140,6 +140,7 @@ export default function Settings({ passkeys }: { passkeys: Passkey[] }) {
                                         signs you out everywhere else.
                                     </p>
                                     <Button
+                                        type="submit"
                                         className="self-start"
                                         disabled={processing}
                                     >
@@ -342,7 +343,11 @@ function Profile({ user }: { user: User }) {
                         />
                     </div>
                 </div>
-                <Button className="self-start" disabled={profile.processing}>
+                <Button
+                    type="submit"
+                    className="self-start"
+                    disabled={profile.processing}
+                >
                     {profile.processing ? 'Saving…' : 'Save profile'}
                 </Button>
                 {profile.recentlySuccessful && (
@@ -425,6 +430,7 @@ function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
                     />
                 </div>
                 <Button
+                    type="submit"
                     variant="outline"
                     disabled={isLoading || !isSupported || !name.trim()}
                 >
@@ -474,6 +480,7 @@ function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
                             >
                                 {({ processing }) => (
                                     <Button
+                                        type="submit"
                                         variant="outline"
                                         size="sm"
                                         disabled={processing || isLoading}

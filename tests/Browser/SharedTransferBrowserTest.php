@@ -71,6 +71,17 @@ it('shows denied and expired states without disclosing the file list', function 
         ->assertSee("You don't have access to these files")
         ->assertSee('Creative')
         ->assertDontSee('private-file.pdf')
+        ->assertAttributeContains('a:has-text("Ask Filippo for access")', 'href', 'mailto:'.$sender->email.'?')
+        ->assertAttributeMissing('a:has-text("Ask Filippo for access")', 'role')
+        ->assertAttribute('a:has-text("Go to Filemax")', 'href', '/')
+        ->assertAttributeMissing('a:has-text("Go to Filemax")', 'role')
+        ->assertScript(<<<'JS'
+            () => {
+                const link = [...document.querySelectorAll('a')].find((element) => element.textContent.trim() === 'Go to Filemax');
+                const style = getComputedStyle(link);
+                return style.borderTopWidth === '1px' && style.borderTopColor !== 'rgba(0, 0, 0, 0)';
+            }
+            JS)
         ->screenshot(filename: 'filemax-recipient-denied')
         ->resize(390, 844)
         ->screenshot(filename: 'filemax-recipient-denied-phone');

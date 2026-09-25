@@ -123,14 +123,16 @@ export default function Show({
                                                     }
                                                 }}
                                             >
-                                                <DialogTrigger asChild>
-                                                    <Button
-                                                        variant="link"
-                                                        size="sm"
-                                                        className="h-auto min-h-0 p-0 text-sm"
-                                                    >
-                                                        Change teams
-                                                    </Button>
+                                                <DialogTrigger
+                                                    render={
+                                                        <Button
+                                                            variant="link"
+                                                            size="sm"
+                                                        />
+                                                    }
+                                                    className="h-auto min-h-0 p-0 text-sm"
+                                                >
+                                                    Change teams
                                                 </DialogTrigger>
                                                 <DialogContent>
                                                     <DialogHeader>
@@ -379,15 +381,17 @@ export default function Show({
                                     open={deleteOpen}
                                     onOpenChange={setDeleteOpen}
                                 >
-                                    <DialogTrigger asChild>
-                                        <Button variant="destructive">
-                                            <HugeiconsIcon
-                                                icon={Delete02Icon}
-                                                size={18}
-                                                aria-hidden="true"
-                                            />
-                                            Delete transfer
-                                        </Button>
+                                    <DialogTrigger
+                                        render={
+                                            <Button variant="destructive" />
+                                        }
+                                    >
+                                        <HugeiconsIcon
+                                            icon={Delete02Icon}
+                                            size={18}
+                                            aria-hidden="true"
+                                        />
+                                        Delete transfer
                                     </DialogTrigger>
                                     <DialogContent>
                                         <DialogHeader>

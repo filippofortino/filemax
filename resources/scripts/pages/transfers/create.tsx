@@ -17,7 +17,7 @@ import {
     TeamBadges,
     TeamPicker,
 } from '@/components/filemax';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { bytes, date } from '@/lib/format';
 import { request, uploadPart } from '@/lib/http';
 import type { Team, Transfer, TransferFile } from '@/lib/types';
@@ -379,20 +379,23 @@ export default function Create({ teams }: { teams: Team[] }) {
                             >
                                 View transfer
                             </Link>
-                            <Button variant="outline" asChild>
-                                <Link
-                                    href={home()}
-                                    onClick={() => {
-                                        setReady(null);
-                                        draft.current = null;
-                                        changeEntries([]);
-                                        setTitle('');
-                                        setMessage('');
-                                    }}
-                                >
-                                    Send another
-                                </Link>
-                            </Button>
+                            <Link
+                                className={cn(
+                                    buttonVariants({
+                                        variant: 'outline',
+                                    }),
+                                )}
+                                href={home()}
+                                onClick={() => {
+                                    setReady(null);
+                                    draft.current = null;
+                                    changeEntries([]);
+                                    setTitle('');
+                                    setMessage('');
+                                }}
+                            >
+                                Send another
+                            </Link>
                         </div>
                     </section>
                 </main>

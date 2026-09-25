@@ -18,6 +18,25 @@ it('shows an empty sender history and a working create action', function (): voi
     $page->click('[aria-label="Create a transfer"]')->assertSee('Transfer details')->assertNoJavascriptErrors();
 });
 
+it('uses links for available pages and disabled buttons at the pagination boundaries', function (): void {
+    $owner = User::factory()->create();
+    Transfer::factory()->count(21)->for($owner)->create();
+    $this->actingAs($owner);
+
+    visit('/transfers')
+        ->assertSee('Page 1 of 2')
+        ->assertDisabled('nav[aria-label="Pagination"] button:has-text("Previous")')
+        ->assertMissing('nav[aria-label="Pagination"] a:has-text("Previous")')
+        ->assertAttributeContains('nav[aria-label="Pagination"] a:has-text("Next")', 'href', 'page=2')
+        ->click('nav[aria-label="Pagination"] a:has-text("Next")')
+        ->assertSee('Page 2 of 2')
+        ->assertDisabled('nav[aria-label="Pagination"] button:has-text("Next")')
+        ->assertMissing('nav[aria-label="Pagination"] a:has-text("Next")')
+        ->click('nav[aria-label="Pagination"] a:has-text("Previous")')
+        ->assertSee('Page 1 of 2')
+        ->assertNoJavascriptErrors();
+});
+
 it('saves team changes only on confirmation and keeps delete dialog keyboard focus inside', function (): void {
     $owner = User::factory()->create(['name' => 'Filippo Fortino']);
     $mediamax = Team::factory()->create(['name' => 'Mediamax']);
@@ -72,21 +91,46 @@ it('saves team changes only on confirmation and keeps delete dialog keyboard foc
 
     $page->press('Change teams')->assertSee('Save changes');
     $page->screenshot(fullPage: false, filename: 'dialog-change-teams');
-    $page->press('[aria-label="Remove Lenergy"]')->press('Cancel')->assertDontSee('Save changes');
+    $page->resize(390, 844)->press('[aria-label="Choose teams"]')
+        ->assertVisible('#team-search')
+        ->assertScript(<<<'JS'
+() => {
+    const trigger = document.querySelector('[aria-label="Choose teams"]').getBoundingClientRect();
+    const popup = document.querySelector('[data-slot="popover-content"]').getBoundingClientRect();
+    return popup.left >= 0 && popup.right <= window.innerWidth
+        && Math.abs(popup.width - Math.max(256, trigger.width)) < 1;
+}
+JS)
+        ->uncheck('[aria-label="Lenergy"]')
+        ->keys(':focus', 'Escape')
+        ->assertMissing('#team-search')
+        ->assertVisible('[aria-label="Choose teams"]:focus')
+        ->assertSee('Save changes')
+        ->press('Cancel')
+        ->assertDontSee('Save changes')
+        ->assertVisible('button:has-text("Change teams"):focus')
+        ->resize(1280, 940);
     expect($transfer->teams()->pluck('teams.id')->all())->toEqualCanonicalizing([$mediamax->id, $lenergy->id]);
 
-    $page->press('Change teams')->press('[aria-label="Remove Lenergy"]')->press('Save changes')->assertDontSee('Save changes');
+    $page->press('Change teams')
+        ->press('[aria-label="Choose teams"]')
+        ->assertChecked('[aria-label="Lenergy"]')
+        ->uncheck('[aria-label="Lenergy"]')
+        ->keys(':focus', 'Escape')
+        ->assertMissing('#team-search')
+        ->press('Save changes')
+        ->assertDontSee('Save changes');
     expect($transfer->teams()->pluck('teams.id')->all())->toBe([$mediamax->id]);
 
     $page->press('button:has-text("Delete transfer")')->assertSee('Delete this transfer?');
-    expect($page->script('() => document.querySelector("[role=dialog]").contains(document.activeElement)'))->toBeTrue();
+    $page->assertVisible('[role="dialog"]:has-text("Delete this transfer?"):focus-within');
     $page->keys(':focus', 'Shift+Tab');
-    expect($page->script('() => document.querySelector("[role=dialog]").contains(document.activeElement)'))->toBeTrue();
+    $page->assertVisible('[role="dialog"]:has-text("Delete this transfer?"):focus-within');
     $page->keys(':focus', 'Tab')->keys(':focus', 'Tab')->keys(':focus', 'Tab');
-    expect($page->script('() => document.querySelector("[role=dialog]").contains(document.activeElement)'))->toBeTrue();
+    $page->assertVisible('[role="dialog"]:has-text("Delete this transfer?"):focus-within');
     $page->screenshot(fullPage: false, filename: 'dialog-delete-transfer');
     $page->keys(':focus', 'Escape')->assertDontSee('Delete this transfer?')->assertNoJavascriptErrors();
-    expect($page->script('() => document.activeElement.textContent'))->toBe('Delete transfer');
+    $page->assertVisible('button:has-text("Delete transfer"):focus');
     expect($transfer->fresh()->revoked_at)->toBeNull();
 
     $page->click('My transfers')->click('a:has-text("Shooting Villa Borbone — selezione")')->assertSee('Not opened yet');

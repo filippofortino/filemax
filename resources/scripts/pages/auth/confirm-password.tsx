@@ -42,7 +42,7 @@ export default function ConfirmPassword({
                             />
                             <ErrorMessage>{errors.password}</ErrorMessage>
                         </div>
-                        <Button size="lg" disabled={processing}>
+                        <Button type="submit" size="lg" disabled={processing}>
                             {processing ? 'Confirming…' : 'Confirm password'}
                         </Button>
                     </>

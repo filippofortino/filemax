@@ -3,8 +3,9 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { Head, Link, usePage } from '@inertiajs/react';
 import switchAccount from '@/actions/App/Http/Controllers/SwitchAccountController';
 import { Shell, TeamBadges } from '@/components/filemax';
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import type { SharedProps, Team } from '@/lib/types';
+import { cn } from '@/lib/utils';
 import { home } from '@/routes';
 import { show } from '@/routes/shared';
 import { notice } from '@/routes/verification';
@@ -69,21 +70,28 @@ export default function AccessDenied({
                     </div>
                     <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
                         {requires_verification ? (
-                            <Button asChild>
-                                <Link href={notice()}>Verify your email</Link>
-                            </Button>
+                            <Link
+                                href={notice()}
+                                className={cn(buttonVariants())}
+                            >
+                                Verify your email
+                            </Link>
                         ) : (
-                            <Button asChild>
-                                <a
-                                    href={`mailto:${sender.email}?subject=${subject}&body=${body}`}
-                                >
-                                    Ask {firstName} for access
-                                </a>
-                            </Button>
+                            <a
+                                className={cn(buttonVariants())}
+                                href={`mailto:${sender.email}?subject=${subject}&body=${body}`}
+                            >
+                                Ask {firstName} for access
+                            </a>
                         )}
-                        <Button variant="outline" asChild>
-                            <Link href={home()}>Go to Filemax</Link>
-                        </Button>
+                        <Link
+                            href={home()}
+                            className={cn(
+                                buttonVariants({ variant: 'outline' }),
+                            )}
+                        >
+                            Go to Filemax
+                        </Link>
                     </div>
                     <p className="pt-1 text-sm text-muted-foreground">
                         Signed in as the wrong account?{' '}
