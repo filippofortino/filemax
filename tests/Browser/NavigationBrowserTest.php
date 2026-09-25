@@ -12,6 +12,7 @@ it('keeps the main navigation in place and offers a new transfer button outside 
         ->assertSee('Drop files here')
         ->assertMissing('header a[aria-label="New transfer"]');
     $page->script('() => document.fonts.ready');
+
     $left = $page->script($navigationLeft);
 
     $page->click('nav a:has-text("My transfers")')
