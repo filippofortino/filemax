@@ -18,6 +18,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import {
     Popover,
     PopoverContent,
+    PopoverHeader,
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { bytes } from '@/lib/format';
@@ -178,12 +179,17 @@ export function Shell({
                                 </PopoverTrigger>
                                 <PopoverContent
                                     align="end"
-                                    className="gap-3 p-5"
+                                    className="w-54 gap-3 p-5"
                                 >
-                                    <strong>{user.name}</strong>
-                                    <span className="break-all text-muted-foreground">
-                                        {user.email}
-                                    </span>
+                                    <PopoverHeader>
+                                        <strong>{user.name}</strong>
+                                        <span
+                                            className="truncate text-muted-foreground"
+                                            title={user.email}
+                                        >
+                                            {user.email}
+                                        </span>
+                                    </PopoverHeader>
                                     {user.email_verified_at && (
                                         <Link
                                             href={settings()}

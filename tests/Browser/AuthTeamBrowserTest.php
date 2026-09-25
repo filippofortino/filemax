@@ -75,6 +75,23 @@ it('signs in and signs out through the account menu', function (): void {
         ->assertNoJavascriptErrors();
 });
 
+it('shortens a long email in the account menu and keeps the full one on hover', function (): void {
+    $user = User::factory()->create(['email' => 'filippo.fortino@mediamaxcommunication.it']);
+    $this->actingAs($user);
+    $email = '[data-slot="popover-content"] [title]';
+
+    $page = visit('/')->resize(1280, 940)
+        ->click('[aria-label="Account menu"]')
+        ->assertAttribute($email, 'title', $user->email);
+    $page->script('() => document.fonts.ready');
+    $page->screenshot(fullPage: false, filename: 'account-menu-long-email');
+
+    expect($page->script("() => { const email = document.querySelector('{$email}'); return email.scrollWidth > email.clientWidth; }"))->toBeTrue()
+        ->and($page->script('() => document.querySelector(\'[data-slot="popover-content"]\').offsetWidth'))->toBe(216)
+        ->and($page->script("() => { const email = document.querySelector('{$email}'); const name = email.previousElementSibling; return email.offsetTop - name.offsetTop - name.offsetHeight; }"))->toBe(2);
+    $page->assertNoJavascriptErrors();
+});
+
 it('lets an admin add and remove a registered member in the teams interface', function (): void {
     $admin = User::factory()->admin()->create();
     $member = User::factory()->create(['name' => 'Beatrice Test']);
