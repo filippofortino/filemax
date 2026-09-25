@@ -1,4 +1,5 @@
 import {
+    Add01Icon,
     Cancel01Icon,
     Copy01Icon,
     File01Icon,
@@ -13,7 +14,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { Link, usePage } from '@inertiajs/react';
 import { useState, type ReactNode } from 'react';
 import { Avatar } from '@/components/avatar';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
     Popover,
     PopoverContent,
@@ -68,15 +69,14 @@ export function Shell({
     active = 'new',
     recipient = false,
     recipientAccount = false,
-    headerAction,
 }: {
     children: ReactNode;
     active?: 'new' | 'transfers' | 'teams' | 'account';
     recipient?: boolean;
     recipientAccount?: boolean;
-    headerAction?: ReactNode;
 }) {
     const user = usePage<SharedProps>().props.auth.user;
+    const showsNewTransfer = !recipient && active !== 'new';
     return (
         <div
             className={cn(
@@ -96,11 +96,7 @@ export function Shell({
                 {!recipient && (
                     <nav
                         aria-label="Main navigation"
-                        className={cn(
-                            'order-last flex h-12 w-full items-stretch justify-center gap-1 md:order-none md:h-full md:w-auto',
-                            headerAction &&
-                                'lg:absolute lg:left-1/2 lg:-translate-x-1/2',
-                        )}
+                        className="order-last flex h-12 w-full items-stretch justify-center gap-1 md:order-none md:h-full md:w-auto lg:absolute lg:left-1/2 lg:-translate-x-1/2"
                     >
                         <Link
                             className={cn(
@@ -137,7 +133,25 @@ export function Shell({
                     </nav>
                 )}
                 <div className="flex items-center gap-2 md:gap-4">
-                    {headerAction}
+                    {showsNewTransfer && (
+                        <Link
+                            href={home()}
+                            aria-label="New transfer"
+                            className={buttonVariants({
+                                size: 'icon-sm',
+                                className: 'md:h-10 md:w-auto md:px-4',
+                            })}
+                        >
+                            <HugeiconsIcon
+                                icon={Add01Icon}
+                                size={16}
+                                aria-hidden="true"
+                            />
+                            <span className="hidden md:inline">
+                                New transfer
+                            </span>
+                        </Link>
+                    )}
                     {recipient && !recipientAccount ? (
                         <span className="text-xs text-muted-foreground md:text-sm">
                             Mediamax Communication
@@ -152,7 +166,7 @@ export function Shell({
                                     <span
                                         className={cn(
                                             'hidden md:inline',
-                                            headerAction && 'md:hidden',
+                                            showsNewTransfer && 'md:hidden',
                                         )}
                                     >
                                         {user.name.split(' ')[0]}
