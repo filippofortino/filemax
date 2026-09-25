@@ -1,4 +1,4 @@
-import { Download01Icon, Loading03Icon } from '@hugeicons/core-free-icons';
+import { Download01Icon, LoaderCircleIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useEffect, useRef, useState } from 'react';
 import { ErrorMessage } from '@/components/filemax';
@@ -98,7 +98,8 @@ export function DownloadAll({
                 aria-busy={busy}
             >
                 <HugeiconsIcon
-                    icon={busy ? Loading03Icon : Download01Icon}
+                    icon={busy ? LoaderCircleIcon : Download01Icon}
+                    className={busy ? 'animate-spin' : undefined}
                     size={20}
                     strokeWidth={2}
                     aria-hidden="true"
@@ -186,7 +187,8 @@ export function FileDownload({
                 aria-busy={busy}
             >
                 <HugeiconsIcon
-                    icon={busy ? Loading03Icon : Download01Icon}
+                    icon={busy ? LoaderCircleIcon : Download01Icon}
+                    className={busy ? 'animate-spin' : undefined}
                     size={16}
                     strokeWidth={2}
                     aria-hidden="true"
