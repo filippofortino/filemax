@@ -33,28 +33,7 @@ type Props = {
 };
 export default function Index({ transfers, teams, filter, totals }: Props) {
     return (
-        <Shell
-            active="transfers"
-            headerAction={
-                <Link
-                    href={home()}
-                    aria-label="New transfer"
-                    className={cn(
-                        buttonVariants({
-                            size: 'icon-sm',
-                            className: 'md:h-10 md:w-auto md:px-4',
-                        }),
-                    )}
-                >
-                    <HugeiconsIcon
-                        icon={Add01Icon}
-                        size={16}
-                        aria-hidden="true"
-                    />
-                    <span className="hidden md:inline">New transfer</span>
-                </Link>
-            }
-        >
+        <Shell active="transfers">
             <Head title="My transfers" />
             <main className="mx-auto w-full max-w-6xl px-5 py-7 md:p-10">
                 <div className="mb-5 flex flex-wrap items-baseline justify-between gap-5">
