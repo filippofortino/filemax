@@ -29,3 +29,26 @@ it('keeps the main navigation in place and offers a new transfer button outside 
         ->assertSee('Drop files here')
         ->assertNoJavascriptErrors();
 });
+
+it('gives the mobile header controls space above them', function (): void {
+    $this->actingAs(User::factory()->admin()->create());
+
+    $page = visit('/transfers')->resize(390, 844)
+        ->assertVisible('header a[aria-label="New transfer"]');
+
+    $topOffsets = $page->script(<<<'JS'
+        () => {
+            const header = document.querySelector('header');
+            return [...header.querySelectorAll(':scope > a, a[aria-label="New transfer"], button[aria-label="Account menu"]')]
+                .map(element => element.getBoundingClientRect().top - header.getBoundingClientRect().top);
+        }
+        JS);
+
+    expect($topOffsets)->toHaveCount(3);
+    foreach ($topOffsets as $offset) {
+        expect($offset)->toBeGreaterThanOrEqual(12);
+    }
+
+    $page->resize(1280, 940);
+    expect($page->script('() => document.querySelector("header").getBoundingClientRect().height'))->toEqual(64);
+});

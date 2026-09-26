@@ -88,6 +88,7 @@ export function Shell({
             <header
                 className={cn(
                     'relative flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-3 border-b bg-background px-5 md:h-16 md:flex-nowrap md:gap-5 md:px-8',
+                    !recipient && 'pt-3 md:pt-0',
                     recipient &&
                         !recipientAccount &&
                         'md:border-0 md:bg-transparent',
