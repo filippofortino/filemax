@@ -486,12 +486,18 @@ function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
                             <Form
                                 action={destroy(passkey.id)}
                                 options={{ preserveScroll: true }}
-                                onSuccess={() =>
+                                onSuccess={(page) => {
+                                    if (
+                                        page.props.status !== 'passkey-deleted'
+                                    ) {
+                                        return;
+                                    }
+
                                     toast.add({
                                         title: 'Passkey removed',
                                         description: `“${passkey.name}” can no longer sign you in.`,
-                                    })
-                                }
+                                    });
+                                }}
                             >
                                 {({ processing }) => (
                                     <Button
