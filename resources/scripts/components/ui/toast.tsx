@@ -36,7 +36,7 @@ function Toast({ className, ...props }: ToastPrimitive.Root.Props) {
         <ToastPrimitive.Root
             data-slot="toast"
             className={cn(
-                'group/toast pointer-events-auto absolute right-0 bottom-0 z-[calc(1000-var(--toast-index))] w-full origin-bottom rounded-lg bg-popover text-sm text-popover-foreground shadow-lg ring-1 ring-foreground/10 will-change-transform select-none',
+                'group/toast pointer-events-auto absolute right-0 bottom-0 z-[calc(1000-var(--toast-index))] w-full origin-bottom rounded-lg bg-foreground text-sm text-background shadow-lg ring-1 ring-white/8 will-change-transform select-none',
                 '[--gap:0.5rem] [--height:var(--toast-frontmost-height,var(--toast-height))] [--offset-y:calc(var(--toast-offset-y)*-1+calc(var(--toast-index)*var(--gap)*-1)+var(--toast-swipe-movement-y))] [--peek:0.75rem] [--scale:calc(max(0,1-(var(--toast-index)*0.1)))] [--shrink:calc(1-var(--scale))]',
                 'h-(--height) [transform:translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--toast-swipe-movement-y)-(var(--toast-index)*var(--peek))-(var(--shrink)*var(--height))))_scale(var(--scale))] [transition:transform_200ms_ease-out,translate_200ms_ease-out,opacity_200ms_ease-out,height_150ms_ease-out]',
                 "after:absolute after:top-full after:left-0 after:h-[calc(var(--gap)+1px)] after:w-full after:content-['']",
@@ -91,7 +91,7 @@ function ToastDescription({
     return (
         <ToastPrimitive.Description
             data-slot="toast-description"
-            className={cn('text-muted-foreground', className)}
+            className={cn('text-slate-400', className)}
             {...props}
         />
     );
@@ -106,7 +106,10 @@ function ToastAction({
         <ToastPrimitive.Action
             data-slot="toast-action"
             render={render}
-            className={cn('mt-2 self-start', className)}
+            className={cn(
+                'mt-2 self-start focus-visible:outline-white',
+                className,
+            )}
             {...props}
         />
     );
@@ -124,7 +127,7 @@ function ToastClose({
             aria-label="Dismiss"
             render={render}
             className={cn(
-                "relative shrink-0 text-muted-foreground after:absolute after:-inset-2 after:content-[''] hover:text-foreground",
+                "relative shrink-0 text-slate-400 after:absolute after:-inset-2 after:content-[''] hover:bg-white/10 hover:text-white focus-visible:outline-white",
                 className,
             )}
             {...props}
@@ -150,7 +153,7 @@ function ToastIcon({ type }: { type: string | undefined }) {
             strokeWidth={2}
             className={cn(
                 'mt-1.75 shrink-0',
-                error ? 'text-destructive' : 'text-emerald-700',
+                error ? 'text-red-400' : 'text-emerald-400',
             )}
             aria-hidden="true"
         />

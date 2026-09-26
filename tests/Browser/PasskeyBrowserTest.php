@@ -56,6 +56,7 @@ JS);
         ->assertNoJavascriptErrors();
 
     expect($page->script('() => window.passkeyCreateCalls'))->toBe(1);
+    $page->wait(0.3)->screenshot(fullPage: false, filename: 'toast-passkey-error');
     $page->press('[data-slot="toast"] button:has-text("Try again")')
         ->assertSeeIn('[data-slot="toast"]', 'The passkey operation was cancelled.')
         ->assertCount('[data-slot="toast"]', 1)
