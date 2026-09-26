@@ -28,7 +28,9 @@ final class TeamController
     {
         Team::query()->create($request->validated());
 
-        return to_route('teams.index')->with('status', 'Team created.');
+        Inertia::flash('toast', ['title' => 'Team created']);
+
+        return to_route('teams.index');
     }
 
     public function update(TeamRequest $request, Team $team): RedirectResponse
@@ -36,6 +38,8 @@ final class TeamController
         Gate::authorize('update', $team);
         $team->update($request->validated());
 
-        return to_route('teams.index')->with('status', 'Team renamed.');
+        Inertia::flash('toast', ['title' => 'Team renamed']);
+
+        return to_route('teams.index');
     }
 }

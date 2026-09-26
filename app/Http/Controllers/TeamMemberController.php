@@ -9,6 +9,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
+use Inertia\Inertia;
 
 final class TeamMemberController
 {
@@ -17,7 +18,9 @@ final class TeamMemberController
         Gate::authorize('update', $team);
         $team->users()->syncWithoutDetaching([$request->string('user_id')->toString()]);
 
-        return to_route('teams.index')->with('status', 'Member added.');
+        Inertia::flash('toast', ['title' => 'Member added']);
+
+        return to_route('teams.index');
     }
 
     public function destroy(Team $team, User $user): RedirectResponse
@@ -25,6 +28,8 @@ final class TeamMemberController
         Gate::authorize('update', $team);
         $team->users()->detach($user);
 
-        return to_route('teams.index')->with('status', 'Member removed.');
+        Inertia::flash('toast', ['title' => 'Member removed']);
+
+        return to_route('teams.index');
     }
 }

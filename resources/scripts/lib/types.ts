@@ -18,6 +18,17 @@ export type SharedProps = {
     status?: string;
     [key: string]: unknown;
 };
+declare module '@inertiajs/core' {
+    interface InertiaConfig {
+        flashDataType: {
+            toast?: {
+                type?: 'success' | 'error';
+                title: string;
+                description?: string;
+            };
+        };
+    }
+}
 export type TransferFile = {
     id: string;
     original_name: string;

@@ -8,15 +8,19 @@ import { home } from '@/routes';
 import { settings } from '@/routes/account';
 import { confirm, confirmOptions, login, loginOptions } from '@/routes/passkey';
 
-export function PasskeyFeedback({ error }: { error: string | null }) {
-    const { url } = usePage();
-    const expired =
+export function sessionExpired(error: string | null): boolean {
+    return (
         error === 'CSRF token mismatch.' ||
         error === 'Unauthenticated.' ||
-        error?.includes('status 419');
+        !!error?.includes('status 419')
+    );
+}
+
+export function PasskeyFeedback({ error }: { error: string | null }) {
+    const { url } = usePage();
     return (
         <ErrorMessage>
-            {expired ? (
+            {sessionExpired(error) ? (
                 <>
                     Your session expired.{' '}
                     <a className="underline" href={url}>

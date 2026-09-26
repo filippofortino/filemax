@@ -5,7 +5,7 @@ import {
     UserGroupIcon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Form, Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { DownloadAll, FileDownload } from '@/components/downloads';
 import {
@@ -42,7 +42,6 @@ export default function Show({
     const sharing = useForm({
         team_ids: transfer.teams.map((team) => team.id),
     });
-    const deletion = useForm({});
     const refresh = () => router.reload({ only: ['transfer'] });
     return (
         <Shell active="transfers">
@@ -405,34 +404,41 @@ export default function Show({
                                                 transfer history will remain.
                                             </DialogDescription>
                                         </DialogHeader>
-                                        <ErrorMessage>
-                                            {Object.values(
-                                                deletion.errors,
-                                            ).join(' ')}
-                                        </ErrorMessage>
-                                        <DialogFooter>
-                                            <Button
-                                                variant="outline"
-                                                onClick={() =>
-                                                    setDeleteOpen(false)
-                                                }
-                                            >
-                                                Keep transfer
-                                            </Button>
-                                            <Button
-                                                variant="destructive"
-                                                disabled={deletion.processing}
-                                                onClick={() =>
-                                                    deletion.delete(
-                                                        destroy.url(
-                                                            transfer.id,
-                                                        ),
-                                                    )
-                                                }
-                                            >
-                                                Delete transfer
-                                            </Button>
-                                        </DialogFooter>
+                                        <Form
+                                            action={destroy(transfer.id)}
+                                            className="flex flex-col gap-4"
+                                        >
+                                            {({ errors, processing }) => (
+                                                <>
+                                                    <ErrorMessage>
+                                                        {Object.values(
+                                                            errors,
+                                                        ).join(' ')}
+                                                    </ErrorMessage>
+                                                    <DialogFooter>
+                                                        <Button
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                setDeleteOpen(
+                                                                    false,
+                                                                )
+                                                            }
+                                                        >
+                                                            Keep transfer
+                                                        </Button>
+                                                        <Button
+                                                            type="submit"
+                                                            variant="destructive"
+                                                            disabled={
+                                                                processing
+                                                            }
+                                                        >
+                                                            Delete transfer
+                                                        </Button>
+                                                    </DialogFooter>
+                                                </>
+                                            )}
+                                        </Form>
                                     </DialogContent>
                                 </Dialog>
                             )}

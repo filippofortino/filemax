@@ -106,7 +106,13 @@ final class TransferController
             $transfer->teams()->sync($teamIds);
         });
 
-        return $request->expectsJson() ? response()->json(['updated' => true]) : back()->with('success', 'Sharing updated.');
+        if ($request->expectsJson()) {
+            return response()->json(['updated' => true]);
+        }
+
+        Inertia::flash('toast', ['title' => 'Sharing updated']);
+
+        return back();
     }
 
     public function destroy(Request $request, Transfer $transfer): JsonResponse|RedirectResponse
@@ -120,6 +126,12 @@ final class TransferController
         });
         dispatch(new PurgeTransfer($transfer->id));
 
-        return $request->expectsJson() ? response()->json(['revoked' => true]) : to_route('transfers.index')->with('success', 'Transfer deleted.');
+        if ($request->expectsJson()) {
+            return response()->json(['revoked' => true]);
+        }
+
+        Inertia::flash('toast', ['title' => 'Transfer deleted', 'description' => "The link to “{$transfer->displayTitle()}” no longer works."]);
+
+        return to_route('transfers.index');
     }
 }

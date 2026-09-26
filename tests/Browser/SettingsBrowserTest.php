@@ -29,7 +29,7 @@ it('saves the profile name and renders settings on desktop and phone', function 
     expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
 
     $page->fill('#full-name', 'Alice Updated')->press('Save profile')
-        ->assertSee('Profile saved.')
+        ->assertSeeIn('[data-slot="toast"]', 'Profile saved')
         ->click('[aria-label="Account menu"]')
         ->assertSee('Alice Updated')
         ->assertNoJavascriptErrors();
@@ -82,7 +82,7 @@ it('previews saves and removes a photo in settings and on sent transfers', funct
 
     $page->press('#profile-form button:has-text("Remove")')->assertMissing('#profile-form img');
     expect($user->refresh()->avatar_path)->toBe($path);
-    $page->press('Save profile')->assertSee('Profile saved.')
+    $page->press('Save profile')->assertSeeIn('[data-slot="toast"]', 'Profile saved')
         ->assertMissing('#profile-form img')->assertMissing('header img[src]')
         ->assertNoJavascriptErrors();
     expect($user->refresh()->avatar_path)->toBeNull();
@@ -102,11 +102,54 @@ it('shows password errors separately and keeps the current session after updatin
 
     expect($page->script('() => document.querySelector("#profile-form [role=alert]") === null'))->toBeTrue();
     $page->fill('#password-current', 'password')->press('Update password')
-        ->assertSee('Password updated.')
+        ->assertSeeIn('[data-slot="toast"]', 'Password updated')
+        ->assertSee('You’re signed out everywhere else.')
         ->assertSee('Profile')
         ->assertNoJavascriptErrors();
 
     expect(Hash::check('new-password', $user->refresh()->password))->toBeTrue();
     expect($page->script('() => [...document.querySelectorAll("#password-form input")].every(input => input.value === "")'))->toBeTrue();
     $page->click('New transfer')->assertSee('Transfer details');
+});
+
+it('shows one connection toast when saves cannot reach the server and fans the stack out on hover', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $page = visit('/account/settings')->resize(1280, 940);
+    $page->script(<<<'JS'
+() => {
+    window.realSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function () {
+        this.dispatchEvent(new ProgressEvent('error'));
+    };
+}
+JS);
+
+    $page->fill('#password-current', 'password')
+        ->fill('#password-new', 'new-password')
+        ->fill('#password-repeat', 'new-password')
+        ->press('Update password')
+        ->assertSeeIn('[data-slot="toast"]', 'Connection lost')
+        ->assertSee('Check your connection and try again.')
+        ->press('Save profile')
+        ->wait(0.3)
+        ->assertCount('[data-slot="toast"]', 1)
+        ->assertNoJavascriptErrors();
+
+    $page->script('() => { XMLHttpRequest.prototype.send = window.realSend; }');
+    $page->press('Update password')
+        ->assertSeeIn('[data-slot="toast"]', 'Password updated')
+        ->assertCount('[data-slot="toast"]', 2)
+        ->assertMissing('[data-slot="toast-viewport"][data-expanded]')
+        ->wait(0.3)
+        ->screenshot(fullPage: false, filename: 'toast-stacked')
+        ->hover('[data-slot="toast"]:has-text("Password updated")')
+        ->assertPresent('[data-slot="toast-viewport"][data-expanded]')
+        ->wait(0.3)
+        ->screenshot(fullPage: false, filename: 'toast-expanded')
+        ->assertNoJavascriptErrors();
+    $page->resize(390, 844)->wait(0.3)->screenshot(fullPage: false, filename: 'toast-phone');
+
+    expect(Hash::check('new-password', $user->refresh()->password))->toBeTrue();
 });

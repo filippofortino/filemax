@@ -27,6 +27,37 @@ it('opens settings with keyboard and confirms identity only when adding a passke
         ->assertNoJavascriptErrors();
 });
 
+it('confirms passkey removal only after password confirmation and deletion', function (): void {
+    $user = User::factory()->create();
+    $passkey = $user->passkeys()->create([
+        'name' => 'Work MacBook',
+        'credential_id' => 'test-credential',
+        'credential' => [],
+    ]);
+    $this->actingAs($user)->withSession([
+        'auth.password_confirmed_at' => now()->subHours(4)->timestamp,
+    ]);
+
+    $page = visit('/account/settings')
+        ->press('[aria-label="Remove Work MacBook"]')
+        ->assertSee('Confirm it’s you')
+        ->assertDontSee('Passkey removed');
+
+    $this->assertModelExists($passkey);
+
+    $page->fill('password', 'password')
+        ->press('Confirm password')
+        ->assertPathIs('/account/settings')
+        ->assertDontSee('Passkey removed')
+        ->press('[aria-label="Remove Work MacBook"]')
+        ->assertSeeIn('[data-slot="toast"]', 'Passkey removed')
+        ->assertSee('“Work MacBook” can no longer sign you in.')
+        ->assertSee('You haven’t added any passkeys yet.')
+        ->assertNoJavascriptErrors();
+
+    $this->assertModelMissing($passkey);
+});
+
 it('keeps a cancelled named passkey registration recoverable on mobile', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user)->withSession(['auth.password_confirmed_at' => now()->timestamp]);
@@ -49,13 +80,19 @@ JS);
     $page->fill('#passkey-name', 'Work MacBook')
         ->assertEnabled('#passkey-form button')
         ->press('Add passkey')
-        ->assertSee('The passkey operation was cancelled.')
+        ->assertSeeIn('[data-slot="toast"]', 'Passkey not added')
+        ->assertSeeIn('[data-slot="toast"]', 'The passkey operation was cancelled.')
         ->assertSee('You haven’t added any passkeys yet.')
         ->assertEnabled('#passkey-form button')
         ->assertNoJavascriptErrors();
 
-    expect($page->text('[role="alert"]'))->toContain('The passkey operation was cancelled.');
     expect($page->script('() => window.passkeyCreateCalls'))->toBe(1);
+    $page->wait(0.3)->screenshot(fullPage: false, filename: 'toast-passkey-error');
+    $page->press('[data-slot="toast"] button:has-text("Try again")')
+        ->assertSeeIn('[data-slot="toast"]', 'The passkey operation was cancelled.')
+        ->assertCount('[data-slot="toast"]', 1)
+        ->assertNoJavascriptErrors();
+    expect($page->script('() => window.passkeyCreateCalls'))->toBe(2);
     expect($page->script('() => document.querySelector("#passkey-name").value'))->toBe('Work MacBook');
     expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
     expect($user->passkeys()->count())->toBe(0);

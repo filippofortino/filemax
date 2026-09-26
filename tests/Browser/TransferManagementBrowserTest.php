@@ -135,7 +135,8 @@ JS)
         ->keys(':focus', 'Escape')
         ->assertMissing('#team-search')
         ->press('Save changes')
-        ->assertDontSee('Save changes');
+        ->assertDontSee('Save changes')
+        ->assertSeeIn('[data-slot="toast"]', 'Sharing updated');
     expect($transfer->teams()->pluck('teams.id')->all())->toBe([$mediamax->id]);
 
     $page->press('button:has-text("Delete transfer")')->assertSee('Delete this transfer?');
@@ -151,4 +152,12 @@ JS)
 
     $page->click('My transfers')->click('a:has-text("Shooting Villa Borbone — selezione")')->assertSee('Not opened yet');
     $page->screenshot(fullPage: false, filename: 'detail-unopened-public');
+
+    $page->press('button:has-text("Delete transfer")')
+        ->press('[role="dialog"] button:has-text("Delete transfer")')
+        ->assertPathIs('/transfers')
+        ->assertSeeIn('[data-slot="toast"]', 'Transfer deleted')
+        ->assertSee('The link to “Shooting Villa Borbone — selezione” no longer works.')
+        ->assertNoJavascriptErrors();
+    expect($public->fresh()->revoked_at)->not->toBeNull();
 });

@@ -102,7 +102,8 @@ it('lets an admin add and remove a registered member in the teams interface', fu
         ->assertSee('Creative Studio')
         ->select('user_id', $member->id)
         ->press('Add member')
-        ->assertSee('1 member');
+        ->assertSee('1 member')
+        ->assertSeeIn('[data-slot="toast"]', 'Member added');
 
     $page->script('() => document.fonts.ready');
     $page->screenshot(fullPage: false, filename: 'teams-admin');
@@ -110,16 +111,17 @@ it('lets an admin add and remove a registered member in the teams interface', fu
     $page
         ->press('[aria-label="Remove Beatrice Test from Creative Studio"]')
         ->assertSee('This team has no members yet.')
+        ->assertSeeIn('[data-slot="toast"]', 'Member removed')
         ->assertNoJavascriptErrors();
 
     expect($team->users()->count())->toBe(0);
 
     $page->fill('#name-'.$team->id, 'Creative Studio Updated')
         ->press('Rename')
-        ->assertSee('Team renamed.')
+        ->assertSeeIn('[data-slot="toast"]', 'Team renamed')
         ->fill('#team-name', 'Production')
         ->press('Create team')
-        ->assertSee('Team created.')
+        ->assertSeeIn('[data-slot="toast"]', 'Team created')
         ->assertSee('Production')
         ->assertNoJavascriptErrors();
 
