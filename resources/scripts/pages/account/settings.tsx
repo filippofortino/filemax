@@ -5,8 +5,9 @@ import { usePasskeyRegister } from '@laravel/passkeys/react';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '@/components/avatar';
 import { ErrorMessage, Shell } from '@/components/filemax';
-import { PasskeyFeedback } from '@/components/passkey-button';
+import { sessionExpired } from '@/components/passkey-button';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/toast';
 import { date, passwordHint } from '@/lib/format';
 import type { SharedProps, User } from '@/lib/types';
 import { destroy, registrationOptions, store } from '@/routes/passkey';
@@ -55,9 +56,16 @@ export default function Settings({ passkeys }: { passkeys: Passkey[] }) {
                             errorBag="updatePassword"
                             options={{ preserveScroll: true }}
                             resetOnSuccess
+                            onSuccess={() =>
+                                toast.add({
+                                    title: 'Password updated',
+                                    description:
+                                        'You’re signed out everywhere else.',
+                                })
+                            }
                             className="flex flex-col gap-5"
                         >
-                            {({ errors, processing, recentlySuccessful }) => (
+                            {({ errors, processing }) => (
                                 <>
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <div className="flex flex-col gap-2">
@@ -148,14 +156,6 @@ export default function Settings({ passkeys }: { passkeys: Passkey[] }) {
                                             ? 'Updating…'
                                             : 'Update password'}
                                     </Button>
-                                    {recentlySuccessful && (
-                                        <p
-                                            role="status"
-                                            className="text-sm text-muted-foreground"
-                                        >
-                                            Password updated.
-                                        </p>
-                                    )}
                                 </>
                             )}
                         </Form>
@@ -212,6 +212,7 @@ function Profile({ user }: { user: User }) {
                             setPreview(null);
                             if (photoInput.current)
                                 photoInput.current.value = '';
+                            toast.add({ title: 'Profile saved' });
                         },
                     });
                 }}
@@ -350,31 +351,51 @@ function Profile({ user }: { user: User }) {
                 >
                     {profile.processing ? 'Saving…' : 'Save profile'}
                 </Button>
-                {profile.recentlySuccessful && (
-                    <p role="status" className="text-sm text-muted-foreground">
-                        Profile saved.
-                    </p>
-                )}
             </form>
         </section>
     );
 }
 
 function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
-    const { status } = usePage<SharedProps>().props;
+    const passkeyForm = useRef<HTMLFormElement>(null);
     const [name, setName] = useState('');
-    const [registered, setRegistered] = useState(false);
-    const { register, isLoading, isSupported, error } = usePasskeyRegister({
+    const { register, isLoading, isSupported } = usePasskeyRegister({
         routes: { options: registrationOptions.url(), submit: store.url() },
         onSuccess: () => {
             setName('');
-            setRegistered(true);
+            toast.add({
+                title: 'Passkey added',
+                description: 'You can now use it to sign in.',
+            });
             router.reload();
         },
         onError: (error) => {
             if (error.message === 'Password confirmation required.') {
                 router.visit(confirmPassword());
+                return;
             }
+            const expired = sessionExpired(error.message);
+            toast.add({
+                id: 'passkey-error',
+                type: 'error',
+                title: 'Passkey not added',
+                description: expired
+                    ? 'Your session expired. Reload this page and try again.'
+                    : error.message,
+                timeout: 0,
+                priority: 'high',
+                actionProps: {
+                    children: expired ? 'Reload page' : 'Try again',
+                    onClick: () => {
+                        toast.close('passkey-error');
+                        if (expired) {
+                            window.location.reload();
+                        } else {
+                            passkeyForm.current?.requestSubmit();
+                        }
+                    },
+                },
+            });
         },
     });
 
@@ -393,22 +414,12 @@ function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
                     recognize, such as “Work MacBook”.
                 </p>
             </div>
-            {(status === 'passkey-deleted' || registered) && (
-                <p
-                    className="rounded-lg border border-blue-200 bg-accent px-4 py-3 text-slate-700"
-                    role="status"
-                >
-                    {status === 'passkey-deleted'
-                        ? 'Passkey removed.'
-                        : 'Passkey added. You can now use it to sign in.'}
-                </p>
-            )}
             <form
+                ref={passkeyForm}
                 id="passkey-form"
                 className="flex flex-col gap-3 sm:flex-row sm:items-end"
                 onSubmit={(event) => {
                     event.preventDefault();
-                    setRegistered(false);
                     void register(name.trim());
                 }}
             >
@@ -443,7 +454,6 @@ function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
                     sign in with your password.
                 </p>
             )}
-            <PasskeyFeedback error={error} />
             {passkeys.length === 0 ? (
                 <p className="border-t py-6 text-center text-muted-foreground">
                     You haven’t added any passkeys yet.
@@ -476,7 +486,12 @@ function Passkeys({ passkeys }: { passkeys: Passkey[] }) {
                             <Form
                                 action={destroy(passkey.id)}
                                 options={{ preserveScroll: true }}
-                                onSuccess={() => setRegistered(false)}
+                                onSuccess={() =>
+                                    toast.add({
+                                        title: 'Passkey removed',
+                                        description: `“${passkey.name}” can no longer sign you in.`,
+                                    })
+                                }
                             >
                                 {({ processing }) => (
                                     <Button

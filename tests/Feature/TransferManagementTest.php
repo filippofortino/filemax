@@ -75,6 +75,17 @@ it('revokes immediately and queues idempotent physical deletion', function (): v
     Queue::assertPushed(PurgeTransfer::class);
 });
 
+it('confirms sharing changes and deletions with a toast', function (): void {
+    Queue::fake();
+    $transfer = Transfer::factory()->create(['visibility' => 'teams', 'title' => 'Brief Q4']);
+    $team = Team::factory()->create();
+    $transfer->user->teams()->attach($team);
+    $this->actingAs($transfer->user)->from(route('transfers.show', $transfer))->patch(route('transfers.update', $transfer), ['team_ids' => [$team->id]])
+        ->assertRedirect(route('transfers.show', $transfer))->assertInertiaFlash('toast.title', 'Sharing updated');
+    $this->delete(route('transfers.destroy', $transfer))->assertRedirect(route('transfers.index'))
+        ->assertInertiaFlash('toast.title', 'Transfer deleted')->assertInertiaFlash('toast.description', 'The link to “Brief Q4” no longer works.');
+});
+
 it('revokes and changes sharing immediately while an archive holds the byte lock', function (): void {
     Queue::fake();
     $transfer = Transfer::factory()->create(['visibility' => 'teams']);
