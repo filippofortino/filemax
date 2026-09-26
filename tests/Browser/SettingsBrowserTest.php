@@ -112,7 +112,7 @@ it('shows password errors separately and keeps the current session after updatin
     $page->click('New transfer')->assertSee('Transfer details');
 });
 
-it('stacks failed saves, fans them out on hover and retries from the toast', function (): void {
+it('shows one connection toast when saves cannot reach the server and fans the stack out on hover', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user);
 
@@ -126,29 +126,28 @@ it('stacks failed saves, fans them out on hover and retries from the toast', fun
 }
 JS);
 
-    $page->press('Save profile')
-        ->assertSeeIn('[data-slot="toast"]', 'Profile not saved')
-        ->fill('#password-current', 'password')
+    $page->fill('#password-current', 'password')
         ->fill('#password-new', 'new-password')
         ->fill('#password-repeat', 'new-password')
         ->press('Update password')
-        ->assertSeeIn('[data-slot="toast"]', 'Password not updated')
+        ->assertSeeIn('[data-slot="toast"]', 'Connection lost')
         ->assertSee('Check your connection and try again.')
+        ->press('Save profile')
+        ->wait(0.3)
+        ->assertCount('[data-slot="toast"]', 1)
+        ->assertNoJavascriptErrors();
+
+    $page->script('() => { XMLHttpRequest.prototype.send = window.realSend; }');
+    $page->press('Update password')
+        ->assertSeeIn('[data-slot="toast"]', 'Password updated')
         ->assertCount('[data-slot="toast"]', 2)
         ->assertMissing('[data-slot="toast-viewport"][data-expanded]')
         ->wait(0.3)
         ->screenshot(fullPage: false, filename: 'toast-stacked')
-        ->hover('[data-slot="toast"]:has-text("Password not updated")')
+        ->hover('[data-slot="toast"]:has-text("Password updated")')
         ->assertPresent('[data-slot="toast-viewport"][data-expanded]')
         ->wait(0.3)
         ->screenshot(fullPage: false, filename: 'toast-expanded')
-        ->assertNoJavascriptErrors();
-
-    $page->script('() => { XMLHttpRequest.prototype.send = window.realSend; }');
-    $page->press('[data-slot="toast"]:has-text("Password not updated") button:has-text("Try again")')
-        ->assertSeeIn('[data-slot="toast"]', 'Password updated')
-        ->assertDontSee('Password not updated')
-        ->assertSee('Profile not saved')
         ->assertNoJavascriptErrors();
     $page->resize(390, 844)->wait(0.3)->screenshot(fullPage: false, filename: 'toast-phone');
 

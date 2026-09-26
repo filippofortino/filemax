@@ -8,6 +8,18 @@ router.on('flash', ({ detail }) => {
     }
 });
 
+router.on('networkError', () => {
+    toast.add({
+        id: 'network-error',
+        type: 'error',
+        title: 'Connection lost',
+        description: 'Check your connection and try again.',
+        timeout: 0,
+        priority: 'high',
+    });
+    return false;
+});
+
 void createInertiaApp({
     title: (title) => (title ? `${title} · Filemax` : 'Filemax'),
     pages: {
