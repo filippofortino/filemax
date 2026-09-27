@@ -58,7 +58,7 @@ it('requests and resets a password by clicking the form buttons', function (): v
 });
 
 it('signs in and signs out through the account menu', function (): void {
-    $user = User::factory()->create();
+    $user = User::factory()->create(['remember_token' => null]);
 
     $page = visit('/login')->resize(1280, 940);
     $page->script('() => document.fonts.ready');
@@ -67,12 +67,15 @@ it('signs in and signs out through the account menu', function (): void {
     $page
         ->fill('email', $user->email)
         ->fill('password', 'password')
+        ->check('remember')
         ->press('form button[data-slot="button"]')
         ->assertSee('Transfer details')
         ->click('[aria-label="Account menu"]')
         ->click('Sign out')
         ->assertSee('Forgot password?')
         ->assertNoJavascriptErrors();
+
+    expect($user->refresh()->remember_token)->not->toBeNull();
 });
 
 it('shortens a long email in the account menu and keeps the full one on hover', function (): void {

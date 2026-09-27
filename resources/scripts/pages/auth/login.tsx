@@ -72,6 +72,10 @@ export default function Login() {
                                 <ErrorMessage>{errors.password}</ErrorMessage>
                             </div>
                         </div>
+                        <label className="-my-3 flex min-h-11 cursor-pointer items-center gap-2.5 self-start">
+                            <input type="checkbox" name="remember" value="1" />
+                            Keep me signed in
+                        </label>
                         <Button
                             type="submit"
                             className="w-full"
