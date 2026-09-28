@@ -6,13 +6,17 @@ The audit found nothing feel-breaking: no `ease-in`, no `transition: all`, no `s
 
 | # | Plan | Severity | Status |
 |---|---|---|---|
-| 001 | [Add a strong ease-out token and use it in the toast](001-strong-ease-out-token.md) | LOW | DONE |
+| 001 | [Add a strong ease-out token (the toast keeps a standard ease)](001-strong-ease-out-token.md) | LOW | DONE |
 | 002 | [Add press feedback to every Button](002-button-press-feedback.md) | LOW | DONE |
 | 003 | [Move popover and dialog to interruptible transitions with proper timing](003-interruptible-popover-and-dialog.md) | MEDIUM | TODO |
 | 004 | [Reduced motion: keep fades and the spinner, drop movement](004-reduced-motion-keep-fades.md) | MEDIUM | TODO |
 | 005 | [Give "Your link is ready" a small entrance](005-link-ready-entrance.md) | LOW | TODO |
 | 006 | [Fade the drop overlay in instead of flashing it](006-drop-overlay-fade.md) | LOW | TODO |
 | 007 | [Animate the Copy link confirmation icon](007-copy-link-confirmation.md) | LOW | TODO |
+
+## Decisions from feel checks
+
+- **The toast uses the standard CSS `ease`, not the `--ease-out` token** (2026-09-28). The strong curve made it land too abruptly at 200ms. The token is for direct UI responses: presses, popovers, dialogs and entrances. See the revision in plan 001.
 
 ## Recommended order
 

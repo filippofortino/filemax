@@ -1,10 +1,20 @@
-# 001 — Add a strong ease-out token and use it in the toast
+# 001 — Add a strong ease-out token (the toast keeps a standard ease)
 
-- **Status**: DONE
+- **Status**: DONE (revised after the feel check)
 - **Commit**: fb24325
 - **Severity**: LOW
 - **Category**: Cohesion & tokens (Easing & duration)
 - **Estimated scope**: 2 files, ~5 changed lines
+
+## Revision after the feel check (supersedes the toast parts below)
+
+As first implemented, the toast felt too snappy. The strong curve front-loads the motion, so at the unchanged 200ms the toast covered about 90% of its travel in the first ~80ms. The feel check on 2026-09-28 decided the toast uses the standard CSS `ease` at its original durations: 200ms in, 150ms out. This is a deliberate decision, so do not flag the toast's curve in future audits.
+
+Final state:
+
+- `resources/css/app.css` keeps the token, `@theme { --ease-out: cubic-bezier(0.23, 1, 0.32, 1); }`. It's for direct UI responses: the button press (002), popover and dialog (003), and the entrances in 005–007.
+- `resources/scripts/components/ui/toast.tsx:41` uses `[transition:transform_200ms_ease,translate_200ms_ease,opacity_200ms_ease,height_150ms_ease]`.
+- `resources/scripts/components/ui/toast.tsx:66` uses `ease-[ease]` in place of the `ease-out` utility.
 
 ## Problem
 
