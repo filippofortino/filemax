@@ -1,10 +1,18 @@
 # 003 — Move popover and dialog to interruptible transitions with proper timing
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: fb24325
 - **Severity**: MEDIUM
 - **Category**: Easing & duration · Interruptibility
 - **Estimated scope**: 2 files, 3 class strings (plus, only if needed, `->wait(0.3)` lines in one browser test)
+
+## Outcome (read before re-running this plan)
+
+The class changes landed exactly as specified. One test needed a wait, but not at a listed line. In `tests/Browser/TransferManagementBrowserTest.php`, the second "Change teams" block pressed "Choose teams" immediately after opening the dialog. The TeamPicker popover then opened during the dialog's 200ms scale-in.
+
+Floating UI measures the anchor with `getBoundingClientRect()`, which includes that in-progress `scale`, so the popover got a stale `--anchor-width`. Transform changes don't fire ResizeObserver, so nothing corrected it. The next re-render (unchecking a team) rewrote the size inside Floating UI's ResizeObserver callback, which logged 5–6 "ResizeObserver loop completed with undelivered notifications" errors and failed `assertNoJavascriptErrors()` at line 149.
+
+Bisecting showed the popover change alone passes and the dialog change alone passes; only the two together fail. A `->wait(0.3)` after `press('Change teams')` fixes it. That window is shorter than a human can click, so the fix is test-side only.
 
 ## Problem
 

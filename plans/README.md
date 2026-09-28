@@ -8,7 +8,7 @@ The audit found nothing feel-breaking: no `ease-in`, no `transition: all`, no `s
 |---|---|---|---|
 | 001 | [Add a strong ease-out token (the toast keeps a standard ease)](001-strong-ease-out-token.md) | LOW | DONE |
 | 002 | [Add press feedback to every Button](002-button-press-feedback.md) | LOW | DONE |
-| 003 | [Move popover and dialog to interruptible transitions with proper timing](003-interruptible-popover-and-dialog.md) | MEDIUM | TODO |
+| 003 | [Move popover and dialog to interruptible transitions with proper timing](003-interruptible-popover-and-dialog.md) | MEDIUM | DONE |
 | 004 | [Reduced motion: keep fades and the spinner, drop movement](004-reduced-motion-keep-fades.md) | MEDIUM | TODO |
 | 005 | [Give "Your link is ready" a small entrance](005-link-ready-entrance.md) | LOW | TODO |
 | 006 | [Fade the drop overlay in instead of flashing it](006-drop-overlay-fade.md) | LOW | TODO |
@@ -30,6 +30,7 @@ The audit found nothing feel-breaking: no `ease-in`, no `transition: all`, no `s
   - 001 and 004 both edit `resources/css/app.css` (different blocks) and `resources/scripts/components/ui/toast.tsx` (lines 41 and 45).
   - 005 and 006 both edit `resources/scripts/pages/transfers/create.tsx`.
 - **003 may need `->wait(0.3)` in `tests/Browser/TransferManagementBrowserTest.php`.** Pest's `assertDontSee`, `assertMissing` and `assertScript` don't wait, and the plan lists the exact lines to watch.
+- **Opening a popover inside a dialog that is still scaling in gives it a stale anchor measurement** (see the outcome in plan 003). Any test that opens a nested popover right after opening its dialog needs `->wait(0.3)` between the two.
 
 ## Verification shared by all plans
 
