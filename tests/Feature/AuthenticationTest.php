@@ -123,6 +123,17 @@ test('verification notifications can be resent with throttling', function (): vo
     $this->post(route('verification.send'))->assertTooManyRequests();
 });
 
+test('verification email uses the Filemax logo and colors', function (): void {
+    $user = User::factory()->unverified()->create();
+
+    $html = (string) (new VerifyEmail)->toMail($user)->render();
+
+    expect(public_path('mail-logo.png'))->toBeFile()
+        ->and($html)->toContain('src="'.asset('mail-logo.png').'"')
+        ->and($html)->toContain('alt="Filemax"')
+        ->and($html)->toContain('background-color: #2140e0');
+});
+
 test('password recovery sends a reset token and consumes it once', function (): void {
     $user = User::factory()->create();
     Notification::fake();
