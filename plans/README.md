@@ -10,7 +10,7 @@ The audit found nothing feel-breaking: no `ease-in`, no `transition: all`, no `s
 | 002 | [Add press feedback to every Button](002-button-press-feedback.md) | LOW | DONE |
 | 003 | [Move popover and dialog to interruptible transitions with proper timing](003-interruptible-popover-and-dialog.md) | MEDIUM | DONE |
 | 004 | [Reduced motion: keep fades and the spinner, drop movement](004-reduced-motion-keep-fades.md) | MEDIUM | DONE |
-| 005 | [Give "Your link is ready" a small entrance](005-link-ready-entrance.md) | LOW | TODO |
+| 005 | [Give "Your link is ready" a small entrance](005-link-ready-entrance.md) | LOW | DONE |
 | 006 | [Fade the drop overlay in instead of flashing it](006-drop-overlay-fade.md) | LOW | TODO |
 | 007 | [Animate the Copy link confirmation icon](007-copy-link-confirmation.md) | LOW | TODO |
 

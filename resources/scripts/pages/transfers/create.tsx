@@ -397,9 +397,12 @@ export default function Create({ teams }: { teams: Team[] }) {
             <Shell>
                 <Head title="Your link is ready" />
                 <main className="flex flex-1 items-center justify-center bg-muted px-5 py-6 md:p-10">
-                    <section className="flex w-full max-w-2xl flex-col gap-6 rounded-xl border bg-background px-5 py-7 md:p-10">
+                    <section
+                        key="ready"
+                        className="flex w-full max-w-2xl flex-col gap-6 rounded-xl border bg-background px-5 py-7 transition-[opacity,translate] duration-300 ease-out md:p-10 starting:opacity-0 motion-safe:starting:translate-y-2"
+                    >
                         <div className="flex flex-col items-center gap-3.5 text-center">
-                            <span className="inline-flex size-18 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                            <span className="inline-flex size-18 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-[opacity,scale] [transition-delay:80ms] duration-300 ease-out starting:opacity-0 motion-safe:starting:scale-90">
                                 <HugeiconsIcon
                                     icon={Tick02Icon}
                                     size={30}

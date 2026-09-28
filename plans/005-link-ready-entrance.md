@@ -1,6 +1,6 @@
 # 005 — Give "Your link is ready" a small entrance
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: fb24325
 - **Severity**: LOW
 - **Category**: Missed opportunities
