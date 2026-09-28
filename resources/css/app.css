@@ -3,6 +3,7 @@
 @import 'shadcn/tailwind.css';
 
 @source '../scripts/**/*.{ts,tsx}';
+@source not '../../plans';
 
 @theme inline {
     --font-sans: 'DM Sans', system-ui, sans-serif;
