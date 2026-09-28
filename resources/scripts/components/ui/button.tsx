@@ -2,7 +2,7 @@ import { Button as ButtonPrimitive } from '@base-ui/react/button';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 const buttonVariants = cva(
-    'inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-transparent text-sm font-semibold whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:cursor-not-allowed disabled:border-transparent disabled:bg-slate-200 disabled:text-slate-500 [&_svg]:shrink-0',
+    'inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-transparent text-sm font-semibold whitespace-nowrap transition-[color,background-color,border-color,scale] duration-160 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-97 disabled:pointer-events-none disabled:cursor-not-allowed disabled:border-transparent disabled:bg-slate-200 disabled:text-slate-500 [&_svg]:shrink-0',
     {
         variants: {
             variant: {
@@ -15,7 +15,7 @@ const buttonVariants = cva(
                 ghost: 'text-foreground hover:bg-muted hover:text-foreground',
                 destructive:
                     'border-red-200 bg-background text-destructive hover:bg-red-50 hover:text-destructive',
-                link: 'text-primary hover:text-primary/90',
+                link: 'text-primary hover:text-primary/90 active:scale-100',
             },
             size: {
                 default: 'min-h-11 px-5',

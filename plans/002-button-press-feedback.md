@@ -1,6 +1,6 @@
 # 002 — Add press feedback to every Button
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: fb24325
 - **Severity**: LOW
 - **Category**: Physicality & origin

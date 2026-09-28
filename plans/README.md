@@ -7,7 +7,7 @@ The audit found nothing feel-breaking: no `ease-in`, no `transition: all`, no `s
 | # | Plan | Severity | Status |
 |---|---|---|---|
 | 001 | [Add a strong ease-out token and use it in the toast](001-strong-ease-out-token.md) | LOW | DONE |
-| 002 | [Add press feedback to every Button](002-button-press-feedback.md) | LOW | TODO |
+| 002 | [Add press feedback to every Button](002-button-press-feedback.md) | LOW | DONE |
 | 003 | [Move popover and dialog to interruptible transitions with proper timing](003-interruptible-popover-and-dialog.md) | MEDIUM | TODO |
 | 004 | [Reduced motion: keep fades and the spinner, drop movement](004-reduced-motion-keep-fades.md) | MEDIUM | TODO |
 | 005 | [Give "Your link is ready" a small entrance](005-link-ready-entrance.md) | LOW | TODO |
@@ -43,3 +43,4 @@ A fresh worktree lacks the gitignored files. Link or copy them from the main che
 - `.env` can be symlinked.
 - Copy `resources/scripts/{actions,routes,wayfinder}` (Wayfinder output).
 - `vendor` **must be a real directory**. Use `cp -cR <main>/vendor vendor` (an APFS clone, no network). If `vendor` is a symlink, Composer and Pest resolve the project root to the main checkout, and every test fails with "Target class [config] does not exist".
+- Executor worktrees branch from `main`, not from the feature branch. They don't contain earlier plans' changes (such as 001's `--ease-out` token), so re-run the plan's verification after applying the diff to the feature branch.
