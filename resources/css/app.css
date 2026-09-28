@@ -110,8 +110,15 @@
 
 @media (prefers-reduced-motion: reduce) {
     *,
-    *::before,
-    *::after {
-        @apply animate-none! transition-none!;
+    ::before,
+    ::after {
+        transition-property:
+            opacity, color, background-color, border-color !important;
+    }
+
+    :not(.animate-spin),
+    ::before,
+    ::after {
+        @apply animate-none!;
     }
 }

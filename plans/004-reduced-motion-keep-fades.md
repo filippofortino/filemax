@@ -1,6 +1,6 @@
 # 004 — Reduced motion: keep fades and the spinner, drop movement
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: fb24325
 - **Severity**: MEDIUM
 - **Category**: Accessibility
