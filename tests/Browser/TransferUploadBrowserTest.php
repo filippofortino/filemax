@@ -397,6 +397,28 @@ JS);
     expect($page->script('() => window.leavePrompts'))->toBe(0);
 });
 
+it('shows the first four ready files until all of them are requested', function (): void {
+    Storage::fake('local');
+    config(['filemax.disk' => 'local']);
+    $this->actingAs(User::factory()->create());
+    $page = visit('/')->assertSee('Browse files');
+    $page->script(<<<'JS'
+() => {
+    const data = new DataTransfer();
+    for (let index = 0; index < 5; index++) data.items.add(new File(['hello'], `file${index}.txt`));
+    document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
+}
+JS);
+    $page->press('Create transfer')->assertSee('Your link is ready')
+        ->assertSee('file3.txt')
+        ->assertDontSee('file4.txt')
+        ->press('Show all 5 files')
+        ->assertSee('file4.txt')
+        ->press('Show fewer files')
+        ->assertDontSee('file4.txt')
+        ->assertNoJavascriptErrors();
+});
+
 function controlledTransferUploads(): string
 {
     return <<<'JS'

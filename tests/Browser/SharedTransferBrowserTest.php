@@ -101,3 +101,19 @@ it('shows denied and expired states without disclosing the file list', function 
         ->screenshot(filename: 'filemax-recipient-unavailable-phone')
         ->assertNoJavascriptErrors();
 });
+
+it('shows the first four files until the recipient asks for all of them', function (): void {
+    $transfer = Transfer::factory()->create();
+    foreach (range(0, 5) as $position) {
+        TransferFile::factory()->for($transfer)->create(['original_name' => 'file'.$position.'.pdf', 'position' => $position]);
+    }
+
+    visit(route('shared.show', $transfer->token))
+        ->assertSee('file3.pdf')
+        ->assertDontSee('file4.pdf')
+        ->press('Show all 6 files')
+        ->assertSee('file5.pdf')
+        ->press('Show fewer files')
+        ->assertDontSee('file5.pdf')
+        ->assertNoJavascriptErrors();
+});
