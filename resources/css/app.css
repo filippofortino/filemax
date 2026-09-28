@@ -27,6 +27,10 @@
     --color-secondary-foreground: var(--color-slate-900);
 }
 
+@theme {
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
 @layer base {
     *,
     ::before,

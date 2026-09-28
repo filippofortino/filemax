@@ -6,7 +6,7 @@ The audit found nothing feel-breaking: no `ease-in`, no `transition: all`, no `s
 
 | # | Plan | Severity | Status |
 |---|---|---|---|
-| 001 | [Add a strong ease-out token and use it in the toast](001-strong-ease-out-token.md) | LOW | TODO |
+| 001 | [Add a strong ease-out token and use it in the toast](001-strong-ease-out-token.md) | LOW | DONE |
 | 002 | [Add press feedback to every Button](002-button-press-feedback.md) | LOW | TODO |
 | 003 | [Move popover and dialog to interruptible transitions with proper timing](003-interruptible-popover-and-dialog.md) | MEDIUM | TODO |
 | 004 | [Reduced motion: keep fades and the spinner, drop movement](004-reduced-motion-keep-fades.md) | MEDIUM | TODO |

@@ -1,6 +1,6 @@
 # 001 — Add a strong ease-out token and use it in the toast
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: fb24325
 - **Severity**: LOW
 - **Category**: Cohesion & tokens (Easing & duration)
