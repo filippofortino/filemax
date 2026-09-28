@@ -138,6 +138,20 @@ JS);
         ->assertNoJavascriptErrors();
 
     $page->script('() => { XMLHttpRequest.prototype.send = window.realSend; }');
+    $page->press('Save profile')
+        ->assertSeeIn('[data-slot="toast"]', 'Profile saved')
+        ->assertCount('[data-slot="toast"]', 2)
+        ->assertScript(<<<'JS'
+() => {
+    const toast = [...document.querySelectorAll('[data-slot="toast"]')]
+        .find(toast => toast.textContent.includes('Connection lost'));
+    return toast.querySelector('[data-slot="toast-content"]').offsetHeight > toast.offsetHeight;
+}
+JS)
+        ->press('[data-slot="toast"]:has-text("Profile saved") [aria-label="Dismiss"]')
+        ->assertCount('[data-slot="toast"]', 1)
+        ->assertNoJavascriptErrors();
+
     $page->press('Update password')
         ->assertSeeIn('[data-slot="toast"]', 'Password updated')
         ->assertCount('[data-slot="toast"]', 2)
