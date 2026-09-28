@@ -54,6 +54,7 @@ export default function Create({ teams }: { teams: Team[] }) {
     const [removing, setRemoving] = useState(false);
     const [error, setError] = useState('');
     const [ready, setReady] = useState<Transfer | null>(null);
+    const [allFiles, setAllFiles] = useState(false);
     const [dragging, setDragging] = useState(false);
     const [remaining, setRemaining] = useState<number | null>(null);
     const dragDepth = useRef(0);
@@ -430,13 +431,26 @@ export default function Create({ teams }: { teams: Team[] }) {
                             </p>
                         )}
                         <div>
-                            {ready.files.map((file) => (
-                                <FileRow
-                                    key={file.id}
-                                    name={file.original_name}
-                                    size={file.size}
-                                />
-                            ))}
+                            {ready.files
+                                .slice(0, allFiles ? undefined : 4)
+                                .map((file) => (
+                                    <FileRow
+                                        key={file.id}
+                                        name={file.original_name}
+                                        size={file.size}
+                                    />
+                                ))}
+                            {ready.files.length > 4 && (
+                                <Button
+                                    className="mt-3 h-auto min-h-0 p-0 text-sm"
+                                    variant="link"
+                                    onClick={() => setAllFiles(!allFiles)}
+                                >
+                                    {allFiles
+                                        ? 'Show fewer files'
+                                        : `Show all ${ready.files.length} files`}
+                                </Button>
+                            )}
                         </div>
                         <div className="flex items-center justify-between gap-3">
                             <Link

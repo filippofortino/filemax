@@ -1,7 +1,9 @@
 import { Head } from '@inertiajs/react';
+import { useState } from 'react';
 import { Avatar } from '@/components/avatar';
 import { DownloadAll, FileDownload } from '@/components/downloads';
 import { FileRow, Shell } from '@/components/filemax';
+import { Button } from '@/components/ui/button';
 import { dateTime } from '@/lib/format';
 
 type SharedTransfer = {
@@ -19,6 +21,7 @@ export default function SharedTransferPage({
 }: {
     transfer: SharedTransfer;
 }) {
+    const [allFiles, setAllFiles] = useState(false);
     return (
         <Shell recipient>
             <Head title={transfer.title}>
@@ -56,23 +59,38 @@ export default function SharedTransferPage({
                         token={transfer.token}
                         totalSize={transfer.total_size}
                     />
-                    <ul className="border-y border-border">
-                        {transfer.files.map((file) => (
-                            <li key={file.id}>
-                                <FileRow
-                                    name={file.name}
-                                    size={file.size}
-                                    variant="recipient"
-                                >
-                                    <FileDownload
-                                        token={transfer.token}
-                                        fileId={file.id}
-                                        name={file.name}
-                                    />
-                                </FileRow>
-                            </li>
-                        ))}
-                    </ul>
+                    <div>
+                        <ul className="border-y border-border">
+                            {transfer.files
+                                .slice(0, allFiles ? undefined : 4)
+                                .map((file) => (
+                                    <li key={file.id}>
+                                        <FileRow
+                                            name={file.name}
+                                            size={file.size}
+                                            variant="recipient"
+                                        >
+                                            <FileDownload
+                                                token={transfer.token}
+                                                fileId={file.id}
+                                                name={file.name}
+                                            />
+                                        </FileRow>
+                                    </li>
+                                ))}
+                        </ul>
+                        {transfer.files.length > 4 && (
+                            <Button
+                                className="mt-3 h-auto min-h-0 p-0 text-sm"
+                                variant="link"
+                                onClick={() => setAllFiles(!allFiles)}
+                            >
+                                {allFiles
+                                    ? 'Show fewer files'
+                                    : `Show all ${transfer.files.length} files`}
+                            </Button>
+                        )}
+                    </div>
                     <p className="text-center text-sm text-muted-foreground">
                         {transfer.files.length}{' '}
                         {transfer.files.length === 1 ? 'file' : 'files'} ·
