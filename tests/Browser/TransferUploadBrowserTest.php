@@ -32,6 +32,7 @@ describe('concurrent upload chunks', function (): void {
         $page->press('Create transfer')->assertScript('window.uploads.length', 1);
         $page->script('() => window.uploads.find(upload => upload.key === "file0.txt:1").fail()');
         $page->assertSee('Some files could not be uploaded.');
+
         $original = Transfer::query()->sole();
         $originalFileId = $original->files()->sole()->id;
 
@@ -371,6 +372,7 @@ JS);
             'Cancel this upload? Uploaded progress will be discarded. You will need to select and upload the files again.',
         ]);
         expect($page->script('() => document.querySelector("button[type=submit]").disabled'))->toBeTrue();
+
         $page->script('() => window.releaseSigning()');
         $page->assertSee('Drop files here')->assertMissing('[role="alert"]')->assertNoJavascriptErrors();
         expect($page->script('() => window.uploads.length'))->toBe(3)
@@ -390,6 +392,7 @@ JS);
             $page->script("() => { window.clockOffset = {$offset} * 1000; window.uploads.forEach(upload => upload.progress(4)); }");
             $page->assertSee($timeLeft);
         }
+
         $page->assertNoJavascriptErrors();
     });
 });
@@ -450,6 +453,7 @@ it('creates a transfer when pressing near the right edge of the shrinking submit
 }
 JS);
     $page->assertSee('edge.txt');
+
     $width = $page->script(<<<'JS'
 () => {
     const button = document.querySelector('button[type=submit]');
