@@ -37,6 +37,15 @@ export function dateTime(value: string | null): string {
           }).format(new Date(value))
         : '—';
 }
+export function relativeDay(value: string | null): string {
+    if (!value) return '—';
+    const midnight = (date: string | number) =>
+        new Date(date).setHours(0, 0, 0, 0);
+    return new Intl.RelativeTimeFormat('en', { numeric: 'auto' }).format(
+        Math.round((midnight(value) - midnight(Date.now())) / 86_400_000),
+        'day',
+    );
+}
 export function initials(name: string): string {
     return name
         .trim()

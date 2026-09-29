@@ -115,7 +115,7 @@ it('rejects duplicate submissions but allows intentional extensions with the lat
     expect($transfer->refresh()->expires_at->equalTo(now()->addDays(14)))->toBeTrue();
 });
 
-it('preserves the link sharing files archive and statistics and flashes only after success', function (): void {
+it('preserves the link sharing files archive and statistics and leaves the toast to the page', function (): void {
     $transfer = Transfer::factory()->expired()->create([
         'visibility' => 'teams', 'download_count' => 5, 'first_opened_at' => now()->subDays(2),
         'last_downloaded_at' => now()->subDays(2), 'archive_path' => 'archives/ready.zip', 'archive_status' => 'ready',
@@ -130,7 +130,7 @@ it('preserves the link sharing files archive and statistics and flashes only aft
 
     $this->actingAs($transfer->user)->from(route('transfers.show', $transfer))
         ->post('/transfers/'.$transfer->id.'/extend', $payload)
-        ->assertRedirect(route('transfers.show', $transfer))->assertInertiaFlash('toast.title', 'Transfer extended');
+        ->assertRedirect(route('transfers.show', $transfer))->assertInertiaFlashMissing('toast');
 
     expect($transfer->refresh()->only(array_keys($attributes)))->toEqual($attributes)
         ->and($file->refresh()->getAttributes())->toEqual($fileAttributes)

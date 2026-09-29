@@ -85,6 +85,7 @@ JS);
     $page->script('() => window.releaseExtension()');
     $page->assertSee('Expires 29 Sept 2026, 14:00')
         ->assertSeeIn('[data-slot="toast"]', 'Transfer extended')
+        ->assertSeeIn('[data-slot="toast"]', 'Now expires 29 Sept 2026, 14:00.')
         ->assertMissing('button:has-text("Extend by 7 days")')
         ->assertNoJavascriptErrors();
 
@@ -99,13 +100,16 @@ it('restores an expired transfer on mobile and supports a second intentional ext
     $this->actingAs($owner);
 
     $page = visit(route('transfers.show', $transfer))->withTimezone('Europe/Rome')->resize(390, 844)
-        ->assertSee('Expired')
+        ->assertSee('Expired 19 Sept 2026, 14:00')
+        ->assertSee('This transfer has expired')
+        ->assertSee('Your files are kept until 19 Oct 2026.')
         ->assertMissing('button:has-text("Download all")')
         ->assertMissing('[aria-label="Download extended.pdf"]')
-        ->press('Extend by 7 days')
+        ->press('Reactivate for 7 days')
         ->assertSee('Expires 27 Sept 2026, 14:00')
         ->assertDontSee('Expired')
         ->assertSeeIn('[data-slot="toast"]', 'Transfer extended')
+        ->assertSeeIn('[data-slot="toast"]', 'Now expires 27 Sept 2026, 14:00.')
         ->assertEnabled('Download all · 4 B')
         ->assertEnabled('[aria-label="Download extended.pdf"]')
         ->assertEnabled('Extend by 7 days');
@@ -129,10 +133,25 @@ it('hides extension outside the extension window', function (string $expiresAt):
     visit(route('transfers.show', $transfer))
         ->assertSee($transfer->title)
         ->assertMissing('button:has-text("Extend by 7 days")')
+        ->assertMissing('button:has-text("Reactivate for 7 days")')
         ->assertNoJavascriptErrors();
 })->with([
     'more than seven days remaining' => '2026-09-28 12:00:00',
     'thirty days expired' => '2026-08-21 12:00:00',
+]);
+
+it('counts down the days left in the extension callout', function (int $days, string $expiry): void {
+    $owner = User::factory()->create();
+    $transfer = Transfer::factory()->for($owner)->create(['expires_at' => now()->addDays($days)]);
+    $this->actingAs($owner);
+
+    visit(route('transfers.show', $transfer))->withTimezone('Europe/Rome')
+        ->assertSee($expiry)
+        ->assertEnabled('Extend by 7 days')
+        ->assertNoJavascriptErrors();
+})->with([
+    'two days' => [2, 'Expires in 2 days'],
+    'one day' => [1, 'Expires tomorrow'],
 ]);
 
 it('keeps stale extension errors visible when the refreshed transfer is no longer eligible', function (): void {

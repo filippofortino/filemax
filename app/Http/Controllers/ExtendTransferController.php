@@ -11,7 +11,6 @@ use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
-use Inertia\Inertia;
 
 final class ExtendTransferController
 {
@@ -41,8 +40,6 @@ final class ExtendTransferController
         if ($request->expectsJson()) {
             return response()->json(['expires_at' => $transfer->expires_at?->toIso8601String()]);
         }
-
-        Inertia::flash('toast', ['title' => 'Transfer extended']);
 
         return back();
     }
