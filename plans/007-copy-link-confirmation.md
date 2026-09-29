@@ -1,6 +1,6 @@
 # 007 — Animate the Copy link confirmation icon
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: fb24325
 - **Severity**: LOW
 - **Category**: Missed opportunities
