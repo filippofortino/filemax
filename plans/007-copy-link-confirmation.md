@@ -24,7 +24,7 @@ Copying the share link is the main action on the "Your link is ready" screen and
 
 ## Target
 
-When the tick appears, it fades in, sharpens from a 2px blur and grows from 0.9, over 150ms with the strong ease-out:
+When the tick appears, it fades in, sharpens from a 2px blur and grows from 0.9, over 150ms with the shared ease-out:
 
 ```tsx
 // resources/scripts/components/filemax.tsx:464-471 — target
@@ -51,7 +51,7 @@ Why this shape:
 - **150ms** fits the small-element budget (125–200ms).
 - **Scale 0.9** is the minimum; nothing should appear from nothing. It's gated behind `motion-safe:`.
 - **A 2px blur** masks the glyph swap. It stays well under the 20px cost ceiling, and it's trivial on an 18px icon.
-- **`ease-out`** resolves to `cubic-bezier(0.23, 1, 0.32, 1)` once plan 001 lands.
+- **`ease-out`** resolves to `cubic-bezier(0.25, 0.46, 0.45, 0.94)` once plan 001 lands.
 - **The label change ("Copy link" → "Copied") stays instant.** The icon carries the moment.
 - **`copied` never resets to `false`** in the existing code, so the tick animates once per page and repeat clicks don't replay it. That's existing behavior; do not change it.
 

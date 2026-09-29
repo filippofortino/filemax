@@ -35,7 +35,7 @@ The popover (account menu and team picker) and the dialog ("Change teams" and "D
 
 Three problems:
 
-1. **Weak curve.** tw-animate-css defines `--animate-in: enter var(--tw-duration, .15s) var(--tw-ease, ease) …`. No `ease-*` class is set here, so the curve falls back to CSS `ease`, which is `cubic-bezier(0.25, 0.1, 0.25, 1)`. Entrances should use a strong ease-out.
+1. **Off-token curve.** tw-animate-css defines `--animate-in: enter var(--tw-duration, .15s) var(--tw-ease, ease) …`. No `ease-*` class is set here, so the curve falls back to CSS `ease`, which is `cubic-bezier(0.25, 0.1, 0.25, 1)`, instead of the app's shared ease-out token.
 2. **Too short.** `duration-100` is half the 200ms minimum for modals, and below the 125ms minimum for small popovers. At 100ms the dialog doesn't read as a layer arriving; it just blinks in.
 3. **Not interruptible.** tw-animate's `@keyframes exit` has only a `to` block. Closing mid-open (clicking the avatar twice, or Escape right after opening) snaps to full opacity and scale, then plays the exit from there. CSS transitions driven by Base UI's `data-starting-style` / `data-ending-style` attributes retarget from the current value instead. Base UI's `Popover.Popup`, `Dialog.Backdrop` and `Dialog.Popup` all set these attributes; this was verified in `node_modules/@base-ui/react` (`popupTransitionStateMapping` / `transitionStatusMapping`).
 
@@ -63,7 +63,7 @@ Why these values:
 - **Dialog: 200ms in, 150ms out.** 200ms is the modal minimum. The dismissal is the system responding, so it's quicker (asymmetric timing). Scale stays 0.95 → 1 from the default center origin, which is correct for a modal, so do not add an `origin-*` class.
 - **The dialog's `transition-[opacity,scale]` must not include `translate`.** The popup is centered with the CSS `translate` property (`-translate-x-1/2 -translate-y-1/2`), and centering must never be animated. Only name the properties that are meant to move. Do not use `transition-transform` or `transition` here, because both include `translate`.
 - **Scale is gated behind `motion-safe:`**, so reduced-motion users get a pure fade once plan 004 lands. With today's global reduced-motion rule, they get an instant open and close.
-- **`ease-out`** resolves to `cubic-bezier(0.23, 1, 0.32, 1)` once plan 001 lands, and to Tailwind's default until then.
+- **`ease-out`** resolves to `cubic-bezier(0.25, 0.46, 0.45, 0.94)` once plan 001 lands, and to Tailwind's default until then.
 
 ## Repo conventions to follow
 

@@ -38,7 +38,7 @@ function Toast({ className, ...props }: ToastPrimitive.Root.Props) {
             className={cn(
                 'group/toast pointer-events-auto absolute right-0 bottom-0 z-[calc(1000-var(--toast-index))] w-full origin-bottom rounded-lg bg-foreground text-sm text-background shadow-lg ring-1 ring-white/8 will-change-transform select-none',
                 '[--gap:0.5rem] [--height:var(--toast-frontmost-height,var(--toast-height))] [--offset-y:calc(var(--toast-offset-y)*-1+calc(var(--toast-index)*var(--gap)*-1)+var(--toast-swipe-movement-y))] [--peek:0.75rem] [--scale:calc(max(0,1-(var(--toast-index)*0.1)))] [--shrink:calc(1-var(--scale))]',
-                'h-(--height) [transform:translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--toast-swipe-movement-y)-(var(--toast-index)*var(--peek))-(var(--shrink)*var(--height))))_scale(var(--scale))] [transition:transform_200ms_ease,translate_200ms_ease,opacity_200ms_ease,height_150ms_ease]',
+                'h-(--height) [transform:translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--toast-swipe-movement-y)-(var(--toast-index)*var(--peek))-(var(--shrink)*var(--height))))_scale(var(--scale))] [transition:transform_200ms_var(--ease-out),translate_200ms_var(--ease-out),opacity_200ms_var(--ease-out),height_150ms_var(--ease-out)]',
                 "after:absolute after:top-full after:left-0 after:h-[calc(var(--gap)+1px)] after:w-full after:content-['']",
                 'data-expanded:h-(--toast-height) data-expanded:[transform:translateX(var(--toast-swipe-movement-x))_translateY(var(--offset-y))]',
                 'data-limited:opacity-0 data-starting-style:translate-y-4 data-starting-style:opacity-0',
@@ -63,7 +63,7 @@ function ToastContent({ className, ...props }: ToastPrimitive.Content.Props) {
         <ToastPrimitive.Content
             data-slot="toast-content"
             className={cn(
-                'flex items-start gap-3 overflow-hidden py-2 pr-2 pl-4 transition-opacity duration-200 ease-[ease] data-behind:pointer-events-none data-behind:opacity-0 data-expanded:pointer-events-auto data-expanded:opacity-100',
+                'flex items-start gap-3 overflow-hidden py-2 pr-2 pl-4 transition-opacity duration-200 ease-out data-behind:pointer-events-none data-behind:opacity-0 data-expanded:pointer-events-auto data-expanded:opacity-100',
                 className,
             )}
             {...props}

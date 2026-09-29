@@ -28,7 +28,7 @@ When a file is dragged into the window on the New transfer page, a 95%-opaque pa
 
 Why these values:
 
-- **150ms with the strong ease-out.** The overlay is feedback ("you can drop here") and must feel immediate. The strong ease-out delivers most of the opacity in the first ~50ms, so there's no perceived delay; it just stops flashing. `ease-out` resolves to `cubic-bezier(0.23, 1, 0.32, 1)` once plan 001 lands.
+- **150ms with the shared ease-out.** The overlay is feedback ("you can drop here") and must feel immediate. An ease-out starts at full speed, so there's no perceived delay; it just stops flashing. `ease-out` resolves to `cubic-bezier(0.25, 0.46, 0.45, 0.94)` once plan 001 lands.
 - **Opacity only, no scale.** It's a full-screen layer, like a modal backdrop, and scaling it would move the whole viewport.
 - **No exit animation.** The element unmounts on drop or drag-leave, and that's intended: on drop, the file list must be visible immediately.
 - **It plays on every drag.** The overlay is conditionally rendered, so it's newly inserted each time `dragging` becomes true, and `@starting-style` (Tailwind's `starting:` variant) applies every time. The `dragDepth` counter (`create.tsx:489-501`) keeps `dragging` true while the pointer crosses child elements, so the fade doesn't retrigger mid-drag.

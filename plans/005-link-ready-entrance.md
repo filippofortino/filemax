@@ -42,13 +42,13 @@ The card fades in while rising 8px over 300ms. The check badge scales up from 0.
 
 Why these values:
 
-- **300ms with the strong ease-out.** A rare celebration moment is allowed more delight than everyday UI. This stays within the 200–500ms modal budget, and the curve front-loads the movement.
+- **300ms with the shared ease-out.** A rare celebration moment is allowed more delight than everyday UI. This stays within the 200–500ms modal budget, and the curve decelerates evenly into place.
 - **`translate-y-2`** is 0.5rem (8px). A small rise, not a slide.
 - **Badge `scale-90`** is scale 0.9. Never go lower; nothing should appear from nothing.
 - **An 80ms stagger**, the top of the 30–80ms range. It never blocks interaction: the "Copy link" button can be clicked immediately, because opacity doesn't block pointer events.
 - **`[transition-delay:80ms]` instead of `delay-80`.** tw-animate-css (imported at `resources/css/app.css:2`) defines its own `delay-*` utility for `animation-delay`. The arbitrary property is unambiguous.
 - **Movement (translate, scale) is gated behind `motion-safe:`.** Under reduced motion there's a fade only once plan 004 lands, and an instant appearance with today's global rule.
-- **`ease-out`** resolves to `cubic-bezier(0.23, 1, 0.32, 1)` once plan 001 lands.
+- **`ease-out`** resolves to `cubic-bezier(0.25, 0.46, 0.45, 0.94)` once plan 001 lands.
 
 ## Repo conventions to follow
 

@@ -6,7 +6,7 @@ The audit found nothing feel-breaking: no `ease-in`, no `transition: all`, no `s
 
 | # | Plan | Severity | Status |
 |---|---|---|---|
-| 001 | [Add a strong ease-out token (the toast keeps a standard ease)](001-strong-ease-out-token.md) | LOW | DONE |
+| 001 | [Add a shared ease-out token and use it in the toast](001-strong-ease-out-token.md) | LOW | DONE |
 | 002 | [Add press feedback to every Button](002-button-press-feedback.md) | LOW | DONE |
 | 003 | [Move popover and dialog to interruptible transitions with proper timing](003-interruptible-popover-and-dialog.md) | MEDIUM | DONE |
 | 004 | [Reduced motion: keep fades and the spinner, drop movement](004-reduced-motion-keep-fades.md) | MEDIUM | DONE |
@@ -16,7 +16,7 @@ The audit found nothing feel-breaking: no `ease-in`, no `transition: all`, no `s
 
 ## Decisions from feel checks
 
-- **The toast uses the standard CSS `ease`, not the `--ease-out` token** (2026-09-28). The strong curve made it land too abruptly at 200ms. The token is for direct UI responses: presses, popovers, dialogs and entrances. See the revision in plan 001.
+- **One shared curve: `--ease-out` is easeOutQuad, `cubic-bezier(0.25, 0.46, 0.45, 0.94)`** (2026-09-29). The originally planned `cubic-bezier(0.23, 1, 0.32, 1)` made the toast (200ms) and the link-ready entrance (300ms) feel too quick, because it covers about a quarter of its travel in the first frame. easeOutQuad is still a pure ease-out but starts at about half that speed and decelerates evenly. Every element that eases out uses the token, the toast included. This is deliberate, so don't flag the token as weak in future audits. See the revisions in plan 001.
 
 ## Recommended order
 
@@ -24,7 +24,7 @@ The audit found nothing feel-breaking: no `ease-in`, no `transition: all`, no `s
 
 ## Dependencies
 
-- **001 comes first.** It redefines `--ease-out` as `cubic-bezier(0.23, 1, 0.32, 1)`. Plans 002, 003, 005, 006 and 007 use the `ease-out` utility and get the strong curve only after 001. They still work without it, just with Tailwind's weaker default curve.
+- **001 comes first.** It redefines `--ease-out` as `cubic-bezier(0.25, 0.46, 0.45, 0.94)`. Plans 002, 003, 005, 006 and 007 use the `ease-out` utility and get the shared curve only after 001. They still work without it, just with Tailwind's default ease-out.
 - **003 and 004 work in either order.** 003 gates scale behind `motion-safe:`, and 004 keeps opacity transitions under reduced motion. Together, reduced-motion users get pure fades.
 - **Shared files, so don't run these in parallel:**
   - 001 and 004 both edit `resources/css/app.css` (different blocks) and `resources/scripts/components/ui/toast.tsx` (lines 41 and 45).

@@ -22,7 +22,7 @@ link: 'text-primary hover:text-primary/90',
 
 ## Target
 
-The button settles 3% smaller while pressed, over 160ms with the strong ease-out, then returns on release:
+The button settles 3% smaller while pressed, over 160ms with the shared ease-out, then returns on release:
 
 ```tsx
 // resources/scripts/components/ui/button.tsx:5 — target
@@ -38,7 +38,7 @@ Why these values:
 
 - **`scale-97`** is `scale(0.97)`. Press feedback stays subtle, in the 0.95–0.98 range.
 - **160ms** is the top of the 100–160ms budget for press feedback.
-- **`ease-out`** resolves to `cubic-bezier(0.23, 1, 0.32, 1)` once plan 001 lands, and to Tailwind's default until then.
+- **`ease-out`** resolves to `cubic-bezier(0.25, 0.46, 0.45, 0.94)` once plan 001 lands, and to Tailwind's default until then.
 - **The transition list names `scale`, not `transform`.** In Tailwind v4, `scale-97` sets the individual CSS `scale` property.
 - **The list is explicit** so nothing unrelated animates. Never use `transition-all`.
 - **The `link` variant opts out** with `active:scale-100`, because text links ("Show all N files", "Change teams") shouldn't shrink. The repo's `cn` (package `cn`, a clsx + tailwind-merge replacement) resolves the conflict last-wins. Verified: `cn('… active:scale-97', 'active:scale-100')` returns `… active:scale-100`.

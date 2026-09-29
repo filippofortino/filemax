@@ -29,7 +29,8 @@
 }
 
 @theme {
-    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    /* easeOutQuad: a gentler curve felt better than a strong ease-out (see plans/README.md). */
+    --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 @layer base {

@@ -1,20 +1,23 @@
-# 001 — Add a strong ease-out token (the toast keeps a standard ease)
+# 001 — Add a shared ease-out token and use it in the toast
 
-- **Status**: DONE (revised after the feel check)
+- **Status**: DONE (revised after two feel checks)
 - **Commit**: fb24325
 - **Severity**: LOW
 - **Category**: Cohesion & tokens (Easing & duration)
 - **Estimated scope**: 2 files, ~5 changed lines
 
-## Revision after the feel check (supersedes the toast parts below)
+## Revisions after feel checks (the values below are already updated)
 
-As first implemented, the toast felt too snappy. The strong curve front-loads the motion, so at the unchanged 200ms the toast covered about 90% of its travel in the first ~80ms. The feel check on 2026-09-28 decided the toast uses the standard CSS `ease` at its original durations: 200ms in, 150ms out. This is a deliberate decision, so do not flag the toast's curve in future audits.
+1. **2026-09-28.** With the originally planned strong curve, `cubic-bezier(0.23, 1, 0.32, 1)`, the toast felt too snappy. That curve covers about a quarter of its travel in the first frame and 90% in the first ~43% of the duration. The toast was moved to CSS `ease` as a stopgap.
+2. **2026-09-29.** The link-ready entrance (plan 005) felt too quick for the same reason. The shared token became easeOutQuad, `cubic-bezier(0.25, 0.46, 0.45, 0.94)`. It's still a pure ease-out, so there's no delay at the start, but it starts at about half the speed (around 11% of the travel in the first frame of a 300ms move) and decelerates evenly (90% at around 68% of the duration). The toast went back on the token. Every element that eases out now shares this one curve.
+
+This is a deliberate, owner-approved choice. Future audits should not flag the token as a weak curve.
 
 Final state:
 
-- `resources/css/app.css` keeps the token, `@theme { --ease-out: cubic-bezier(0.23, 1, 0.32, 1); }`. It's for direct UI responses: the button press (002), popover and dialog (003), and the entrances in 005–007.
-- `resources/scripts/components/ui/toast.tsx:41` uses `[transition:transform_200ms_ease,translate_200ms_ease,opacity_200ms_ease,height_150ms_ease]`.
-- `resources/scripts/components/ui/toast.tsx:66` uses `ease-[ease]` in place of the `ease-out` utility.
+- `resources/css/app.css`: `@theme { --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94); }`.
+- `resources/scripts/components/ui/toast.tsx:41`: `[transition:transform_200ms_var(--ease-out),translate_200ms_var(--ease-out),opacity_200ms_var(--ease-out),height_150ms_var(--ease-out)]`.
+- `resources/scripts/components/ui/toast.tsx:66`: the `ease-out` utility.
 
 ## Problem
 
@@ -41,7 +44,7 @@ Both curves are too gentle for UI, so toasts drift into place instead of arrivin
 ```css
 /* resources/css/app.css — new block, placed directly after the existing `@theme inline { … }` block */
 @theme {
-    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 ```
 
@@ -64,7 +67,7 @@ Both curves are too gentle for UI, so toasts drift into place instead of arrivin
 1. In `resources/css/app.css`, find the closing `}` of the `@theme inline {` block (line 28). Insert a blank line after it, then this block:
    ```css
    @theme {
-       --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+       --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
    }
    ```
 2. In `resources/scripts/components/ui/toast.tsx` line 41, inside the `[transition:…]` arbitrary value, replace each of the four occurrences of `_ease-out` with `_var(--ease-out)`. The result must match the Target string exactly. Do not change any duration.
@@ -85,14 +88,14 @@ Both curves are too gentle for UI, so toasts drift into place instead of arrivin
   - `bun run test:lint` passes.
   - `node_modules/.bin/vp check` reports no errors beyond those it reported before your edit.
   - `bun run build` succeeds.
-  - `grep -o -- '--ease-out:[^;}]*' public/build/assets/app-*.css` prints `--ease-out:cubic-bezier(.23, 1, .32, 1)`. Custom-property values keep their spaces after minification.
+  - `grep -o -- '--ease-out:[^;}]*' public/build/assets/app-*.css` prints `--ease-out:cubic-bezier(.25, .46, .45, .94)`. Custom-property values keep their spaces after minification.
   - `grep -o 'transition:transform[^;}]*var(--ease-out)[^;}]*' public/build/assets/app-*.css` prints `transition:transform .2s var(--ease-out),translate .2s var(--ease-out),opacity .2s var(--ease-out),height .15s var(--ease-out)`.
   - `grep -n '_ease-out' resources/scripts/components/ui/toast.tsx` prints nothing.
 - **Tests**: this change is visual only. Per the repo rule, run the browser suite that exercises the toast end to end, after `bun run build` (browser tests load built assets unless `public/hot` exists):
   `php artisan test --compact tests/Browser/SettingsBrowserTest.php`. It must pass. Do not write tests that assert class strings or CSS values. If Playwright reports a missing browser, stop and report. Do not install anything.
 - **Feel check** at `https://filemax.test/account/settings`:
-  - Click "Save profile" three times quickly. Each toast arrives decisively, with most of the movement in the first ~60ms, then settles softly. There is no slow drift at the start.
-  - Hover the toast stack. Expanding and collapsing uses the same crisp curve.
+  - Click "Save profile" three times quickly. Each toast arrives smoothly, with no abrupt jump in the first frame and no slow drift at the start.
+  - Hover the toast stack. Expanding and collapsing uses the same curve.
   - Drag a toast to the right. It tracks the pointer with no lag (Base UI disables transitions while swiping) and flies out on release.
-  - In DevTools, open the Animations panel and set playback to 10%. The toast's transform curve is front-loaded: fast at the start, long gentle tail.
-- **Done when**: the built CSS defines `--ease-out` as `cubic-bezier(.23, 1, .32, 1)`, the toast's compiled transition references `var(--ease-out)`, `toast.tsx` contains no bare `ease-out` keyword inside the arbitrary transition, and `SettingsBrowserTest` passes.
+  - In DevTools, open the Animations panel and set playback to 10%. The toast's transform curve starts moderately and decelerates evenly, with no jump on the first frame.
+- **Done when**: the built CSS defines `--ease-out` as `cubic-bezier(.25, .46, .45, .94)`, the toast's compiled transition references `var(--ease-out)`, `toast.tsx` contains no bare `ease-out` keyword inside the arbitrary transition, and `SettingsBrowserTest` passes.
