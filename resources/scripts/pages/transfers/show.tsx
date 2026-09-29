@@ -1,5 +1,6 @@
 import {
     ArrowLeft01Icon,
+    Calendar01Icon,
     Delete02Icon,
     Globe02Icon,
     UserGroupIcon,
@@ -25,10 +26,11 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { bytes, date, dateTime } from '@/lib/format';
+import { toast } from '@/components/ui/toast';
+import { bytes, date, dateTime, relativeDay } from '@/lib/format';
 import type { Team, Transfer } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { destroy, index, update } from '@/routes/transfers';
+import { destroy, extend, index, update } from '@/routes/transfers';
 export default function Show({
     transfer,
     teams,
@@ -89,12 +91,70 @@ export default function Show({
                         )}
                     </div>
                     <p className="text-muted-foreground">
-                        Created {date(transfer.created_at)} · Expires{' '}
+                        Created {date(transfer.created_at)} ·{' '}
+                        {transfer.available || transfer.revoked_at
+                            ? 'Expires'
+                            : 'Expired'}{' '}
                         {dateTime(transfer.expires_at)} · {transfer.files_count}{' '}
                         {transfer.files_count === 1 ? 'file' : 'files'} ·{' '}
                         {bytes(transfer.total_size)}
                     </p>
                 </div>
+                <Form
+                    action={extend(transfer.id)}
+                    className="mb-6 flex flex-col gap-2 empty:hidden"
+                    options={{ preserveScroll: true }}
+                    onSuccess={(page) =>
+                        toast.add({
+                            title: 'Transfer extended',
+                            description: `Now expires ${dateTime((page.props.transfer as Transfer).expires_at)}.`,
+                        })
+                    }
+                >
+                    {({ errors, processing }) => (
+                        <>
+                            {transfer.can_extend && (
+                                <div className="flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-5">
+                                    <input
+                                        type="hidden"
+                                        name="expected_expires_at"
+                                        value={transfer.expires_at ?? ''}
+                                    />
+                                    <div className="flex min-w-0 flex-col gap-1">
+                                        <p className="font-semibold">
+                                            {transfer.available
+                                                ? `Expires ${relativeDay(transfer.expires_at)}`
+                                                : 'This transfer has expired'}
+                                        </p>
+                                        <p className="text-slate-700">
+                                            {transfer.available
+                                                ? 'After that, recipients can no longer download. Extending keeps the same link.'
+                                                : `The link no longer works. Your files are kept until ${date(transfer.retained_until)}.`}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        type="submit"
+                                        variant="outline"
+                                        disabled={processing}
+                                        aria-busy={processing}
+                                    >
+                                        <HugeiconsIcon
+                                            icon={Calendar01Icon}
+                                            size={18}
+                                            aria-hidden="true"
+                                        />
+                                        {transfer.available
+                                            ? 'Extend by 7 days'
+                                            : 'Reactivate for 7 days'}
+                                    </Button>
+                                </div>
+                            )}
+                            <ErrorMessage>
+                                {Object.values(errors).join(' ')}
+                            </ErrorMessage>
+                        </>
+                    )}
+                </Form>
                 <div className="grid grid-cols-1 items-start gap-7 md:grid-cols-3 md:gap-10">
                     <section className="flex min-w-0 flex-col gap-7 md:col-span-2">
                         {transfer.url && <CopyLink url={transfer.url} />}

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\ExtendTransferController;
 use App\Http\Controllers\TransferController;
 use App\Http\Controllers\TransferFileUploadController;
 use App\Http\Controllers\TransferUploadController;
@@ -15,6 +16,7 @@ Route::middleware(['auth', EnsureEligibleEmail::class, 'verified'])->prefix('tra
     Route::post('/', [TransferController::class, 'store'])->name('store');
     Route::get('/{transfer}', [TransferController::class, 'show'])->name('show');
     Route::patch('/{transfer}', [TransferController::class, 'update'])->name('update');
+    Route::post('/{transfer}/extend', ExtendTransferController::class)->name('extend');
     Route::delete('/{transfer}', [TransferController::class, 'destroy'])->name('destroy');
     Route::post('/{transfer}/upload', [TransferUploadController::class, 'store'])->name('uploads.finalize');
     Route::scopeBindings()->group(function (): void {
