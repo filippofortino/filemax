@@ -24,7 +24,7 @@ beforeEach(function (): void {
 it('extends an eligible transfer from the later of expiry and now', function (int $remainingDays, int $expectedDays): void {
     $transfer = Transfer::factory()->create(['expires_at' => now()->addDays($remainingDays)]);
 
-    $this->actingAs($transfer->user)->postJson('/transfers/'.$transfer->id.'/extend', [
+    $this->actingAs($transfer->user)->postJson(route('transfers.extend', $transfer), [
         'expected_expires_at' => $transfer->expires_at->toIso8601String(),
     ])->assertOk()->assertJsonPath('expires_at', now()->addDays($expectedDays)->toIso8601String());
 
