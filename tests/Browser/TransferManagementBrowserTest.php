@@ -129,6 +129,7 @@ JS)
     expect($transfer->teams()->pluck('teams.id')->all())->toEqualCanonicalizing([$mediamax->id, $lenergy->id]);
 
     $page->press('Change teams')
+        ->wait(0.3)
         ->press('[aria-label="Choose teams"]')
         ->assertChecked('[aria-label="Lenergy"]')
         ->uncheck('[aria-label="Lenergy"]')

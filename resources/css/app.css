@@ -3,6 +3,7 @@
 @import 'shadcn/tailwind.css';
 
 @source '../scripts/**/*.{ts,tsx}';
+@source not '../../plans';
 
 @theme inline {
     --font-sans: 'DM Sans', system-ui, sans-serif;
@@ -25,6 +26,11 @@
     --color-destructive: var(--color-red-700);
     --color-secondary: var(--color-slate-100);
     --color-secondary-foreground: var(--color-slate-900);
+}
+
+@theme {
+    /* easeOutQuad: a gentler curve felt better than a strong ease-out (see plans/README.md). */
+    --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 @layer base {
@@ -105,8 +111,15 @@
 
 @media (prefers-reduced-motion: reduce) {
     *,
-    *::before,
-    *::after {
-        @apply animate-none! transition-none!;
+    ::before,
+    ::after {
+        transition-property:
+            opacity, color, background-color, border-color !important;
+    }
+
+    :not(.animate-spin),
+    ::before,
+    ::after {
+        @apply animate-none!;
     }
 }

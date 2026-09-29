@@ -463,9 +463,15 @@ export function CopyLink({ url }: { url: string }) {
                 />
                 <Button type="button" onClick={copy} className="px-4">
                     <HugeiconsIcon
+                        key={copied ? 'copied' : 'copy'}
                         icon={copied ? Tick02Icon : Copy01Icon}
                         size={18}
                         aria-hidden="true"
+                        className={
+                            copied
+                                ? 'transition-[opacity,scale,filter] duration-150 ease-out starting:opacity-0 starting:blur-[2px] motion-safe:starting:scale-90'
+                                : undefined
+                        }
                     />
                     {copied ? 'Copied' : 'Copy link'}
                 </Button>
