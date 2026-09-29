@@ -2,7 +2,7 @@ import { Button as ButtonPrimitive } from '@base-ui/react/button';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 const buttonVariants = cva(
-    'inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-transparent text-sm font-semibold whitespace-nowrap transition-[color,background-color,border-color,scale] duration-160 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-97 disabled:pointer-events-none disabled:cursor-not-allowed disabled:border-transparent disabled:bg-slate-200 disabled:text-slate-500 [&_svg]:shrink-0',
+    'relative inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-transparent text-sm font-semibold whitespace-nowrap transition-[color,background-color,border-color,scale] duration-160 ease-out after:absolute after:-inset-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:scale-97 active:after:scale-[calc(1/0.97)] disabled:pointer-events-none disabled:cursor-not-allowed disabled:border-transparent disabled:bg-slate-200 disabled:text-slate-500 [&_svg]:shrink-0',
     {
         variants: {
             variant: {

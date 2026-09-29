@@ -25,6 +25,7 @@ it('uses links for available pages and disabled buttons at the pagination bounda
     $this->actingAs($owner);
 
     visit('/transfers')
+        ->assertSee('21 transfers · 21 active · 0 expired')
         ->assertSee('Page 1 of 2')
         ->assertDisabled('nav[aria-label="Pagination"] button:has-text("Previous")')
         ->assertMissing('nav[aria-label="Pagination"] a:has-text("Previous")')
@@ -107,11 +108,11 @@ it('saves team changes only on confirmation and keeps delete dialog keyboard foc
 
     $page->press('Change teams')->assertSee('Save changes');
     $page->screenshot(fullPage: false, filename: 'dialog-change-teams');
-    $page->resize(390, 844)->press('[aria-label="Choose teams"]')
+    $page->resize(390, 844)->press('button:has-text("Choose teams")')
         ->assertVisible('#team-search')
         ->assertScript(<<<'JS'
 () => {
-    const trigger = document.querySelector('[aria-label="Choose teams"]').getBoundingClientRect();
+    const trigger = [...document.querySelectorAll('button')].find((button) => button.textContent.startsWith('Choose teams')).getBoundingClientRect();
     const popup = document.querySelector('[data-slot="popover-content"]').getBoundingClientRect();
     return popup.left >= 0 && popup.right <= window.innerWidth
         && Math.abs(popup.width - Math.max(256, trigger.width)) < 1;
@@ -120,7 +121,7 @@ JS)
         ->uncheck('[aria-label="Lenergy"]')
         ->keys(':focus', 'Escape')
         ->assertMissing('#team-search')
-        ->assertVisible('[aria-label="Choose teams"]:focus')
+        ->assertVisible('button:has-text("Choose teams"):focus')
         ->assertSee('Save changes')
         ->press('Cancel')
         ->assertDontSee('Save changes')
@@ -130,7 +131,7 @@ JS)
 
     $page->press('Change teams')
         ->wait(0.3)
-        ->press('[aria-label="Choose teams"]')
+        ->press('button:has-text("Choose teams")')
         ->assertChecked('[aria-label="Lenergy"]')
         ->uncheck('[aria-label="Lenergy"]')
         ->keys(':focus', 'Escape')

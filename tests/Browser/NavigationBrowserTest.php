@@ -39,7 +39,7 @@ it('gives the mobile header controls space above them', function (): void {
     $topOffsets = $page->script(<<<'JS'
         () => {
             const header = document.querySelector('header');
-            return [...header.querySelectorAll(':scope > a, a[aria-label="New transfer"], button[aria-label="Account menu"]')]
+            return [...header.querySelectorAll(':scope > a, a[aria-label="New transfer"], button[aria-label$="account menu"]')]
                 .map(element => element.getBoundingClientRect().top - header.getBoundingClientRect().top);
         }
         JS);

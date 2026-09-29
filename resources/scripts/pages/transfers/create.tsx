@@ -1,5 +1,4 @@
 import {
-    Alert02Icon,
     Cancel01Icon,
     Globe02Icon,
     Tick02Icon,
@@ -45,6 +44,12 @@ export default function Create({ teams }: { teams: Team[] }) {
     const operating = useRef(false);
     const cancelling = useRef(false);
     const picker = useRef<HTMLInputElement>(null);
+    const statusHeading = useRef<HTMLHeadingElement>(null);
+    const readyHeading = useRef<HTMLHeadingElement>(null);
+    const fileList = useRef<HTMLDivElement>(null);
+    const refocusRow = useRef<number | null>(null);
+    const browseFiles = useRef<HTMLButtonElement>(null);
+    const teamsTrigger = useRef<HTMLButtonElement>(null);
     const [title, setTitle] = useState('');
     const [message, setMessage] = useState('');
     const [visibility, setVisibility] = useState<'public' | 'teams'>('public');
@@ -53,6 +58,7 @@ export default function Create({ teams }: { teams: Team[] }) {
     const [busy, setBusy] = useState(false);
     const [removing, setRemoving] = useState(false);
     const [error, setError] = useState('');
+    const [validationFailed, setValidationFailed] = useState(false);
     const [ready, setReady] = useState<Transfer | null>(null);
     const [allFiles, setAllFiles] = useState(false);
     const [dragging, setDragging] = useState(false);
@@ -96,6 +102,24 @@ export default function Create({ teams }: { teams: Team[] }) {
             abort.current?.abort();
         };
     }, [ready]);
+    useEffect(() => {
+        if (ready && document.activeElement === document.body)
+            readyHeading.current?.focus();
+    }, [ready]);
+    useEffect(() => {
+        const index = refocusRow.current;
+        if (busy || index === null) return;
+        refocusRow.current = null;
+        if (document.activeElement !== document.body) return;
+        const rows = Array.from(fileList.current?.children ?? []);
+        const target =
+            [...rows.slice(index), ...rows.slice(0, index).reverse()]
+                .map((row) => row.querySelector('button'))
+                .find(Boolean) ??
+            statusHeading.current ??
+            browseFiles.current;
+        target?.focus();
+    }, [busy, entries]);
     function addFiles(files: FileList | File[]) {
         if (draft.current || busy || ready) return;
         changeEntries([
@@ -115,11 +139,17 @@ export default function Create({ teams }: { teams: Team[] }) {
     async function removeFile(entry: Entry) {
         if (operating.current) return;
         operating.current = true;
+        refocusRow.current = currentEntries.current.findIndex(
+            (item) => item.key === entry.key,
+        );
         setRemoving(true);
         setBusy(true);
         setError('');
         try {
-            if (draft.current && entry.remote)
+            if (draft.current && currentEntries.current.length === 1) {
+                await request(destroy.url(draft.current.id), 'DELETE');
+                draft.current = null;
+            } else if (draft.current && entry.remote)
                 await request(
                     remove.url({
                         transfer: draft.current.id,
@@ -138,18 +168,29 @@ export default function Create({ teams }: { teams: Team[] }) {
             setBusy(false);
         }
     }
-    function send() {
-        if (operating.current || !currentEntries.current.length) return;
+    function send(started: number) {
+        if (operating.current) return;
+        const filesMissing = !currentEntries.current.length;
+        const teamsMissing = visibility === 'teams' && !selectedTeams.length;
+        setValidationFailed(filesMissing || teamsMissing);
+        if (filesMissing) {
+            browseFiles.current?.focus();
+            return;
+        }
+        if (teamsMissing) {
+            teamsTrigger.current?.focus();
+            return;
+        }
         operating.current = true;
         setBusy(true);
+        statusHeading.current?.focus();
         setError('');
         setRemaining(null);
         const controller = new AbortController();
         abort.current = controller;
-        upload.current = runUpload(controller);
+        upload.current = runUpload(controller, started);
     }
-    async function runUpload(controller: AbortController) {
-        const started = Date.now();
+    async function runUpload(controller: AbortController, started: number) {
         let transferred = 0;
         try {
             if (!draft.current) {
@@ -329,7 +370,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                 currentEntries.current.some((entry) => entry.status !== 'done')
             ) {
                 setError(
-                    'Some files could not be uploaded. Completed files are safe — retry sends only what is missing.',
+                    'Some files could not be uploaded. Completed files are safe — retry sends only what’s missing, or remove the failed files to finish with the rest.',
                 );
                 return;
             }
@@ -363,7 +404,14 @@ export default function Create({ teams }: { teams: Team[] }) {
     }
     async function cancel() {
         if (cancelling.current || removing) return;
+        if (
+            !window.confirm(
+                'Cancel this upload? Uploaded progress will be discarded. You will need to select and upload the files again.',
+            )
+        )
+            return;
         cancelling.current = true;
+        refocusRow.current = 0;
         operating.current = true;
         abort.current?.abort();
         setBusy(true);
@@ -391,7 +439,18 @@ export default function Create({ teams }: { teams: Team[] }) {
           : 0;
     const availableUntil = new Date();
     availableUntil.setDate(availableUntil.getDate() + expiry);
-    const hasDraft = !!draft.current;
+    const hasDraft = entries.some((entry) => entry.remote !== undefined);
+    const teamsHint = !selectedTeams.length && (
+        <p
+            id="teams-hint"
+            className={cn(
+                'text-sm text-muted-foreground',
+                validationFailed && 'text-destructive',
+            )}
+        >
+            Select at least one team.
+        </p>
+    );
     if (ready)
         return (
             <Shell>
@@ -402,16 +461,23 @@ export default function Create({ teams }: { teams: Team[] }) {
                         className="flex w-full max-w-2xl flex-col gap-6 rounded-xl border bg-background px-5 py-7 transition-[opacity,translate] duration-300 ease-out md:p-10 starting:opacity-0 motion-safe:starting:translate-y-2"
                     >
                         <div className="flex flex-col items-center gap-3.5 text-center">
-                            <span className="inline-flex size-18 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-[opacity,scale] [transition-delay:80ms] duration-300 ease-out starting:opacity-0 motion-safe:starting:scale-90">
+                            <span className="inline-flex size-18 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-[opacity,scale] [transition-delay:80ms] duration-300 ease-out starting:opacity-0 motion-safe:starting:scale-90">
                                 <HugeiconsIcon
                                     icon={Tick02Icon}
                                     size={30}
                                     aria-hidden="true"
                                 />
                             </span>
-                            <h1 className="text-4xl">Your link is ready</h1>
+                            <h1
+                                ref={readyHeading}
+                                tabIndex={-1}
+                                className="text-4xl"
+                            >
+                                Your link is ready
+                            </h1>
                             <p className="text-muted-foreground">
-                                {ready.files.length} files ·{' '}
+                                {ready.files.length}{' '}
+                                {ready.files.length === 1 ? 'file' : 'files'} ·{' '}
                                 {bytes(ready.total_size)} · expires{' '}
                                 {dateTime(ready.expires_at)}
                             </p>
@@ -514,8 +580,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                         ref={picker}
                         type="file"
                         multiple
-                        className="sr-only"
-                        aria-label="Choose files"
+                        hidden
                         onChange={(event) => {
                             if (event.target.files)
                                 addFiles(event.target.files);
@@ -524,7 +589,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                     />
                     {!entries.length ? (
                         <div className="flex min-h-72 flex-1 flex-col items-center justify-center gap-4 text-center md:min-h-80">
-                            <span className="inline-flex size-18 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                            <span className="inline-flex size-18 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                                 <HugeiconsIcon
                                     icon={Upload01Icon}
                                     size={32}
@@ -539,7 +604,9 @@ export default function Create({ teams }: { teams: Team[] }) {
                                 Anywhere on this page works.
                             </p>
                             <Button
+                                ref={browseFiles}
                                 variant="outline"
+                                aria-describedby="submit-hint"
                                 onClick={() => picker.current?.click()}
                             >
                                 Browse files
@@ -549,7 +616,11 @@ export default function Create({ teams }: { teams: Team[] }) {
                         <>
                             <div className="flex flex-col gap-3 rounded-xl border bg-background p-6">
                                 <div className="flex items-baseline justify-between gap-3">
-                                    <h1 className="text-3xl">
+                                    <h1
+                                        ref={statusHeading}
+                                        tabIndex={-1}
+                                        className="text-3xl"
+                                    >
                                         {busy
                                             ? 'Uploading…'
                                             : hasDraft
@@ -558,7 +629,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                                         entry.status ===
                                                         'failed',
                                                 )
-                                                  ? 'A little interruption'
+                                                  ? 'Upload incomplete'
                                                   : 'Ready to finish'
                                               : 'Ready to send'}
                                     </h1>
@@ -584,8 +655,8 @@ export default function Create({ teams }: { teams: Team[] }) {
                                                 <span>
                                                     About{' '}
                                                     {remaining < 60
-                                                        ? `${remaining} seconds`
-                                                        : `${Math.ceil(remaining / 60)} minutes`}{' '}
+                                                        ? `${remaining} ${remaining === 1 ? 'second' : 'seconds'}`
+                                                        : `${Math.ceil(remaining / 60)} ${Math.ceil(remaining / 60) === 1 ? 'minute' : 'minutes'}`}{' '}
                                                     left
                                                 </span>
                                             )}
@@ -593,12 +664,15 @@ export default function Create({ teams }: { teams: Team[] }) {
                                     </>
                                 ) : (
                                     <p className="text-muted-foreground">
-                                        {entries.length} files ·{' '}
-                                        {bytes(totalSize)}
+                                        {entries.length}{' '}
+                                        {entries.length === 1
+                                            ? 'file'
+                                            : 'files'}{' '}
+                                        · {bytes(totalSize)}
                                     </p>
                                 )}
                             </div>
-                            <div className="flex flex-col gap-2">
+                            <div ref={fileList} className="flex flex-col gap-2">
                                 {entries.map((entry) => (
                                     <div
                                         className="overflow-hidden rounded-lg border bg-background px-3"
@@ -689,7 +763,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                     Add more files
                                 </Button>
                             )}
-                            {hasDraft && (
+                            {busy && hasDraft && (
                                 <p className="text-center text-sm text-muted-foreground">
                                     Keep this tab open until the upload
                                     finishes.
@@ -702,7 +776,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                     className="flex min-w-0 flex-col gap-6 px-5 py-7 md:px-8 md:py-9 lg:gap-7 lg:px-16 lg:py-12"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        void send();
+                        send(Date.now());
                     }}
                 >
                     <h2>Transfer details</h2>
@@ -712,7 +786,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                 <span className="text-sm font-semibold">
                                     Title
                                 </span>
-                                <div className="rounded-md border bg-muted px-3.5 py-3 text-base">
+                                <div className="rounded-md border bg-muted px-3.5 py-3 text-base wrap-anywhere">
                                     {title || entries[0]?.file.name}
                                 </div>
                             </div>
@@ -720,7 +794,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                 <span className="text-sm font-semibold">
                                     Message
                                 </span>
-                                <div className="rounded-md border bg-muted px-3.5 py-3 text-base whitespace-pre-wrap">
+                                <div className="rounded-md border bg-muted px-3.5 py-3 text-base wrap-anywhere whitespace-pre-wrap">
                                     {message || 'No message'}
                                 </div>
                             </div>
@@ -731,11 +805,20 @@ export default function Create({ teams }: { teams: Team[] }) {
                                     </span>
                                     {visibility === 'teams' ? (
                                         !busy ? (
-                                            <TeamPicker
-                                                teams={teams}
-                                                selected={selectedTeams}
-                                                onChange={setSelectedTeams}
-                                            />
+                                            <>
+                                                <TeamPicker
+                                                    teams={teams}
+                                                    selected={selectedTeams}
+                                                    onChange={setSelectedTeams}
+                                                    triggerRef={teamsTrigger}
+                                                    describedBy={
+                                                        selectedTeams.length
+                                                            ? undefined
+                                                            : 'teams-hint'
+                                                    }
+                                                />
+                                                {teamsHint}
+                                            </>
                                         ) : (
                                             <TeamBadges
                                                 teams={teams.filter((team) =>
@@ -832,7 +915,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                                         ] as const
                                     ).map((option) => (
                                         <label
-                                            className="flex cursor-pointer flex-col gap-2 rounded-lg border border-input p-4 has-checked:border-primary has-checked:bg-primary/5 has-checked:ring-1 has-checked:ring-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary has-disabled:cursor-not-allowed"
+                                            className="flex cursor-pointer flex-col gap-2 rounded-lg border border-input p-4 has-checked:border-primary has-checked:bg-primary/5 has-checked:ring-1 has-checked:ring-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary has-disabled:cursor-not-allowed has-disabled:bg-muted has-disabled:text-muted-foreground"
                                             key={option.value}
                                         >
                                             <span className="flex items-center justify-between has-checked:text-primary">
@@ -900,12 +983,14 @@ export default function Create({ teams }: { teams: Team[] }) {
                                             selected={selectedTeams}
                                             onChange={setSelectedTeams}
                                             disabled={busy}
+                                            triggerRef={teamsTrigger}
+                                            describedBy={
+                                                selectedTeams.length
+                                                    ? undefined
+                                                    : 'teams-hint'
+                                            }
                                         />
-                                        {!selectedTeams.length && (
-                                            <p className="text-sm text-muted-foreground">
-                                                Select at least one team.
-                                            </p>
-                                        )}
+                                        {teamsHint}
                                     </>
                                 )}
                             </fieldset>
@@ -940,28 +1025,12 @@ export default function Create({ teams }: { teams: Team[] }) {
                     )}
                     <div className="flex flex-col gap-3">
                         <ErrorMessage>{error}</ErrorMessage>
-                        {error && hasDraft && (
-                            <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-slate-700">
-                                <HugeiconsIcon
-                                    className="mr-1 inline"
-                                    icon={Alert02Icon}
-                                    size={16}
-                                    aria-hidden="true"
-                                />
-                                Completed files are safe. Retry failed files or
-                                remove them to finish with the rest.
-                            </p>
-                        )}
                         <Button
                             size="lg"
                             type="submit"
                             className={cn(busy && hasDraft && 'hidden')}
-                            disabled={
-                                busy ||
-                                entries.length === 0 ||
-                                (visibility === 'teams' &&
-                                    selectedTeams.length === 0)
-                            }
+                            disabled={busy}
+                            aria-describedby="submit-hint"
                         >
                             {busy
                                 ? 'Uploading…'
@@ -980,7 +1049,15 @@ export default function Create({ teams }: { teams: Team[] }) {
                                 Cancel upload
                             </Button>
                         )}
-                        <p className="text-center text-sm text-muted-foreground">
+                        <p
+                            id="submit-hint"
+                            className={cn(
+                                'text-center text-sm text-muted-foreground',
+                                validationFailed &&
+                                    !entries.length &&
+                                    'text-destructive',
+                            )}
+                        >
                             {!entries.length
                                 ? 'Add at least one file to continue'
                                 : busy

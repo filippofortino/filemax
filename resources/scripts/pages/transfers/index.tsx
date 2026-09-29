@@ -40,8 +40,9 @@ export default function Index({ transfers, teams, filter, totals }: Props) {
                     <h1>My transfers</h1>
                     {totals.total > 0 && (
                         <p className="text-muted-foreground">
-                            {totals.total} transfers · {totals.active} active ·{' '}
-                            {totals.expired} expired
+                            {totals.total}{' '}
+                            {totals.total === 1 ? 'transfer' : 'transfers'} ·{' '}
+                            {totals.active} active · {totals.expired} expired
                         </p>
                     )}
                 </div>

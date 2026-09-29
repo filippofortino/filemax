@@ -12,7 +12,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Link, usePage } from '@inertiajs/react';
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode, type Ref } from 'react';
 import { Avatar } from '@/components/avatar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -163,7 +163,7 @@ export function Shell({
                             <Popover>
                                 <PopoverTrigger
                                     className="flex items-center gap-2.5 text-muted-foreground"
-                                    aria-label="Account menu"
+                                    aria-label={`${user.name}, account menu`}
                                 >
                                     <span
                                         className={cn(
@@ -273,9 +273,19 @@ export function AuthLayout({
         </main>
     );
 }
-export function ErrorMessage({ children }: { children?: ReactNode }) {
+export function ErrorMessage({
+    children,
+    id,
+}: {
+    children?: ReactNode;
+    id?: string;
+}) {
     return children ? (
-        <p className="text-sm wrap-anywhere text-destructive" role="alert">
+        <p
+            id={id}
+            className="text-sm wrap-anywhere text-destructive"
+            role="alert"
+        >
             {children}
         </p>
     ) : null;
@@ -319,11 +329,15 @@ export function TeamPicker({
     selected,
     onChange,
     disabled = false,
+    triggerRef,
+    describedBy,
 }: {
     teams: Team[];
     selected: string[];
     onChange: (ids: string[]) => void;
     disabled?: boolean;
+    triggerRef?: Ref<HTMLButtonElement>;
+    describedBy?: string;
 }) {
     const [query, setQuery] = useState('');
     const availableSelection = selected.filter((id) =>
@@ -342,7 +356,8 @@ export function TeamPicker({
                     render={<Button variant="outline" />}
                     type="button"
                     className="w-full flex-wrap justify-between gap-y-1 py-2 whitespace-normal"
-                    aria-label="Choose teams"
+                    ref={triggerRef}
+                    aria-describedby={describedBy}
                     disabled={disabled}
                 >
                     Choose teams
@@ -390,7 +405,10 @@ export function TeamPicker({
                                         {team.name}
                                     </span>
                                     <small className="text-muted-foreground">
-                                        {team.users_count} members
+                                        {team.users_count}{' '}
+                                        {team.users_count === 1
+                                            ? 'member'
+                                            : 'members'}
                                     </small>
                                 </label>
                             ))}
