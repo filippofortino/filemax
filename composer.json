@@ -10,7 +10,6 @@
     "license": "MIT",
     "require": {
         "php": "^8.5.0",
-        "aws/aws-sdk-php": "^3.395.7",
         "inertiajs/inertia-laravel": "^3.3.4",
         "intervention/image": "^4.0",
         "laravel/fortify": "^1.39",
@@ -19,7 +18,8 @@
         "laravel/wayfinder": "^0.1.21",
         "league/flysystem-aws-s3-v3": "^3.35.3",
         "maennchen/zipstream-php": "^3.2.2",
-        "nunomaduro/essentials": "^1.2.0"
+        "nunomaduro/essentials": "^1.2.0",
+        "resend/resend-php": "^1.16"
     },
     "require-dev": {
         "driftingly/rector-laravel": "^2.6.2",
