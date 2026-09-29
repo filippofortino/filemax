@@ -990,7 +990,7 @@ export default function Create({ teams }: { teams: Team[] }) {
                     </div>
                 </form>
                 {dragging && !hasDraft && (
-                    <div className="pointer-events-none fixed inset-3 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-accent/95 p-6 text-center font-heading text-4xl">
+                    <div className="pointer-events-none fixed inset-3 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-accent/95 p-6 text-center font-heading text-4xl transition-opacity duration-150 ease-out starting:opacity-0">
                         Drop to add your files
                     </div>
                 )}

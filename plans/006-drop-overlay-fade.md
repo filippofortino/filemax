@@ -1,6 +1,6 @@
 # 006 — Fade the drop overlay in instead of flashing it
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: fb24325
 - **Severity**: LOW
 - **Category**: Missed opportunities
