@@ -26,5 +26,6 @@ it('shows the sign in form to guests', function (): void {
 it('shows the new transfer form to verified staff', function (): void {
     $this->actingAs(User::factory()->create());
     visit('/')->assertSee('Drop files here')->assertSee('Transfer details')
-        ->assertSee('7 days')->assertDontSee('Once downloaded')->assertNoJavascriptErrors();
+        ->assertSee('7 days')->assertDontSee('Once downloaded')->assertNoJavascriptErrors()
+        ->screenshot(fullPage: false, filename: 'new-transfer-no-teams');
 });

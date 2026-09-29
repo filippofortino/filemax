@@ -70,7 +70,7 @@ it('signs in and signs out through the account menu', function (): void {
         ->check('remember')
         ->press('form button[data-slot="button"]')
         ->assertSee('Transfer details')
-        ->click('[aria-label="Account menu"]')
+        ->click('[aria-label$="account menu"]')
         ->click('Sign out')
         ->assertSee('Forgot password?')
         ->assertNoJavascriptErrors();
@@ -78,13 +78,29 @@ it('signs in and signs out through the account menu', function (): void {
     expect($user->refresh()->remember_token)->not->toBeNull();
 });
 
+it('signs in when pressing near the edge of the submit button', function (string $reducedMotion): void {
+    $user = User::factory()->create();
+
+    $page = visit('/login', ['reducedMotion' => $reducedMotion])
+        ->fill('email', $user->email)
+        ->fill('password', 'password');
+
+    $page->page()->locator('form button[data-slot="button"]')->click([
+        'position' => ['x' => 1, 'y' => 24],
+        'delay' => 100,
+        'force' => true,
+    ]);
+
+    $page->assertSee('Transfer details')->assertNoJavascriptErrors();
+})->with(['no-preference', 'reduce']);
+
 it('shortens a long email in the account menu and keeps the full one on hover', function (): void {
     $user = User::factory()->create(['email' => 'filippo.fortino@mediamaxcommunication.it']);
     $this->actingAs($user);
     $email = '[data-slot="popover-content"] [title]';
 
     $page = visit('/')->resize(1280, 940)
-        ->click('[aria-label="Account menu"]')
+        ->click('[aria-label$="account menu"]')
         ->assertAttribute($email, 'title', $user->email);
     $page->script('() => document.fonts.ready');
     $page->screenshot(fullPage: false, filename: 'account-menu-long-email');
@@ -130,4 +146,36 @@ it('lets an admin add and remove a registered member in the teams interface', fu
 
     expect($team->refresh()->name)->toBe('Creative Studio Updated');
     expect(Team::query()->where('name', 'Production')->exists())->toBeTrue();
+});
+
+it('associates sign in errors and focuses the first invalid field', function (): void {
+    $user = User::factory()->create();
+    $page = visit('/login');
+
+    $page->assertScript('document.getElementById("email").hasAttribute("aria-describedby")', false)
+        ->assertScript('document.getElementById("password").hasAttribute("aria-describedby")', false)
+        ->fill('email', $user->email)
+        ->fill('password', 'incorrect-password')
+        ->press('form button[data-slot="button"]')
+        ->assertSee(__('auth.failed'))
+        ->assertAttribute('#email', 'aria-invalid', 'true')
+        ->assertAttribute('#email', 'aria-describedby', 'login-email-error')
+        ->assertSeeIn('#login-email-error', __('auth.failed'))
+        ->assertScript('document.activeElement.id', 'email');
+    $page->screenshot(filename: 'auth-login-validation');
+
+    $page->fill('password', '');
+    $page->script('() => { document.querySelector("form").noValidate = true; }');
+    $page->press('form button[data-slot="button"]')
+        ->assertAttribute('#password', 'aria-invalid', 'true')
+        ->assertAttribute('#password', 'aria-describedby', 'login-password-error')
+        ->assertSeeIn('#login-password-error', __('validation.required', ['attribute' => 'password']))
+        ->assertAttribute('#email', 'aria-invalid', 'false')
+        ->assertScript('document.getElementById("email").hasAttribute("aria-describedby")', false)
+        ->assertScript('document.activeElement.id', 'password');
+
+    $page->fill('password', 'password')
+        ->press('form button[data-slot="button"]')
+        ->assertSee('Transfer details')
+        ->assertNoJavascriptErrors();
 });

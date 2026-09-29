@@ -235,10 +235,7 @@ function Profile({ user }: { user: User }) {
                                 id="avatar"
                                 type="file"
                                 accept="image/jpeg,image/png"
-                                className="sr-only"
-                                aria-label="Profile photo"
-                                aria-describedby="avatar-requirements"
-                                aria-invalid={!!profile.errors.avatar}
+                                hidden
                                 disabled={profile.processing}
                                 onChange={(event) => {
                                     const avatar = event.target.files?.[0];
@@ -259,6 +256,7 @@ function Profile({ user }: { user: User }) {
                                 type="button"
                                 variant="outline"
                                 disabled={profile.processing}
+                                aria-describedby="avatar-requirements"
                                 onClick={() => photoInput.current?.click()}
                             >
                                 Upload photo

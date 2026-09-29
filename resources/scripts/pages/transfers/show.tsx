@@ -234,7 +234,10 @@ export default function Show({
                                                     {team.name}
                                                 </strong>
                                                 <span className="text-xs text-muted-foreground">
-                                                    {team.users_count} members
+                                                    {team.users_count}{' '}
+                                                    {team.users_count === 1
+                                                        ? 'member'
+                                                        : 'members'}
                                                 </span>
                                             </span>
                                         ))}
