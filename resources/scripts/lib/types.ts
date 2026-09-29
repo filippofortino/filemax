@@ -57,5 +57,6 @@ export type Transfer = {
     created_at: string;
     revoked_at: string | null;
     available: boolean;
+    can_extend: boolean;
     url: string;
 };

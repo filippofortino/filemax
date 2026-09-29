@@ -53,6 +53,107 @@ it('shows the expiry date and time in the viewer timezone', function (): void {
         ->assertNoJavascriptErrors();
 });
 
+it('extends an active transfer and disables extension while the request is processing', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-09-20 12:00:00'));
+    $owner = User::factory()->create();
+    $transfer = Transfer::factory()->for($owner)->create(['expires_at' => now()->addDays(2)]);
+    $this->actingAs($owner);
+
+    $page = visit(route('transfers.show', $transfer))->withTimezone('Europe/Rome')
+        ->assertSee('Expires 22 Sept 2026, 14:00')
+        ->assertEnabled('Extend by 7 days');
+    $page->script(<<<'JS'
+() => {
+    const open = XMLHttpRequest.prototype.open;
+    const send = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (method, url, ...args) {
+        this.isExtension = method.toUpperCase() === 'POST' && String(url).endsWith('/extend');
+        return open.call(this, method, url, ...args);
+    };
+    XMLHttpRequest.prototype.send = function (body) {
+        if (this.isExtension) {
+            window.releaseExtension = () => send.call(this, body);
+            return;
+        }
+        return send.call(this, body);
+    };
+}
+JS);
+
+    $page->press('Extend by 7 days')->assertDisabled('Extend by 7 days');
+    $page->script('() => window.releaseExtension()');
+    $page->assertSee('Expires 29 Sept 2026, 14:00')
+        ->assertSeeIn('[data-slot="toast"]', 'Transfer extended')
+        ->assertMissing('button:has-text("Extend by 7 days")')
+        ->assertNoJavascriptErrors();
+
+    expect($transfer->refresh()->expires_at->toDateTimeString())->toBe('2026-09-29 12:00:00');
+});
+
+it('restores an expired transfer on mobile and supports a second intentional extension', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-09-20 12:00:00'));
+    $owner = User::factory()->create();
+    $transfer = Transfer::factory()->for($owner)->expired()->create();
+    TransferFile::factory()->for($transfer)->create(['original_name' => 'extended.pdf']);
+    $this->actingAs($owner);
+
+    $page = visit(route('transfers.show', $transfer))->withTimezone('Europe/Rome')->resize(390, 844)
+        ->assertSee('Expired')
+        ->assertMissing('button:has-text("Download all")')
+        ->assertMissing('[aria-label="Download extended.pdf"]')
+        ->press('Extend by 7 days')
+        ->assertSee('Expires 27 Sept 2026, 14:00')
+        ->assertDontSee('Expired')
+        ->assertSeeIn('[data-slot="toast"]', 'Transfer extended')
+        ->assertEnabled('Download all · 4 B')
+        ->assertEnabled('[aria-label="Download extended.pdf"]')
+        ->assertEnabled('Extend by 7 days');
+
+    expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+    $page->screenshot(fullPage: true, filename: 'detail-extended-phone');
+    $page->press('Extend by 7 days')
+        ->assertSee('Expires 4 Oct 2026, 14:00')
+        ->assertMissing('button:has-text("Extend by 7 days")')
+        ->assertNoJavascriptErrors();
+
+    expect($transfer->refresh()->expires_at->toDateTimeString())->toBe('2026-10-04 12:00:00');
+});
+
+it('hides extension outside the extension window', function (string $expiresAt): void {
+    $this->travelTo(CarbonImmutable::parse('2026-09-20 12:00:00'));
+    $owner = User::factory()->create();
+    $transfer = Transfer::factory()->for($owner)->create(['expires_at' => $expiresAt]);
+    $this->actingAs($owner);
+
+    visit(route('transfers.show', $transfer))
+        ->assertSee($transfer->title)
+        ->assertMissing('button:has-text("Extend by 7 days")')
+        ->assertNoJavascriptErrors();
+})->with([
+    'more than seven days remaining' => '2026-09-28 12:00:00',
+    'thirty days expired' => '2026-08-21 12:00:00',
+]);
+
+it('keeps stale extension errors visible when the refreshed transfer is no longer eligible', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-09-20 12:00:00'));
+    $owner = User::factory()->create();
+    $transfer = Transfer::factory()->for($owner)->create(['expires_at' => now()->addDays(2)]);
+    $this->actingAs($owner);
+
+    $page = visit(route('transfers.show', $transfer))->withTimezone('Europe/Rome')
+        ->assertEnabled('Extend by 7 days');
+    $transfer->update(['expires_at' => now()->addDays(14)]);
+
+    $page->press('Extend by 7 days')
+        ->assertSeeIn('[role="alert"]', 'This transfer has changed. Refresh the page and try again.')
+        ->assertSee('Expires 4 Oct 2026, 14:00')
+        ->assertMissing('button:has-text("Extend by 7 days")')
+        ->assertMissing('[data-slot="toast"]')
+        ->assertNoJavascriptErrors();
+
+    expect($transfer->refresh()->expires_at->toDateTimeString())->toBe('2026-10-04 12:00:00');
+});
+
 it('saves team changes only on confirmation and keeps delete dialog keyboard focus inside', function (): void {
     $owner = User::factory()->create(['name' => 'Filippo Fortino']);
     $mediamax = Team::factory()->create(['name' => 'Mediamax']);

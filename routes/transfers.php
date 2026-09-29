@@ -15,6 +15,7 @@ Route::middleware(['auth', EnsureEligibleEmail::class, 'verified'])->prefix('tra
     Route::post('/', [TransferController::class, 'store'])->name('store');
     Route::get('/{transfer}', [TransferController::class, 'show'])->name('show');
     Route::patch('/{transfer}', [TransferController::class, 'update'])->name('update');
+    Route::post('/{transfer}/extend', [TransferController::class, 'extend'])->name('extend');
     Route::delete('/{transfer}', [TransferController::class, 'destroy'])->name('destroy');
     Route::post('/{transfer}/upload', [TransferUploadController::class, 'store'])->name('uploads.finalize');
     Route::scopeBindings()->group(function (): void {

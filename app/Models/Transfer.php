@@ -83,6 +83,17 @@ final class Transfer extends Model
         return $this->status === 'ready' && $this->revoked_at === null && $this->purged_at === null && $this->expires_at?->isFuture() === true;
     }
 
+    public function canExtend(): bool
+    {
+        $now = now();
+
+        return $this->status === 'ready'
+            && $this->revoked_at === null
+            && $this->purged_at === null
+            && $this->expires_at?->gt($now->copy()->subDays(30)) === true
+            && $this->expires_at->lte($now->copy()->addDays(7));
+    }
+
     public function displayTitle(): string
     {
         return $this->title ?? ($this->files->first()->original_name ?? 'Untitled transfer');

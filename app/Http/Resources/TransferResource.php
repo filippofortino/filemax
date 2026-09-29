@@ -28,6 +28,7 @@ final class TransferResource extends JsonResource
             'last_downloaded_at' => $this->last_downloaded_at?->toIso8601String(),
             'revoked_at' => $this->revoked_at?->toIso8601String(),
             'available' => $this->isAvailable(),
+            'can_extend' => $this->canExtend(),
             'total_size' => $this->files->sum('size'),
             'files_count' => $this->files->count(),
             'files' => TransferFileResource::collection($this->files)->resolve($request),

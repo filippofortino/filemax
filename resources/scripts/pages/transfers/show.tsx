@@ -1,5 +1,6 @@
 import {
     ArrowLeft01Icon,
+    Calendar01Icon,
     Delete02Icon,
     Globe02Icon,
     UserGroupIcon,
@@ -28,7 +29,7 @@ import {
 import { bytes, date, dateTime } from '@/lib/format';
 import type { Team, Transfer } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { destroy, index, update } from '@/routes/transfers';
+import { destroy, extend, index, update } from '@/routes/transfers';
 export default function Show({
     transfer,
     teams,
@@ -375,6 +376,39 @@ export default function Show({
                                     onDownload={refresh}
                                 />
                             )}
+                            <Form
+                                action={extend(transfer.id)}
+                                className="contents"
+                                options={{ preserveScroll: true }}
+                            >
+                                {({ errors, processing }) => (
+                                    <>
+                                        <input
+                                            type="hidden"
+                                            name="expected_expires_at"
+                                            value={transfer.expires_at ?? ''}
+                                        />
+                                        {transfer.can_extend && (
+                                            <Button
+                                                type="submit"
+                                                variant="outline"
+                                                disabled={processing}
+                                                aria-busy={processing}
+                                            >
+                                                <HugeiconsIcon
+                                                    icon={Calendar01Icon}
+                                                    size={18}
+                                                    aria-hidden="true"
+                                                />
+                                                Extend by 7 days
+                                            </Button>
+                                        )}
+                                        <ErrorMessage>
+                                            {Object.values(errors).join(' ')}
+                                        </ErrorMessage>
+                                    </>
+                                )}
+                            </Form>
                             {!transfer.revoked_at && (
                                 <Dialog
                                     open={deleteOpen}
