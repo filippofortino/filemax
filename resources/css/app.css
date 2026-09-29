@@ -76,7 +76,7 @@
         ),
     select,
     textarea {
-        @apply h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-base text-foreground placeholder:text-slate-400 disabled:bg-muted disabled:text-muted-foreground aria-invalid:border-destructive;
+        @apply h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-base text-foreground placeholder:text-muted-foreground disabled:bg-muted disabled:text-muted-foreground aria-invalid:border-destructive;
     }
 
     textarea {

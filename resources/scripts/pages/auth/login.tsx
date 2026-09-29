@@ -1,4 +1,5 @@
 import { Form, Head, Link } from '@inertiajs/react';
+import { useRef } from 'react';
 import { AuthLayout, ErrorMessage } from '@/components/filemax';
 import { PasskeyButton } from '@/components/passkey-button';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,9 @@ import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 
 export default function Login() {
+    const emailInput = useRef<HTMLInputElement>(null);
+    const passwordInput = useRef<HTMLInputElement>(null);
+
     return (
         <AuthLayout
             title="Sign in"
@@ -23,6 +27,15 @@ export default function Login() {
                 action={store()}
                 className="flex flex-col gap-5"
                 resetOnSuccess={['password']}
+                onError={(errors) => {
+                    requestAnimationFrame(() => {
+                        if (errors.email) {
+                            emailInput.current?.focus();
+                        } else if (errors.password) {
+                            passwordInput.current?.focus();
+                        }
+                    });
+                }}
             >
                 {({ errors, processing }) => (
                     <>
@@ -35,6 +48,7 @@ export default function Login() {
                                     Email
                                 </label>
                                 <input
+                                    ref={emailInput}
                                     id="email"
                                     name="email"
                                     type="email"
@@ -42,8 +56,15 @@ export default function Login() {
                                     placeholder="you@mediamaxcommunication.it"
                                     required
                                     aria-invalid={!!errors.email}
+                                    aria-describedby={
+                                        errors.email
+                                            ? 'login-email-error'
+                                            : undefined
+                                    }
                                 />
-                                <ErrorMessage>{errors.email}</ErrorMessage>
+                                <ErrorMessage id="login-email-error">
+                                    {errors.email}
+                                </ErrorMessage>
                             </div>
                             <div className="flex flex-col gap-2">
                                 <div className="flex items-baseline justify-between">
@@ -61,6 +82,7 @@ export default function Login() {
                                     </Link>
                                 </div>
                                 <input
+                                    ref={passwordInput}
                                     id="password"
                                     name="password"
                                     type="password"
@@ -68,8 +90,15 @@ export default function Login() {
                                     placeholder="••••••••"
                                     required
                                     aria-invalid={!!errors.password}
+                                    aria-describedby={
+                                        errors.password
+                                            ? 'login-password-error'
+                                            : undefined
+                                    }
                                 />
-                                <ErrorMessage>{errors.password}</ErrorMessage>
+                                <ErrorMessage id="login-password-error">
+                                    {errors.password}
+                                </ErrorMessage>
                             </div>
                         </div>
                         <label className="-my-3 flex min-h-11 cursor-pointer items-center gap-2.5 self-start">

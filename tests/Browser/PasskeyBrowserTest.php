@@ -12,7 +12,7 @@ it('opens settings with keyboard and confirms identity only when adding a passke
         ->fill('password', 'password')
         ->press('form button[data-slot="button"]')
         ->assertSee('Transfer details')
-        ->keys('[aria-label="Account menu"]', 'Enter')
+        ->keys('[aria-label$="account menu"]', 'Enter')
         ->keys('a[href$="/account/settings"]', 'Enter')
         ->assertSee('Profile')
         ->assertSee('You haven’t added any passkeys yet.')
@@ -89,10 +89,10 @@ JS);
     expect($page->script('() => window.passkeyCreateCalls'))->toBe(1);
     $page->wait(0.3)->screenshot(fullPage: false, filename: 'toast-passkey-error');
     $page->press('[data-slot="toast"] button:has-text("Try again")')
+        ->assertScript('window.passkeyCreateCalls', 2)
         ->assertSeeIn('[data-slot="toast"]', 'The passkey operation was cancelled.')
         ->assertCount('[data-slot="toast"]', 1)
         ->assertNoJavascriptErrors();
-    expect($page->script('() => window.passkeyCreateCalls'))->toBe(2);
     expect($page->script('() => document.querySelector("#passkey-name").value'))->toBe('Work MacBook');
     expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
     expect($user->passkeys()->count())->toBe(0);

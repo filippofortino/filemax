@@ -30,7 +30,7 @@ it('saves the profile name and renders settings on desktop and phone', function 
 
     $page->fill('#full-name', 'Alice Updated')->press('Save profile')
         ->assertSeeIn('[data-slot="toast"]', 'Profile saved')
-        ->click('[aria-label="Account menu"]')
+        ->click('[aria-label$="account menu"]')
         ->assertSee('Alice Updated')
         ->assertNoJavascriptErrors();
 
@@ -166,4 +166,16 @@ JS)
     $page->resize(390, 844)->wait(0.3)->screenshot(fullPage: false, filename: 'toast-phone');
 
     expect(Hash::check('new-password', $user->refresh()->password))->toBeTrue();
+});
+
+it('tabs from the header straight to Upload photo, which announces the photo requirements', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    visit('/account/settings')
+        ->keys('#profile-form button:has-text("Upload photo")', 'Shift+Tab')
+        ->assertScript('Boolean(document.activeElement.closest("header"))')
+        ->keys(':focus', 'Tab')
+        ->assertScript('document.activeElement.innerText', 'Upload photo')
+        ->assertScript('document.getElementById(document.activeElement.getAttribute("aria-describedby"))?.innerText.startsWith("JPG or PNG")')
+        ->assertNoJavascriptErrors();
 });
