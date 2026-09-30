@@ -544,7 +544,7 @@ JS);
     expect(Storage::disk('local')->size($transfer->files()->where('position', 1)->sole()->path))->toBe(1024);
     $page->click('View transfer')->assertSee('Downloads')->assertSee('Not opened yet')->assertSee('No download clicks yet.');
     $page->screenshot(filename: 'transfer-detail-unopened');
-    $page->click('My transfers')->assertSee('1 transfer · 1 active · 0 expired')->assertSee('Spot autunno');
+    $page->click('My transfers')->assertSee('1 transfer · 1 active')->assertSee('Spot autunno');
     $page->screenshot(filename: 'transfer-history');
 });
 

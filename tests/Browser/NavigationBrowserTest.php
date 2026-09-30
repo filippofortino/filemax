@@ -10,6 +10,7 @@ it('keeps the main navigation in place and offers a new transfer button outside 
 
     $page = visit('/')->resize(1280, 940)
         ->assertSee('Drop files here')
+        ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', 'New transfer')
         ->assertMissing('header a[aria-label="New transfer"]');
     $page->script('() => document.fonts.ready');
 
@@ -17,11 +18,13 @@ it('keeps the main navigation in place and offers a new transfer button outside 
 
     $page->click('nav a:has-text("My transfers")')
         ->assertSee('No transfers yet')
+        ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', 'My transfers')
         ->assertVisible('header a[aria-label="New transfer"]');
     expect($page->script($navigationLeft))->toEqualWithDelta($left, 1);
 
     $page->click('nav a:has-text("Teams")')
         ->assertSee('Manage who can receive transfers')
+        ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', 'Teams')
         ->assertVisible('header a[aria-label="New transfer"]');
     expect($page->script($navigationLeft))->toEqualWithDelta($left, 1);
 
@@ -47,6 +50,20 @@ it('gives the mobile header controls space above them', function (): void {
     expect($topOffsets)->toHaveCount(3);
     foreach ($topOffsets as $offset) {
         expect($offset)->toBeGreaterThanOrEqual(12);
+    }
+
+    foreach ([390, 320] as $width) {
+        $page->resize($width, 844);
+        expect($page->script(<<<'JS'
+            () => {
+                const nav = document.querySelector('nav[aria-label="Main navigation"]');
+                const button = document.querySelector('header a[aria-label="New transfer"]');
+                const links = [...nav.querySelectorAll('a')];
+                return nav.getBoundingClientRect().top >= button.getBoundingClientRect().bottom
+                    && links.every(link => link.getBoundingClientRect().top === nav.getBoundingClientRect().top)
+                    && document.documentElement.scrollWidth <= innerWidth;
+            }
+            JS))->toBeTrue();
     }
 
     $page->resize(1280, 940);
