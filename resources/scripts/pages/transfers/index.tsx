@@ -105,8 +105,6 @@ type Props = {
     totals: {
         total: number;
         active: number;
-        expired: number;
-        downloads: number;
     };
 };
 export default function Index({

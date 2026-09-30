@@ -12,6 +12,7 @@ use App\Jobs\PurgeTransfer;
 use App\Models\Team;
 use App\Models\Transfer;
 use App\Services\TransferStorage;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
@@ -63,50 +64,38 @@ final class TransferController
 
     public function index(IndexTransfersRequest $request): Response|RedirectResponse
     {
-        $query = Transfer::query()->where('user_id', ($request->user() ?? abort(403))->id)->where('status', 'ready');
+        $user = $request->user() ?? abort(403);
         /** @var array{filter?: ?string, status?: ?string, search?: ?string} $filters */
         $filters = $request->validated();
         $filter = $filters['filter'] ?? 'all';
         $status = $filters['status'] ?? 'all';
-        $search = mb_trim($filters['search'] ?? '');
+        $search = $filters['search'] ?? '';
         $now = now();
-        $soonUntil = $now->copy()->addHours(24);
-        $active = fn (Builder $query): Builder => $query->whereNull('revoked_at')->whereNull('purged_at')->where('expires_at', '>', $now);
-        $expired = fn (Builder $query): Builder => $query->whereNotNull('revoked_at')->orWhereNotNull('purged_at')->orWhereNull('expires_at')->orWhere('expires_at', '<=', $now);
-        $historyTeams = Team::query()->whereHas('transfers', fn (Builder $query) => $query->where('user_id', $request->user()->id))->orderBy('name')->get(['id', 'name']);
+
+        $historyQuery = Transfer::query()->where('user_id', $user->id)->where('status', 'ready');
         $totals = [
-            'total' => (clone $query)->count(),
-            'active' => (clone $query)->where($active)->count(),
-            'expired' => (clone $query)->where($expired)->count(),
-            'downloads' => (int) (clone $query)->sum('download_count'),
+            'total' => (clone $historyQuery)->count(),
+            'active' => $this->applyHistoryStatus(clone $historyQuery, 'active', $now)->count(),
         ];
-        if ($filter === 'public') {
-            $query->where('visibility', 'public');
-        } elseif ($filter !== 'all') {
-            $query->whereHas('teams', fn (Builder $query) => $query->whereKey($filter));
-        }
 
-        if ($search !== '') {
-            $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
-            $query->whereRaw("LOWER(COALESCE(title, (SELECT original_name FROM transfer_files WHERE transfer_files.transfer_id = transfers.id ORDER BY position LIMIT 1), 'Untitled transfer')) LIKE LOWER(?) ESCAPE '!'", [$pattern]);
-        }
+        $matchingQuery = $this->applyHistoryFilters(clone $historyQuery, $filter, $search);
+        $statusCounts = $this->historyStatusCounts($matchingQuery, $now);
+        $resultsQuery = $this->applyHistoryStatus(clone $matchingQuery, $status, $now);
+        $transfers = $resultsQuery
+            ->with(['files', 'teams' => fn (Relation $query) => $query->withCount('users')])
+            ->latest()
+            ->latest('id')
+            ->paginate(8)
+            ->withQueryString();
 
-        $statusCounts = [
-            'all' => (clone $query)->count(),
-            'active' => (clone $query)->where($active)->count(),
-            'soon' => (clone $query)->where($active)->where('expires_at', '<=', $soonUntil)->count(),
-            'expired' => (clone $query)->where($expired)->count(),
-        ];
-        match ($status) {
-            'active' => $query->where($active),
-            'soon' => $query->where($active)->where('expires_at', '<=', $soonUntil),
-            'expired' => $query->where($expired),
-            default => null,
-        };
-        $transfers = $query->with(['files', 'teams' => fn (Relation $query) => $query->withCount('users')])->latest()->latest('id')->paginate(8)->withQueryString();
         if ($transfers->currentPage() > $transfers->lastPage()) {
             return redirect($transfers->url($transfers->lastPage()));
         }
+
+        $historyTeams = Team::query()
+            ->whereHas('transfers', fn (Builder $query) => $query->where('user_id', $user->id))
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         return Inertia::render('transfers/index', [
             'transfers' => TransferResource::collection($transfers),
@@ -166,5 +155,75 @@ final class TransferController
         Inertia::flash('toast', ['title' => 'Transfer deleted', 'description' => "The link to “{$transfer->displayTitle()}” no longer works."]);
 
         return to_route('transfers.index');
+    }
+
+    /**
+     * @param  Builder<Transfer>  $query
+     * @return Builder<Transfer>
+     */
+    private function applyHistoryFilters(Builder $query, string $filter, string $search): Builder
+    {
+        if ($filter === 'public') {
+            $query->where('visibility', 'public');
+        } elseif ($filter !== 'all') {
+            $query->whereHas('teams', fn (Builder $query) => $query->whereKey($filter));
+        }
+
+        if ($search !== '') {
+            $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
+            $query->whereRaw(<<<'SQL'
+                LOWER(COALESCE(
+                    title,
+                    (
+                        SELECT original_name
+                        FROM transfer_files
+                        WHERE transfer_files.transfer_id = transfers.id
+                        ORDER BY position
+                        LIMIT 1
+                    ),
+                    'Untitled transfer'
+                )) LIKE LOWER(?) ESCAPE '!'
+                SQL, [$pattern]);
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param  Builder<Transfer>  $query
+     * @return array{all: int, active: int, soon: int, expired: int}
+     */
+    private function historyStatusCounts(Builder $query, CarbonInterface $now): array
+    {
+        return [
+            'all' => (clone $query)->count(),
+            'active' => $this->applyHistoryStatus(clone $query, 'active', $now)->count(),
+            'soon' => $this->applyHistoryStatus(clone $query, 'soon', $now)->count(),
+            'expired' => $this->applyHistoryStatus(clone $query, 'expired', $now)->count(),
+        ];
+    }
+
+    /**
+     * @param  Builder<Transfer>  $query
+     * @return Builder<Transfer>
+     */
+    private function applyHistoryStatus(Builder $query, string $status, CarbonInterface $now): Builder
+    {
+        if ($status === 'expired') {
+            return $query->where(fn (Builder $query) => $query
+                ->whereNotNull('revoked_at')
+                ->orWhereNotNull('purged_at')
+                ->orWhereNull('expires_at')
+                ->orWhere('expires_at', '<=', $now));
+        }
+
+        if ($status === 'active' || $status === 'soon') {
+            $query->whereNull('revoked_at')->whereNull('purged_at')->where('expires_at', '>', $now);
+            if ($status === 'soon') {
+                $query->where('expires_at', '<=', $now->copy()->addHours(24));
+            }
+        }
+
+        return $query;
     }
 }

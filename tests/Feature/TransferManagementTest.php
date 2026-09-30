@@ -16,7 +16,7 @@ beforeEach(function (): void {
     config(['inertia.testing.ensure_pages_exist' => false]);
 });
 
-it('lists only owned transfers with historical team filters and expired totals', function (): void {
+it('lists only owned transfers with historical team filters and availability totals', function (): void {
     $owner = User::factory()->create();
     $team = Team::factory()->create();
     $owned = Transfer::factory()->for($owner)->create(['visibility' => 'teams']);
@@ -25,14 +25,14 @@ it('lists only owned transfers with historical team filters and expired totals',
     Transfer::factory()->for($owner)->expired()->create();
     Transfer::factory()->create();
     $this->actingAs($owner)->get(route('transfers.index'))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
-        ->component('transfers/index', false)->has('transfers.data', 2)->where('totals.active', 1)->where('totals.expired', 1)->where('teams.0.id', $team->id));
+        ->component('transfers/index', false)->has('transfers.data', 2)->where('totals', ['total' => 2, 'active' => 1])->where('teams.0.id', $team->id));
     $this->get(route('transfers.index', ['filter' => $team->id]))->assertInertia(fn (Assert $page): Assert => $page->has('transfers.data', 1)->where('transfers.data.0.id', $owned->id));
     $this->get(route('transfers.index', ['filter' => 'public']))->assertInertia(fn (Assert $page): Assert => $page->has('transfers.data', 1));
 });
 
 it('renders an empty owner history', function (): void {
     $this->actingAs(User::factory()->create())->get(route('transfers.index'))->assertInertia(fn (Assert $page): Assert => $page
-        ->has('transfers.data', 0)->where('totals.total', 0)
+        ->has('transfers.data', 0)->where('totals', ['total' => 0, 'active' => 0])
         ->where('filter', 'all')->where('status', 'all')->where('search', '')
         ->where('statusCounts', ['all' => 0, 'active' => 0, 'soon' => 0, 'expired' => 0]));
 });
@@ -60,7 +60,7 @@ it('filters availability and counts the inclusive next day without crossing owne
         ->where('transfers.data', fn ($transfers): bool => collect($transfers)->pluck('title')->sort()->values()->all() === collect($expectedTitles)->sort()->values()->all())
         ->where('transfers.data', fn ($transfers): bool => collect($transfers)->every(fn (array $transfer): bool => $transfer['expiring_soon'] === in_array($transfer['title'], ['soon', 'boundary'], true)))
         ->where('statusCounts', ['all' => 7, 'active' => 3, 'soon' => 2, 'expired' => 4])
-        ->where('totals.total', 7)->where('totals.active', 3)->where('totals.expired', 4)
+        ->where('totals', ['total' => 7, 'active' => 3])
         ->where('status', $status));
 })->with([
     'all' => ['all', ['soon', 'boundary', 'later', 'expired', 'revoked', 'purged', 'no expiry']],
@@ -85,7 +85,7 @@ it('counts audience and search matches before the selected status while preservi
     $this->actingAs($owner)->get(route('transfers.index', ['filter' => $team->id, 'search' => 'campaign', 'status' => 'active']))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
         ->has('transfers.data', 1)->where('transfers.data.0.id', $match->id)
         ->where('statusCounts', ['all' => 2, 'active' => 1, 'soon' => 1, 'expired' => 1])
-        ->where('totals.total', 4)->where('totals.active', 3)->where('totals.expired', 1)
+        ->where('totals', ['total' => 4, 'active' => 3])
         ->where('teams.0.id', $team->id));
     $this->get(route('transfers.index', ['filter' => 'public', 'search' => 'campaign']))->assertInertia(fn (Assert $page): Assert => $page
         ->has('transfers.data', 1)->where('transfers.data.0.title', 'Campaign public')
