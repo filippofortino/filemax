@@ -59,5 +59,7 @@ export type Transfer = {
     available: boolean;
     can_extend: boolean;
     retained_until: string | null;
+    expiring_soon: boolean;
+    expires_in: string | null;
     url: string;
 };

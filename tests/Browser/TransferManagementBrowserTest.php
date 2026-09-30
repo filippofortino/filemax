@@ -21,22 +21,317 @@ it('shows an empty sender history and a working create action', function (): voi
 
 it('uses links for available pages and disabled buttons at the pagination boundaries', function (): void {
     $owner = User::factory()->create();
-    Transfer::factory()->count(21)->for($owner)->create();
+    Transfer::factory()->count(17)->for($owner)->create();
     $this->actingAs($owner);
 
     visit('/transfers')
-        ->assertSee('21 transfers · 21 active · 0 expired')
-        ->assertSee('Page 1 of 2')
+        ->assertSee('17 transfers · 17 active')
+        ->assertSee('Showing 1–8 of 17')
+        ->assertAttribute('nav[aria-label="Pagination"] a[aria-label="Page 1"]', 'aria-current', 'page')
         ->assertDisabled('nav[aria-label="Pagination"] button:has-text("Previous")')
         ->assertMissing('nav[aria-label="Pagination"] a:has-text("Previous")')
         ->assertAttributeContains('nav[aria-label="Pagination"] a:has-text("Next")', 'href', 'page=2')
         ->click('nav[aria-label="Pagination"] a:has-text("Next")')
-        ->assertSee('Page 2 of 2')
+        ->assertSee('Showing 9–16 of 17')
+        ->click('nav[aria-label="Pagination"] a[aria-label="Page 3"]')
+        ->assertSee('Showing 17–17 of 17')
         ->assertDisabled('nav[aria-label="Pagination"] button:has-text("Next")')
         ->assertMissing('nav[aria-label="Pagination"] a:has-text("Next")')
         ->click('nav[aria-label="Pagination"] a:has-text("Previous")')
-        ->assertSee('Page 1 of 2')
+        ->assertSee('Showing 9–16 of 17')
+        ->click('nav[aria-label="Pagination"] a[aria-label="Page 1"]')
+        ->assertSee('Showing 1–8 of 17')
         ->assertNoJavascriptErrors();
+});
+
+it('combines title search with audience and status counts across pages and clears every filter', function (): void {
+    $owner = User::factory()->create();
+    $team = Team::factory()->create(['name' => 'Creative']);
+    $owner->teams()->attach($team);
+    Transfer::factory()->count(9)->for($owner)->create(['title' => 'Campaign public version']);
+    Transfer::factory()->for($owner)->create(['title' => 'Campaign public urgent', 'expires_at' => now()->addHours(6)]);
+    Transfer::factory()->for($owner)->expired()->create(['title' => 'Campaign public expired']);
+    Transfer::factory()->for($owner)->create(['title' => 'Campaign public deleted', 'revoked_at' => now()]);
+    Transfer::factory()->for($owner)->create(['title' => 'Unrelated presentation']);
+    $target = Transfer::factory()->for($owner)->create([
+        'title' => 'Campaign team target',
+        'visibility' => 'teams',
+        'expires_at' => now()->addHours(12),
+        'created_at' => now()->subDay(),
+    ]);
+    $target->teams()->attach($team);
+    $this->actingAs($owner);
+
+    $page = visit('/transfers')
+        ->assertDontSee('Campaign team target')
+        ->type('Search transfers', 'team target')
+        ->assertSee('Campaign team target')
+        ->assertSee('Showing 1–1 of 1')
+        ->assertVisible('#transfer-search:focus')
+        ->type('Search transfers', 'Campaign')
+        ->keys('#transfer-search', 'Enter')
+        ->assertSee('Showing 1–8 of 13')
+        ->assertSeeIn('[aria-label="Filter by status"] button:has-text("All")', '13')
+        ->assertSeeIn('[aria-label="Filter by status"] button:has-text("Active")', '11')
+        ->assertSeeIn('[aria-label="Filter by status"] button:has-text("Expiring soon")', '2')
+        ->assertSeeIn('[aria-label="Filter by status"] button:has-text("Expired")', '2')
+        ->click('[aria-label="Filter by status"] button:has-text("Active")')
+        ->assertSee('Showing 1–8 of 11')
+        ->click('nav[aria-label="Filter transfers"] a:has-text("Public")')
+        ->assertSee('Showing 1–8 of 10')
+        ->assertSeeIn('[aria-label="Filter by status"] button:has-text("All")', '12')
+        ->assertSeeIn('[aria-label="Filter by status"] button:has-text("Active")', '10')
+        ->assertSeeIn('[aria-label="Filter by status"] button:has-text("Expiring soon")', '1')
+        ->click('nav[aria-label="Pagination"] a:has-text("Next")')
+        ->assertSee('Showing 9–10 of 10')
+        ->assertQueryStringHas('search', 'Campaign')
+        ->assertQueryStringHas('filter', 'public')
+        ->assertQueryStringHas('status', 'active')
+        ->refresh()
+        ->assertValue('#transfer-search', 'Campaign')
+        ->assertSee('Showing 9–10 of 10')
+        ->assertAttribute('[aria-label="Filter by status"] button:has-text("Active")', 'aria-pressed', 'true')
+        ->assertAttribute('nav[aria-label="Filter transfers"] a:has-text("Public")', 'aria-current', 'page')
+        ->click('[aria-label="Filter by status"] button:has-text("Expiring soon")')
+        ->assertSee('Showing 1–1 of 1')
+        ->assertSee('Campaign public urgent')
+        ->assertQueryStringMissing('page')
+        ->type('Search transfers', 'No matching title')
+        ->assertSee('No matching transfers')
+        ->assertMissing('nav[aria-label="Pagination"]')
+        ->press('Clear filters')
+        ->assertValue('#transfer-search', '')
+        ->assertSee('Showing 1–8 of 14')
+        ->assertAttribute('[aria-label="Filter by status"] button:has-text("All")', 'aria-pressed', 'true')
+        ->assertAttribute('nav[aria-label="Filter transfers"] a:has-text("Everyone")', 'aria-current', 'page')
+        ->assertNoJavascriptErrors();
+
+    $page->click('[aria-label="Filter by status"] button:has-text("Expired")')
+        ->assertSee('Campaign public expired')
+        ->assertSee('Campaign public deleted')
+        ->assertSee('Deleted')
+        ->assertDontSee('Campaign public urgent');
+});
+
+it('supports keyboard status selection and restores filters through browser history on a narrow screen', function (): void {
+    $owner = User::factory()->create();
+    $team = Team::factory()->create(['name' => 'Creative production and account management']);
+    $owner->teams()->attach($team);
+    Transfer::factory()->for($owner)->create(['title' => 'Campaign public active']);
+    Transfer::factory()->for($owner)->expired()->create(['title' => 'Campaign public expired']);
+    Transfer::factory()->for($owner)->create(['title' => 'Budget public urgent', 'expires_at' => now()->addHours(2)]);
+    $target = Transfer::factory()->for($owner)->create([
+        'title' => 'Campaign team urgent',
+        'visibility' => 'teams',
+        'expires_at' => now()->addHours(6),
+    ]);
+    $target->teams()->attach($team);
+    $this->actingAs($owner);
+
+    $page = visit('/transfers?search=Campaign&status=active')->resize(390, 844)
+        ->assertValue('#transfer-search', 'Campaign')
+        ->assertSee('Page 1 of 1')
+        ->keys('[aria-label="Filter by status"] button:has-text("Active")', 'ArrowRight')
+        ->assertVisible('[aria-label="Filter by status"] button:has-text("Expiring soon"):focus')
+        ->keys(':focus', 'Space')
+        ->assertSee('Page 1 of 1')
+        ->assertSee('Campaign team urgent')
+        ->assertAttribute('[aria-label="Filter by status"] button:has-text("Expiring soon")', 'aria-pressed', 'true')
+        ->assertScript(<<<'JS'
+() => {
+    const selected = document.querySelector('[aria-label="Filter by status"] button[aria-pressed="true"]:focus-visible');
+    if (!selected) return false;
+    const style = getComputedStyle(selected);
+    return style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) >= 2;
+}
+JS)
+        ->keys('[aria-label="Filter by status"] button:has-text("Expiring soon")', 'Space')
+        ->assertAttribute('[aria-label="Filter by status"] button:has-text("Expiring soon")', 'aria-pressed', 'true')
+        ->click('nav[aria-label="Filter transfers"] a:has-text("Public")')
+        ->assertSee('No matching transfers')
+        ->type('Search transfers', 'Budget')
+        ->keys('#transfer-search', 'Enter')
+        ->assertSee('Budget public urgent')
+        ->assertSee('Page 1 of 1')
+        ->back()
+        ->assertValue('#transfer-search', 'Campaign')
+        ->assertSee('Campaign team urgent')
+        ->assertAttribute('[aria-label="Filter by status"] button:has-text("Expiring soon")', 'aria-pressed', 'true')
+        ->assertAttribute('nav[aria-label="Filter transfers"] a:has-text("Everyone")', 'aria-current', 'page')
+        ->forward()
+        ->assertValue('#transfer-search', 'Budget')
+        ->assertSee('Budget public urgent')
+        ->assertAttribute('nav[aria-label="Filter transfers"] a:has-text("Public")', 'aria-current', 'page')
+        ->assertScript('() => document.documentElement.scrollWidth <= window.innerWidth')
+        ->assertNoJavascriptErrors();
+
+    $page->screenshot(fullPage: false, filename: 'history-filtered-phone');
+});
+
+it('keeps mobile filters on one line and paginates with scrollable keyboard accessible audience chips', function (): void {
+    $owner = User::factory()->create();
+    $teams = Team::factory()->count(4)->sequence(
+        ['name' => 'Brand strategy'],
+        ['name' => 'Creative production'],
+        ['name' => 'Mediamax'],
+        ['name' => 'Studio Zeta'],
+    )->create();
+    Transfer::factory()->count(10)->for($owner)->has(TransferFile::factory(), 'files')->create([
+        'title' => 'Campaign mobile delivery',
+        'visibility' => 'teams',
+        'expires_at' => now()->addHours(6),
+        'download_count' => 3,
+    ])->each(fn (Transfer $transfer) => $transfer->teams()->attach($teams->modelKeys()));
+    $this->actingAs($owner);
+
+    $page = visit('/transfers?search=Campaign&status=soon');
+
+    foreach ([320, 390] as $width) {
+        $page->resize($width, 844)
+            ->assertSee('Page 1 of 2')
+            ->assertDontSee('Showing 1–8 of 10')
+            ->assertAttribute('[aria-label="Filter by status"] button[aria-pressed="true"]', 'aria-label', 'Expiring soon, 10')
+            ->assertScript(<<<'JS'
+() => {
+    const statuses = [...document.querySelectorAll('[aria-label="Filter by status"] button')];
+    const audience = document.querySelector('nav[aria-label="Filter transfers"]');
+    const chips = [...audience.querySelectorAll('a')];
+    return document.documentElement.scrollWidth <= window.innerWidth
+        && statuses.map((button) => button.innerText.trim()).join('|') === 'All|Active|Soon|Expired'
+        && statuses.every((button) => {
+            const bounds = button.getBoundingClientRect();
+            const content = document.createRange();
+            content.selectNodeContents(button);
+            return Math.abs(bounds.top - statuses[0].getBoundingClientRect().top) < 1
+                && [...content.getClientRects()].filter((rect) => rect.width > 0).every((rect) =>
+                    rect.left >= bounds.left && rect.right <= bounds.right);
+        })
+        && audience.scrollWidth > audience.clientWidth
+        && chips.every((chip) => chip.getBoundingClientRect().height >= 44
+            && Math.abs(chip.getBoundingClientRect().top - chips[0].getBoundingClientRect().top) < 1);
+}
+JS)
+            ->screenshot(fullPage: true, filename: 'history-filters-'.$width);
+    }
+
+    $page->assertDisabled('nav[aria-label="Pagination"] button:has-text("Previous")')
+        ->keys('nav[aria-label="Filter transfers"] a:has-text("Everyone")', 'Tab')
+        ->keys(':focus', 'Tab')
+        ->keys(':focus', 'Tab')
+        ->keys(':focus', 'Tab')
+        ->keys(':focus', 'Tab')
+        ->assertVisible('nav[aria-label="Filter transfers"] a:has-text("Studio Zeta"):focus-visible')
+        ->assertScript(<<<'JS'
+() => {
+    const audience = document.querySelector('nav[aria-label="Filter transfers"]');
+    const chip = document.activeElement;
+    const bounds = chip.getBoundingClientRect();
+    const viewport = audience.getBoundingClientRect();
+    const style = getComputedStyle(chip);
+    return audience.scrollLeft > 0 && bounds.left >= viewport.left && bounds.right <= viewport.right
+        && style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) >= 2
+        && document.documentElement.scrollWidth <= window.innerWidth;
+}
+JS)
+        ->keys(':focus', 'Enter')
+        ->assertQueryStringHas('filter', $teams->last()->id)
+        ->assertQueryStringHas('search', 'Campaign')
+        ->assertQueryStringHas('status', 'soon')
+        ->click('nav[aria-label="Pagination"] a:has-text("Next")')
+        ->assertSee('Page 2 of 2')
+        ->assertQueryStringHas('page', '2')
+        ->assertQueryStringHas('filter', $teams->last()->id)
+        ->assertQueryStringHas('search', 'Campaign')
+        ->assertQueryStringHas('status', 'soon')
+        ->assertDisabled('nav[aria-label="Pagination"] button:has-text("Next")')
+        ->click('nav[aria-label="Filter transfers"] a:has-text("Everyone")')
+        ->assertSee('Page 1 of 2')
+        ->assertQueryStringMissing('page')
+        ->type('Search transfers', 'Missing campaign')
+        ->assertSee('No matching transfers')
+        ->press('Clear filters')
+        ->assertValue('#transfer-search', '')
+        ->assertSee('Page 1 of 2')
+        ->assertAttribute('[aria-label="Filter by status"] button:has-text("All")', 'aria-pressed', 'true')
+        ->assertAttribute('nav[aria-label="Filter transfers"] a:has-text("Everyone")', 'aria-current', 'page')
+        ->screenshot(fullPage: true, filename: 'history-mobile-scroll-filters')
+        ->resize(1280, 940)
+        ->assertSee('Showing 1–8 of 10')
+        ->assertDontSee('Page 1 of 2')
+        ->assertSeeIn('[aria-label="Filter by status"] button:has-text("Expiring soon")', '10')
+        ->assertVisible('nav[aria-label="Pagination"] a[aria-label="Page 2"]')
+        ->assertScript('() => document.documentElement.scrollWidth <= window.innerWidth')
+        ->assertNoJavascriptErrors();
+});
+
+it('cancels an in-flight audience request immediately when a new search is typed', function (): void {
+    $owner = User::factory()->create();
+    $team = Team::factory()->create();
+    $owner->teams()->attach($team);
+    $target = Transfer::factory()->for($owner)->create(['title' => 'Needle team transfer', 'visibility' => 'teams']);
+    $target->teams()->attach($team);
+    Transfer::factory()->for($owner)->create(['title' => 'Unrelated public transfer']);
+    $this->actingAs($owner);
+
+    $page = visit('/transfers')->assertSee('Showing 1–2 of 2');
+    $page->script(<<<'JS'
+() => {
+    const prototype = XMLHttpRequest.prototype;
+    const original = { open: prototype.open, send: prototype.send, abort: prototype.abort };
+    const urls = new WeakMap();
+    const input = document.querySelector('#transfer-search');
+    const probe = { held: null, handlingInput: false, cancelledDuringInput: false };
+    const markInput = () => {
+        probe.handlingInput = true;
+    };
+    const finishInput = () => { probe.handlingInput = false; };
+    input.addEventListener('input', markInput, true);
+    document.addEventListener('input', finishInput);
+    prototype.open = function (method, url, ...args) {
+        urls.set(this, new URL(url, window.location.href));
+        return original.open.call(this, method, url, ...args);
+    };
+    prototype.send = function (...args) {
+        const url = urls.get(this);
+        if (!probe.held && url?.pathname === '/transfers' && url.searchParams.get('filter') === 'public') {
+            probe.held = this;
+            return;
+        }
+        return original.send.apply(this, args);
+    };
+    prototype.abort = function (...args) {
+        const result = original.abort.apply(this, args);
+        if (this === probe.held) {
+            probe.cancelledDuringInput = probe.handlingInput;
+            this.dispatchEvent(new Event('abort'));
+        }
+        return result;
+    };
+    probe.restore = () => {
+        Object.assign(prototype, original);
+        input.removeEventListener('input', markInput, true);
+        document.removeEventListener('input', finishInput);
+        delete window.transferRequestProbe;
+    };
+    window.transferRequestProbe = probe;
+}
+JS);
+
+    try {
+        $page->click('nav[aria-label="Filter transfers"] a:has-text("Public")')
+            ->assertScript('() => window.transferRequestProbe.held !== null')
+            ->type('Search transfers', 'Needle')
+            ->assertScript('() => window.transferRequestProbe.cancelledDuringInput')
+            ->assertQueryStringHas('search', 'Needle')
+            ->assertSee('Showing 1–1 of 1')
+            ->assertSee('Needle team transfer')
+            ->assertDontSee('Unrelated public transfer')
+            ->assertValue('#transfer-search', 'Needle')
+            ->assertAttribute('nav[aria-label="Filter transfers"] a:has-text("Everyone")', 'aria-current', 'page')
+            ->assertNoJavascriptErrors();
+    } finally {
+        $page->script('() => window.transferRequestProbe.restore()');
+    }
 });
 
 it('shows the expiry date and time in the viewer timezone', function (): void {
@@ -44,11 +339,18 @@ it('shows the expiry date and time in the viewer timezone', function (): void {
     $owner = User::factory()->create();
     Transfer::factory()->for($owner)->create(['title' => 'Spot autunno', 'expires_at' => '2026-09-25 12:00:00']);
     Transfer::factory()->for($owner)->create(['title' => 'Brandbook Mediamax', 'expires_at' => '2026-09-19 08:30:00']);
+    Transfer::factory()->for($owner)->create(['title' => 'Consegna urgente', 'expires_at' => now()->addHours(6)]);
+    Transfer::factory()->for($owner)->create(['title' => 'Ultima revisione', 'expires_at' => now()->addMinutes(30)]);
     $this->actingAs($owner);
 
     visit('/transfers')->withTimezone('Europe/Rome')
         ->assertSee('Expires 25 Sept 2026, 14:00')
         ->assertSee('Expired 19 Sept 2026, 10:30')
+        ->assertSeeIn('a:has-text("Consegna urgente") span[title]:visible', 'Expires in 6 hours')
+        ->assertSeeIn('a:has-text("Ultima revisione") span[title]:visible', 'Expires in 30 minutes')
+        ->assertAttributeContains('a:has-text("Consegna urgente") span[title="Expires 20 Sept 2026, 20:00"]:visible', 'class', 'text-orange-700')
+        ->assertVisible('a:has-text("Consegna urgente") span[title] svg[aria-hidden="true"]:visible')
+        ->screenshot(fullPage: false, filename: 'history-expiring-soon')
         ->click('a:has-text("Spot autunno")')
         ->assertSee('Expires 25 Sept 2026, 14:00')
         ->assertNoJavascriptErrors();
@@ -209,9 +511,9 @@ it('saves team changes only on confirmation and keeps delete dialog keyboard foc
     $page->screenshot(fullPage: false, filename: 'history-phone');
     $page->resize(1280, 940);
 
-    $page->click('nav[aria-label="Filter transfers"] a:has-text("Public links")')->assertSee('Shooting Villa Borbone — selezione')->assertDontSee('Master spot + visual approvato');
+    $page->click('nav[aria-label="Filter transfers"] a:has-text("Public")')->assertSee('Shooting Villa Borbone — selezione')->assertDontSee('Master spot + visual approvato');
     $page->click('nav[aria-label="Filter transfers"] a:has-text("Mediamax")')->assertSee('Master spot + visual approvato')->assertDontSee('Shooting Villa Borbone — selezione');
-    $page->click('nav[aria-label="Filter transfers"] a:has-text("All transfers")')->assertSee('Shooting Villa Borbone — selezione');
+    $page->click('nav[aria-label="Filter transfers"] a:has-text("Everyone")')->assertSee('Shooting Villa Borbone — selezione');
 
     $page->click('a:has-text("Master spot + visual approvato")')->assertSee('First opened')->assertSee('Change teams');
     $page->screenshot(fullPage: false, filename: 'detail-teams');

@@ -107,6 +107,7 @@ export function Shell({
                                     'border-primary font-semibold text-primary',
                             )}
                             href={home()}
+                            aria-current={active === 'new' ? 'page' : undefined}
                         >
                             New transfer
                         </Link>
@@ -117,6 +118,9 @@ export function Shell({
                                     'border-primary font-semibold text-primary',
                             )}
                             href={transfers()}
+                            aria-current={
+                                active === 'transfers' ? 'page' : undefined
+                            }
                         >
                             My transfers
                         </Link>
@@ -128,6 +132,9 @@ export function Shell({
                                         'border-primary font-semibold text-primary',
                                 )}
                                 href={teams()}
+                                aria-current={
+                                    active === 'teams' ? 'page' : undefined
+                                }
                             >
                                 Teams
                             </Link>
