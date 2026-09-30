@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\Models\Transfer;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -14,6 +15,8 @@ final class TransferResource extends JsonResource
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
+        $available = $this->isAvailable();
+
         return [
             'id' => $this->id,
             'title' => $this->displayTitle(),
@@ -27,7 +30,9 @@ final class TransferResource extends JsonResource
             'download_count' => $this->download_count,
             'last_downloaded_at' => $this->last_downloaded_at?->toIso8601String(),
             'revoked_at' => $this->revoked_at?->toIso8601String(),
-            'available' => $this->isAvailable(),
+            'available' => $available,
+            'expiring_soon' => $available && $this->expires_at?->lte(now()->addHours(24)) === true,
+            'expires_in' => $available ? $this->expires_at?->diffForHumans(syntax: CarbonInterface::DIFF_ABSOLUTE) : null,
             'can_extend' => $this->canExtend(),
             'retained_until' => $this->expires_at?->addDays(30)->toIso8601String(),
             'total_size' => $this->files->sum('size'),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\IndexTransfersRequest;
 use App\Http\Requests\StoreTransferRequest;
 use App\Http\Requests\UpdateTransferSharingRequest;
 use App\Http\Resources\TransferResource;
@@ -13,6 +14,7 @@ use App\Models\Transfer;
 use App\Services\TransferStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\SQLiteConnection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,6 +23,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Pdo\Sqlite;
 
 final class TransferController
 {
@@ -60,16 +63,23 @@ final class TransferController
         return response()->json(['transfer' => new TransferResource($transfer->load(['files', 'teams' => fn (Relation $query) => $query->withCount('users')]))], 201);
     }
 
-    public function index(Request $request): Response
+    public function index(IndexTransfersRequest $request): Response
     {
-        Gate::authorize('create', Transfer::class);
         $query = Transfer::query()->where('user_id', ($request->user() ?? abort(403))->id)->where('status', 'ready');
-        $filter = $request->string('filter', 'all')->toString();
+        /** @var array{filter?: ?string, status?: ?string, search?: ?string} $filters */
+        $filters = $request->validated();
+        $filter = $filters['filter'] ?? 'all';
+        $status = $filters['status'] ?? 'all';
+        $search = mb_trim($filters['search'] ?? '');
+        $now = now();
+        $soonUntil = $now->copy()->addHours(24);
+        $active = fn (Builder $query): Builder => $query->whereNull('revoked_at')->whereNull('purged_at')->where('expires_at', '>', $now);
+        $expired = fn (Builder $query): Builder => $query->whereNotNull('revoked_at')->orWhereNotNull('purged_at')->orWhereNull('expires_at')->orWhere('expires_at', '<=', $now);
         $historyTeams = Team::query()->whereHas('transfers', fn (Builder $query) => $query->where('user_id', $request->user()->id))->orderBy('name')->get(['id', 'name']);
         $totals = [
             'total' => (clone $query)->count(),
-            'active' => (clone $query)->whereNull('revoked_at')->where('expires_at', '>', now())->count(),
-            'expired' => (clone $query)->whereNull('revoked_at')->where('expires_at', '<=', now())->count(),
+            'active' => (clone $query)->where($active)->count(),
+            'expired' => (clone $query)->where($expired)->count(),
             'downloads' => (int) (clone $query)->sum('download_count'),
         ];
         if ($filter === 'public') {
@@ -78,10 +88,38 @@ final class TransferController
             $query->whereHas('teams', fn (Builder $query) => $query->whereKey($filter));
         }
 
+        if ($search !== '') {
+            $connection = $query->getConnection();
+            $lower = 'LOWER';
+            if ($connection instanceof SQLiteConnection && ($pdo = $connection->getReadPdo()) instanceof Sqlite) {
+                $pdo->createFunction('filemax_lower', mb_strtolower(...), 1, Sqlite::DETERMINISTIC);
+                $lower = 'filemax_lower';
+            }
+
+            $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_strtolower($search)).'%';
+            $query->whereRaw("{$lower}(COALESCE(title, (SELECT original_name FROM transfer_files WHERE transfer_files.transfer_id = transfers.id ORDER BY position LIMIT 1), 'Untitled transfer')) LIKE ? ESCAPE '!'", [$pattern]);
+        }
+
+        $statusCounts = [
+            'all' => (clone $query)->count(),
+            'active' => (clone $query)->where($active)->count(),
+            'soon' => (clone $query)->where($active)->where('expires_at', '<=', $soonUntil)->count(),
+            'expired' => (clone $query)->where($expired)->count(),
+        ];
+        match ($status) {
+            'active' => $query->where($active),
+            'soon' => $query->where($active)->where('expires_at', '<=', $soonUntil),
+            'expired' => $query->where($expired),
+            default => null,
+        };
+
         return Inertia::render('transfers/index', [
-            'transfers' => TransferResource::collection($query->with(['files', 'teams' => fn (Relation $query) => $query->withCount('users')])->latest()->paginate(20)->withQueryString()),
+            'transfers' => TransferResource::collection($query->with(['files', 'teams' => fn (Relation $query) => $query->withCount('users')])->latest()->latest('id')->paginate(8)->withQueryString()),
             'teams' => $historyTeams,
             'filter' => $filter,
+            'status' => $status,
+            'search' => $search,
+            'statusCounts' => $statusCounts,
             'totals' => $totals,
         ]);
     }
