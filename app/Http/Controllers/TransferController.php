@@ -63,7 +63,7 @@ final class TransferController
         return response()->json(['transfer' => new TransferResource($transfer->load(['files', 'teams' => fn (Relation $query) => $query->withCount('users')]))], 201);
     }
 
-    public function index(IndexTransfersRequest $request): Response
+    public function index(IndexTransfersRequest $request): Response|RedirectResponse
     {
         $query = Transfer::query()->where('user_id', ($request->user() ?? abort(403))->id)->where('status', 'ready');
         /** @var array{filter?: ?string, status?: ?string, search?: ?string} $filters */
@@ -112,9 +112,13 @@ final class TransferController
             'expired' => $query->where($expired),
             default => null,
         };
+        $transfers = $query->with(['files', 'teams' => fn (Relation $query) => $query->withCount('users')])->latest()->latest('id')->paginate(8)->withQueryString();
+        if ($transfers->currentPage() > $transfers->lastPage()) {
+            return redirect($transfers->url($transfers->lastPage()));
+        }
 
         return Inertia::render('transfers/index', [
-            'transfers' => TransferResource::collection($query->with(['files', 'teams' => fn (Relation $query) => $query->withCount('users')])->latest()->latest('id')->paginate(8)->withQueryString()),
+            'transfers' => TransferResource::collection($transfers),
             'teams' => $historyTeams,
             'filter' => $filter,
             'status' => $status,

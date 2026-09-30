@@ -334,6 +334,85 @@ JS);
     }
 });
 
+it('honors returning to All while a status request is pending', function (): void {
+    $owner = User::factory()->create();
+    Transfer::factory()->for($owner)->create(['title' => 'Active probe']);
+    Transfer::factory()->for($owner)->expired()->create(['title' => 'Expired probe']);
+    $this->actingAs($owner);
+    $page = visit('/transfers')->assertSee('Active probe')->assertSee('Expired probe');
+    $page->script(<<<'JS'
+() => {
+    const prototype = XMLHttpRequest.prototype;
+    const original = { open: prototype.open, send: prototype.send, abort: prototype.abort };
+    const urls = new WeakMap();
+    const probe = { held: null, args: null, cancelled: false, finished: false };
+    prototype.open = function (method, url, ...args) {
+        urls.set(this, new URL(url, location.href));
+        return original.open.call(this, method, url, ...args);
+    };
+    prototype.send = function (...args) {
+        if (!probe.held && urls.get(this)?.searchParams.get('status') === 'expired') {
+            probe.held = this;
+            probe.args = args;
+            return;
+        }
+        return original.send.apply(this, args);
+    };
+    prototype.abort = function (...args) {
+        const result = original.abort.apply(this, args);
+        if (this === probe.held) {
+            probe.cancelled = true;
+            this.dispatchEvent(new Event('abort'));
+        }
+        return result;
+    };
+    const finish = (event) => {
+        if (event.detail.visit.url.searchParams.get('status') === 'expired') probe.finished = true;
+    };
+    document.addEventListener('inertia:finish', finish);
+    probe.release = () => { if (!probe.cancelled) original.send.apply(probe.held, probe.args); };
+    probe.restore = () => {
+        Object.assign(prototype, original);
+        document.removeEventListener('inertia:finish', finish);
+        delete window.statusRequestProbe;
+    };
+    window.statusRequestProbe = probe;
+}
+JS);
+    try {
+        $page->click('[aria-label="Filter by status"] button:has-text("Expired")')
+            ->assertScript('() => window.statusRequestProbe.held !== null')
+            ->click('[aria-label="Filter by status"] button:has-text("All")');
+        $page->script('() => window.statusRequestProbe.release()');
+        $page->assertScript('() => window.statusRequestProbe.finished')
+            ->assertAttribute('div[aria-busy]', 'aria-busy', 'false')
+            ->assertAttribute('[aria-label="Filter by status"] button:has-text("All")', 'aria-pressed', 'true')
+            ->assertSee('Active probe')
+            ->assertSee('Expired probe')
+            ->assertNoJavascriptErrors();
+    } finally {
+        $page->script('() => window.statusRequestProbe.restore()');
+    }
+});
+
+it('recovers a stale history page without clearing its filters', function (): void {
+    $owner = User::factory()->create();
+    Transfer::factory()->count(9)->for($owner)->create(['title' => 'Campaign active']);
+    Transfer::factory()->count(8)->for($owner)->expired()->create(['title' => 'Campaign expired']);
+    $this->actingAs($owner);
+
+    visit('/transfers?filter=public&status=active&search=Campaign&page=3')
+        ->assertQueryStringHas('page', '2')
+        ->assertQueryStringHas('filter', 'public')
+        ->assertQueryStringHas('status', 'active')
+        ->assertQueryStringHas('search', 'Campaign')
+        ->assertSee('Showing 9–9 of 9')
+        ->assertDontSee('No matching transfers')
+        ->click('nav[aria-label="Pagination"] a:has-text("Previous")')
+        ->assertSee('Showing 1–8 of 9')
+        ->assertNoJavascriptErrors();
+});
+
 it('shows the expiry date and time in the viewer timezone', function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-09-20 12:00:00'));
     $owner = User::factory()->create();

@@ -166,6 +166,24 @@ it('searches the full history and preserves filters across stable eight-item pag
         ->has('transfers.data', 1)->where('transfers.data.0.id', $expectedIds->last()));
 });
 
+it('redirects stale history pages to the last valid page while preserving filters', function (int $matchingCount, int $lastPage, int $visibleCount): void {
+    $owner = User::factory()->create();
+    $team = Team::factory()->create();
+    Transfer::factory()->for($owner)->hasAttached($team)->count($matchingCount)->create(['title' => 'Campaign', 'visibility' => 'teams']);
+    Transfer::factory()->for($owner)->create(['title' => 'Unrelated transfer']);
+    $filters = ['filter' => $team->id, 'status' => 'active', 'search' => 'Campaign'];
+    $destination = route('transfers.index', [...$filters, 'page' => $lastPage]);
+
+    $this->actingAs($owner)->get(route('transfers.index', [...$filters, 'page' => 3]))->assertRedirect($destination);
+    $this->get($destination)->assertOk()->assertInertia(fn (Assert $page): Assert => $page
+        ->has('transfers.data', $visibleCount)->where('transfers.meta.current_page', $lastPage)
+        ->where('transfers.meta.last_page', $lastPage)->where('transfers.meta.total', $matchingCount)
+        ->where('filter', $team->id)->where('status', 'active')->where('search', 'Campaign'));
+})->with([
+    'remaining matches' => [9, 2, 1],
+    'no matches' => [0, 1, 0],
+]);
+
 it('rejects malformed transfer filters', function (array $query, string $field): void {
     $this->actingAs(User::factory()->create())->getJson(route('transfers.index', $query))->assertUnprocessable()->assertJsonValidationErrors($field);
 })->with([

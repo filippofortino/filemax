@@ -266,10 +266,10 @@ export default function Index({
                                 spacing={0.5}
                                 className="w-full rounded-lg bg-muted p-1 md:w-fit"
                                 onValueChange={(values) => {
-                                    if (values[0]) {
+                                    if (values[0] || pending) {
                                         visitFilters(
                                             query,
-                                            values[0] as Status,
+                                            (values[0] ?? status) as Status,
                                         );
                                     }
                                 }}
