@@ -14,7 +14,6 @@ use App\Models\Transfer;
 use App\Services\TransferStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Database\SQLiteConnection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,7 +22,6 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
-use Pdo\Sqlite;
 
 final class TransferController
 {
@@ -89,15 +87,8 @@ final class TransferController
         }
 
         if ($search !== '') {
-            $connection = $query->getConnection();
-            $lower = 'LOWER';
-            if ($connection instanceof SQLiteConnection && ($pdo = $connection->getReadPdo()) instanceof Sqlite) {
-                $pdo->createFunction('filemax_lower', mb_strtolower(...), 1, Sqlite::DETERMINISTIC);
-                $lower = 'filemax_lower';
-            }
-
-            $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_strtolower($search)).'%';
-            $query->whereRaw("{$lower}(COALESCE(title, (SELECT original_name FROM transfer_files WHERE transfer_files.transfer_id = transfers.id ORDER BY position LIMIT 1), 'Untitled transfer')) LIKE ? ESCAPE '!'", [$pattern]);
+            $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
+            $query->whereRaw("LOWER(COALESCE(title, (SELECT original_name FROM transfer_files WHERE transfer_files.transfer_id = transfers.id ORDER BY position LIMIT 1), 'Untitled transfer')) LIKE LOWER(?) ESCAPE '!'", [$pattern]);
         }
 
         $statusCounts = [

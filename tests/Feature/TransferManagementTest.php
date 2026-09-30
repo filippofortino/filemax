@@ -128,7 +128,7 @@ it('treats search pattern characters literally', function (string $search): void
         ->has('transfers.data', 1)->where('transfers.data.0.id', $match->id));
 })->with(['percent' => ['%'], 'underscore' => ['_'], 'backslash' => ['\\'], 'escape' => ['!'], 'combined' => ['%_\\!']]);
 
-it('matches accented displayed titles and fallback filenames case insensitively', function (string $search): void {
+it('searches accented titles and fallback filenames using native database case conversion', function (string $search, string $expectedTitle): void {
     $owner = User::factory()->create();
     Transfer::factory()->for($owner)->create(['title' => 'ÉTÉ photos']);
     $fallback = Transfer::factory()->for($owner)->create(['title' => null]);
@@ -136,8 +136,8 @@ it('matches accented displayed titles and fallback filenames case insensitively'
     Transfer::factory()->for($owner)->create(['title' => 'Other photos']);
 
     $this->actingAs($owner)->get(route('transfers.index', ['search' => $search]))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
-        ->has('transfers.data', 2)->where('statusCounts.all', 2));
-})->with(['uppercase' => ['ÉTÉ'], 'lowercase' => ['été']]);
+        ->has('transfers.data', 1)->where('transfers.data.0.title', $expectedTitle)->where('statusCounts.all', 1));
+})->with(['title' => ['ÉTÉ PHOTOS', 'ÉTÉ photos'], 'fallback filename' => ['été AFFICHE', 'été affiche.pdf']]);
 
 it('trims search before validating its length', function (): void {
     $title = str_repeat('a', 255);
