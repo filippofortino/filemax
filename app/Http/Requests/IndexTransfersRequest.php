@@ -26,7 +26,7 @@ final class IndexTransfersRequest extends FormRequest
         ];
     }
 
-    protected function prepareForValidation(): void
+    public function prepareForValidation(): void
     {
         if (is_string($this->input('search'))) {
             $this->merge(['search' => mb_trim($this->input('search'))]);
