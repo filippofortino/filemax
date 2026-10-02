@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Rules\AllowedEmailDomain;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -21,7 +22,7 @@ final class ProtectFortifyRequests
             }
 
             $rules = [
-                'email' => ['required', 'string', 'email:filter', 'max:255', 'ends_with:@mediamaxcommunication.it'],
+                'email' => ['required', 'string', 'email:filter', 'max:255', new AllowedEmailDomain],
             ];
             if ($request->routeIs('login.store')) {
                 $rules['remember'] = ['sometimes', 'boolean'];

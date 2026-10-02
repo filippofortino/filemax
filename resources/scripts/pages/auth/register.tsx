@@ -12,7 +12,7 @@ export default function Register() {
     return (
         <AuthLayout
             title="Create your account"
-            description="Filemax is for the Mediamax team. Use your company email to get started."
+            description="Use your email to get started with Filemax."
             footer={
                 <>
                     Already have an account? <Link href={login()}>Sign in</Link>
@@ -49,14 +49,14 @@ export default function Register() {
                                 className="text-sm font-semibold"
                                 htmlFor="email"
                             >
-                                Company email
+                                Email
                             </label>
                             <input
                                 id="email"
                                 name="email"
                                 type="email"
                                 autoComplete="email"
-                                placeholder="you@mediamaxcommunication.it"
+                                placeholder="you@example.com"
                                 required
                                 maxLength={255}
                                 aria-invalid={!!errors.email}

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Fortify;
 
 use App\Models\User;
+use App\Rules\AllowedEmailDomain;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -18,7 +19,7 @@ final class CreateNewUser implements CreatesNewUsers
         /** @var array{name: string, email: string, password: string} $validated */
         $validated = Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email:filter', 'max:255', 'ends_with:@mediamaxcommunication.it', Rule::unique(User::class)],
+            'email' => ['required', 'string', 'email:filter', 'max:255', new AllowedEmailDomain, Rule::unique(User::class)],
             'password' => ['required', 'string', 'confirmed', Password::defaults()],
         ])->validate();
 

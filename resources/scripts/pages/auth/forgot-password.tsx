@@ -8,7 +8,7 @@ export default function ForgotPassword() {
     return (
         <AuthLayout
             title="Forgot your password?"
-            description="Enter your company email and we’ll send you a link to reset it."
+            description="Enter your email and we’ll send you a link to reset your password."
             footer={<Link href={login()}>Back to sign in</Link>}
         >
             <Head title="Reset password" />
@@ -20,14 +20,14 @@ export default function ForgotPassword() {
                                 className="text-sm font-semibold"
                                 htmlFor="email"
                             >
-                                Company email
+                                Email
                             </label>
                             <input
                                 id="email"
                                 name="email"
                                 type="email"
                                 autoComplete="email"
-                                placeholder="you@mediamaxcommunication.it"
+                                placeholder="you@example.com"
                                 required
                                 aria-invalid={!!errors.email}
                             />

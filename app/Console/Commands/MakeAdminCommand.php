@@ -11,7 +11,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
 #[Description('Explicitly grant or revoke Filemax team administration')]
-#[Signature('filemax:admin {email : The registered, verified Mediamax email} {--revoke : Remove admin access}')]
+#[Signature('filemax:admin {email : The registered, verified email} {--revoke : Remove admin access}')]
 final class MakeAdminCommand extends Command
 {
     public function handle(): int
@@ -20,7 +20,7 @@ final class MakeAdminCommand extends Command
         $user = User::query()->where('email', Str::lower(mb_trim($email)))->first();
 
         if (! $user || (! $this->option('revoke') && (! $user->isEligible() || ! $user->hasVerifiedEmail()))) {
-            $this->error('Choose an existing, verified Mediamax account.');
+            $this->error('Choose an existing, verified account with an allowed email domain.');
 
             return self::FAILURE;
         }

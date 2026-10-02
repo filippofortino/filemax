@@ -13,7 +13,7 @@ final class EnsureEligibleEmail
     /** @param Closure(Request): Response $next */
     public function handle(Request $request, Closure $next): Response
     {
-        abort_unless($request->user()?->isEligible() ?? false, 403, 'A Mediamax account is required.');
+        abort_unless($request->user()?->isEligible() ?? false, 403, 'An eligible account is required.');
 
         return $next($request);
     }
