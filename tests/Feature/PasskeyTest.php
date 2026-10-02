@@ -262,8 +262,9 @@ test('changing the account password retains existing passkeys', function (): voi
     $this->assertModelExists($passkey);
 });
 
-test('passkey login uses the intended destination and consumes its challenge once', function (): void {
-    $user = User::factory()->create();
+test('passkey login uses the intended destination and consumes its challenge once', function (array $domains): void {
+    config(['filemax.allowed_email_domains' => $domains]);
+    $user = User::factory()->create(['email' => 'alice@example.com']);
     [$passkey, $privateKey] = filemaxPasskey($user);
     $this->withSession(['url.intended' => '/t/shared-transfer']);
     $sessionId = session()->getId();
@@ -281,7 +282,7 @@ test('passkey login uses the intended destination and consumes its challenge onc
     $this->postJson(route('passkey.login'), ['credential' => $credential])
         ->assertUnprocessable()->assertJsonValidationErrors('credential');
     $this->assertGuest();
-});
+})->with(['open domains' => [[]], 'single domain' => [['example.com']], 'multiple domains' => [['mediamaxcommunication.it', 'example.com']]]);
 
 test('a signed assertion for a different challenge is rejected and cannot be retried', function (): void {
     [$passkey, $privateKey] = filemaxPasskey(User::factory()->create());

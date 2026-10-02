@@ -29,7 +29,7 @@ final class TeamMemberRequest extends FormRequest
     {
         return [function (Validator $validator): void {
             if (! $validator->errors()->has('user_id') && ! User::query()->findOrFail($this->string('user_id')->toString())->isEligible()) {
-                $validator->errors()->add('user_id', 'Choose a registered Mediamax account.');
+                $validator->errors()->add('user_id', 'Choose a registered account with an allowed email domain.');
             }
         }];
     }

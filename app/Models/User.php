@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Rules\AllowedEmailDomain;
 use Carbon\CarbonInterface;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -64,7 +65,7 @@ final class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 
     public function isEligible(): bool
     {
-        return Str::afterLast(Str::lower($this->email), '@') === 'mediamaxcommunication.it';
+        return AllowedEmailDomain::allows($this->email);
     }
 
     public function avatarUrl(): ?string

@@ -53,7 +53,7 @@ export default function Login() {
                                     name="email"
                                     type="email"
                                     autoComplete="email"
-                                    placeholder="you@mediamaxcommunication.it"
+                                    placeholder="you@example.com"
                                     required
                                     aria-invalid={!!errors.email}
                                     aria-describedby={

@@ -10,18 +10,22 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 
 it('registers an eligible account and asks the user to verify their email', function (): void {
+    config(['filemax.allowed_email_domains' => []]);
     Notification::fake();
 
     $page = visit('/register')->resize(1280, 940)
+        ->assertSee('Use your email to get started with Filemax.')
+        ->assertDontSee('Company email')
+        ->assertAttribute('#email', 'placeholder', 'you@example.com')
         ->assertSee('At least 8 characters.')
         ->assertAttribute('#password', 'minlength', '8')
         ->fill('name', 'Alice Test')
-        ->fill('email', 'alice@mediamaxcommunication.it')
+        ->fill('email', 'alice@example.com')
         ->fill('password', 'a-good-password')
         ->fill('password_confirmation', 'a-good-password')
         ->press('Create account')
         ->assertSee('Check your email')
-        ->assertSee('alice@mediamaxcommunication.it')
+        ->assertSee('alice@example.com')
         ->assertNoJavascriptErrors();
 
     $page->script('() => document.fonts.ready');
@@ -36,10 +40,14 @@ it('registers an eligible account and asks the user to verify their email', func
 });
 
 it('requests and resets a password by clicking the form buttons', function (): void {
-    $user = User::factory()->create();
+    config(['filemax.allowed_email_domains' => ['example.com']]);
+    $user = User::factory()->create(['email' => 'alice@example.com']);
     Notification::fake();
 
     visit('/forgot-password')
+        ->assertSee('Enter your email and we’ll send you a link to reset your password.')
+        ->assertDontSee('Company email')
+        ->assertAttribute('#email', 'placeholder', 'you@example.com')
         ->fill('email', $user->email)
         ->press('Send reset link')
         ->assertSee('If that account exists, a password reset link has been sent.')
@@ -48,6 +56,7 @@ it('requests and resets a password by clicking the form buttons', function (): v
     $notification = Notification::sent($user, ResetPassword::class)->sole();
 
     visit(route('password.reset', ['token' => $notification->token, 'email' => $user->email]))
+        ->assertDontSee('Company email')
         ->fill('password', 'new-browser-password')
         ->fill('password_confirmation', 'new-browser-password')
         ->press('Reset password')
@@ -61,6 +70,7 @@ it('signs in and signs out through the account menu', function (): void {
     $user = User::factory()->create(['remember_token' => null]);
 
     $page = visit('/login')->resize(1280, 940);
+    $page->assertAttribute('#email', 'placeholder', 'you@example.com');
     $page->script('() => document.fonts.ready');
     $page->screenshot(fullPage: false, filename: 'auth-login');
 

@@ -35,7 +35,7 @@ export default function ResetPassword({
                                 className="text-sm font-semibold"
                                 htmlFor="email"
                             >
-                                Company email
+                                Email
                             </label>
                             <input
                                 id="email"
