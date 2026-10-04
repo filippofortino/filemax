@@ -27,6 +27,7 @@ use Laravel\Fortify\PasskeyAuthenticatable;
  * @property-read string|null $avatar_path
  * @property-read bool $is_admin
  * @property-read CarbonInterface|null $email_verified_at
+ * @property-read CarbonInterface|null $onboarded_at
  * @property-read string $password
  * @property-read string|null $remember_token
  * @property-read CarbonInterface $created_at
@@ -85,6 +86,7 @@ final class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'avatar_path' => 'string',
             'is_admin' => 'boolean',
             'email_verified_at' => 'datetime',
+            'onboarded_at' => 'datetime',
             'password' => 'hashed',
             'remember_token' => 'string',
             'created_at' => 'datetime',

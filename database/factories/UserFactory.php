@@ -22,6 +22,7 @@ final class UserFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->userName().'@mediamaxcommunication.it',
             'email_verified_at' => now(),
+            'onboarded_at' => now(),
             'password' => 'password',
             'remember_token' => Str::random(10),
         ];
