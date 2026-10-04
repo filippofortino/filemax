@@ -26,11 +26,18 @@ use Inertia\Response;
 
 final class TransferController
 {
-    public function create(Request $request): Response
+    public function create(Request $request): Response|RedirectResponse
     {
         Gate::authorize('create', Transfer::class);
+        $user = $request->user() ?? abort(403);
 
-        return Inertia::render('transfers/create', ['teams' => ($request->user() ?? abort(403))->teams()->withCount('users')->orderBy('name')->get(['teams.id', 'name'])]);
+        if ($user->onboarded_at === null) {
+            $user->forceFill(['onboarded_at' => now()])->save();
+
+            return to_route('welcome');
+        }
+
+        return Inertia::render('transfers/create', ['teams' => $user->teams()->withCount('users')->orderBy('name')->get(['teams.id', 'name'])]);
     }
 
     public function store(StoreTransferRequest $request, TransferStorage $storage): JsonResponse

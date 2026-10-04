@@ -79,7 +79,7 @@ test('registration login recovery and sender access accept configured or unrestr
     Notification::assertSentTo($user, VerifyEmail::class);
     $this->get(route('home'))->assertRedirect(route('verification.notice'));
     $user->markEmailAsVerified();
-    $this->actingAs($user)->get(route('home'))->assertOk();
+    $this->actingAs($user)->get(route('home'))->assertRedirect(route('welcome'));
     $this->post(route('logout'))->assertRedirect(route('login'));
 
     $this->post(route('login.store'), ['email' => ' ALICE@EXAMPLE.COM ', 'password' => 'a-secure-password'])

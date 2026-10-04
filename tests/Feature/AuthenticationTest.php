@@ -194,7 +194,7 @@ test('password recovery invalidates the original registration session before any
     $this->get($verificationUrl)->assertRedirect();
     expect($user->refresh()->hasVerifiedEmail())->toBeTrue();
     $switchBrowserSession($ownerCookie);
-    $this->get(route('home'))->assertOk();
+    $this->get(route('home'))->assertRedirect(route('welcome'));
 
     $url = $destination === 'home'
         ? route('home')
