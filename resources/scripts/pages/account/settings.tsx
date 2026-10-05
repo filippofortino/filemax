@@ -421,7 +421,12 @@ function Privacy({
                                     },
                                 }),
                                 onSuccess: () =>
-                                    toast.add({ title: 'Privacy saved' }),
+                                    toast.add({
+                                        title: 'Privacy saved',
+                                        description: checked
+                                            ? 'Recipients see your name and photo again.'
+                                            : 'Recipients no longer see your name or photo.',
+                                    }),
                             },
                         )
                     }

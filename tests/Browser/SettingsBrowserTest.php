@@ -100,6 +100,7 @@ it('hides the sender name on transfers with the privacy switch', function (): vo
         ->click('[role="switch"]')
         ->assertSee('No sender shown, only the files')
         ->assertSeeIn('[data-slot="toast"]', 'Privacy saved')
+        ->assertSee('Recipients no longer see your name or photo.')
         ->assertAttribute('[role="switch"]', 'aria-checked', 'false')
         ->assertNoJavascriptErrors()
         ->screenshot(filename: 'settings-privacy-hidden');
