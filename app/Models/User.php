@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
@@ -32,6 +33,7 @@ use Laravel\Fortify\PasskeyAuthenticatable;
  * @property-read string|null $remember_token
  * @property-read CarbonInterface $created_at
  * @property-read CarbonInterface $updated_at
+ * @property-read UserSettings $settings
  */
 #[Hidden([
     'password',
@@ -62,6 +64,12 @@ final class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function teams(): BelongsToMany
     {
         return $this->belongsToMany(Team::class);
+    }
+
+    /** @return HasOne<UserSettings, $this> */
+    public function settings(): HasOne
+    {
+        return $this->hasOne(UserSettings::class)->withDefault();
     }
 
     public function isEligible(): bool

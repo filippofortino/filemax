@@ -25,11 +25,13 @@ final class SharedTransferController
             return redirect()->guest(route('login'));
         }
 
+        $sender = $transfer->user->settings->show_name_on_transfers ? $transfer->user : null;
+
         if (! Gate::forUser($request->user())->allows('download', $transfer)) {
             $request->session()->put('url.intended', route('shared.show', $transfer->token));
 
             return Inertia::render('shared/denied', [
-                'sender' => $transfer->user()->first(['name', 'email']),
+                'sender' => $sender?->only(['name', 'email']),
                 'token' => $transfer->token,
                 'url' => route('shared.show', $transfer->token),
                 'own_teams' => $request->user()?->teams()->get(['teams.id', 'teams.name'])->map->only(['id', 'name']) ?? [],
@@ -38,7 +40,7 @@ final class SharedTransferController
         }
 
         $transfer->whereKey($transfer->id)->whereNull('first_opened_at')->update(['first_opened_at' => now()]);
-        $transfer->load(['files', 'user']);
+        $transfer->load('files');
 
         $response = Inertia::render('shared/show', [
             'transfer' => [
@@ -46,7 +48,7 @@ final class SharedTransferController
                 'token' => $transfer->token,
                 'title' => $transfer->displayTitle(),
                 'message' => $transfer->message,
-                'sender' => [...$transfer->user->only(['name', 'email']), 'avatar_url' => $transfer->user->avatarUrl()],
+                'sender' => $sender ? [...$sender->only(['name', 'email']), 'avatar_url' => $sender->avatarUrl()] : null,
                 'files' => $transfer->files->map(fn (TransferFile $file): array => [
                     'id' => $file->id,
                     'name' => $file->original_name,
