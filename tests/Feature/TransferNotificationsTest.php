@@ -67,31 +67,27 @@ it('reminds by default unless the owner turned it off', function (): void {
     Notification::assertNotSentTo($optedOut->user, TransferExpiring::class);
 });
 
-it('reminds again before the new expiry once a transfer is extended', function (): void {
+it('reminds once per transfer, even after it is extended', function (): void {
     $transfer = Transfer::factory()->create();
     $this->travel(6)->days();
     $this->artisan('filemax:send-expiry-reminders')->assertSuccessful();
 
     ($this->extend)($transfer);
-    expect($transfer->refresh()->expiry_reminder_sent_at)->toBeNull();
-    $this->artisan('filemax:send-expiry-reminders')->assertSuccessful();
-    Notification::assertSentToTimes($transfer->user, TransferExpiring::class, 1);
-
     $this->travel(7)->days();
     $this->artisan('filemax:send-expiry-reminders')->assertSuccessful();
-    Notification::assertSentToTimes($transfer->user, TransferExpiring::class, 2);
+
+    Notification::assertSentToTimes($transfer->user, TransferExpiring::class, 1);
 });
 
-it('reminds 1-day transfers only once they are extended', function (): void {
+it('never reminds 1-day transfers, even once they are extended', function (): void {
     $transfer = Transfer::factory()->create(['expires_in_days' => 1, 'expires_at' => now()->addDay()]);
     $this->artisan('filemax:send-expiry-reminders')->assertSuccessful();
-    Notification::assertNothingSent();
 
     ($this->extend)($transfer);
     $this->travel(7)->days();
     $this->artisan('filemax:send-expiry-reminders')->assertSuccessful();
 
-    Notification::assertSentToTimes($transfer->user, TransferExpiring::class, 1);
+    Notification::assertNothingSent();
 });
 
 it('emails the owner once when someone else first downloads the transfer', function (string $download): void {

@@ -21,14 +21,9 @@ final class SendExpiryRemindersCommand extends Command
 
         Transfer::query()->with('user')
             ->where('status', 'ready')->whereNull('revoked_at')->whereNull('purged_at')->whereNull('expiry_reminder_sent_at')
-            ->where('expires_at', '>', now())->where('expires_at', '<=', now()->addDay())
+            ->where('expires_in_days', '>', 1)->where('expires_at', '>', now())->where('expires_at', '<=', now()->addDay())
             ->whereDoesntHave('user.settings', fn (Builder $settings) => $settings->where('notify_transfer_expiring', false))
             ->lazyById()->each(function (Transfer $transfer) use (&$count): void {
-                // A 1-day transfer starts inside the window, so it's only reminded once an extension makes it last longer.
-                if ($transfer->created_at->diffInDays($transfer->expires_at) <= 2) {
-                    return;
-                }
-
                 $transfer->update(['expiry_reminder_sent_at' => now()]);
                 $transfer->user->notify(new TransferExpiring($transfer));
                 $count++;
