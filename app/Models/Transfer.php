@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Notifications\TransferDownloaded;
 use Carbon\CarbonInterface;
 use Database\Factories\TransferFactory;
 use Illuminate\Database\Eloquent\Attributes\Guarded;
@@ -30,6 +31,8 @@ use Illuminate\Support\Str;
  * @property ?CarbonInterface $first_opened_at
  * @property int $download_count
  * @property ?CarbonInterface $last_downloaded_at
+ * @property ?CarbonInterface $first_downloaded_at
+ * @property ?CarbonInterface $expiry_reminder_sent_at
  * @property ?CarbonInterface $revoked_at
  * @property ?CarbonInterface $purged_at
  * @property ?string $archive_status
@@ -94,6 +97,18 @@ final class Transfer extends Model
             && $this->expires_at->lte($now->copy()->addDays(7));
     }
 
+    /** Counts a download and emails the owner the first time someone else downloads the transfer. */
+    public function recordDownload(?User $downloader): void
+    {
+        $now = now();
+        $isFirst = $this->first_downloaded_at === null && $downloader?->id !== $this->user_id;
+        $this->increment('download_count', 1, ['last_downloaded_at' => $now, 'first_downloaded_at' => $isFirst ? $now : $this->first_downloaded_at]);
+
+        if ($isFirst && $this->user->settings->notify_transfer_downloaded) {
+            $this->user->notify(new TransferDownloaded($this));
+        }
+    }
+
     public function displayTitle(): string
     {
         return $this->title ?? ($this->files->first()->original_name ?? 'Untitled transfer');
@@ -108,6 +123,8 @@ final class Transfer extends Model
             'first_opened_at' => 'datetime',
             'download_count' => 'integer',
             'last_downloaded_at' => 'datetime',
+            'first_downloaded_at' => 'datetime',
+            'expiry_reminder_sent_at' => 'datetime',
             'revoked_at' => 'datetime',
             'purged_at' => 'datetime',
             'archive_requested_at' => 'datetime',

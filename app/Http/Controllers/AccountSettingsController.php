@@ -25,7 +25,7 @@ final class AccountSettingsController
                     'created_at' => $passkey->created_at?->toIso8601String(),
                     'last_used_at' => $passkey->last_used_at?->toIso8601String(),
                 ]),
-            'settings' => $user->settings->only(['show_name_on_transfers']),
+            'settings' => $user->settings->only(['show_name_on_transfers', 'notify_transfer_expiring', 'notify_transfer_downloaded']),
         ]);
     }
 

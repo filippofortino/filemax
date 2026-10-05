@@ -19,7 +19,7 @@ final class TransferArchiveController
         $transfer = DB::transaction(function () use ($request, $transfer, &$prepare): Transfer {
             $transfer = Transfer::query()->lockForUpdate()->findOrFail($transfer->id);
             Gate::forUser($request->user())->authorize('download', $transfer);
-            $transfer->increment('download_count', 1, ['last_downloaded_at' => now()]);
+            $transfer->recordDownload($request->user());
 
             $prepare = ! in_array($transfer->archive_status, ['pending', 'processing', 'ready'], true);
             if ($prepare) {

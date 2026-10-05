@@ -29,7 +29,7 @@ final class ExtendTransferController
                     throw ValidationException::withMessages(['expected_expires_at' => 'This transfer cannot be extended. Extensions are available in the final 7 days and for 30 days after expiry, while the files are retained.']);
                 }
 
-                $transfer->update(['expires_at' => now()->max($transfer->expires_at)->addDays(7)]);
+                $transfer->update(['expires_at' => now()->max($transfer->expires_at)->addDays(7), 'expiry_reminder_sent_at' => null]);
 
                 return $transfer;
             });

@@ -11,6 +11,10 @@ final class UpdateAccountSettingsRequest extends FormRequest
     /** @return array<string, list<string>> */
     public function rules(): array
     {
-        return ['show_name_on_transfers' => ['required', 'boolean']];
+        return [
+            'show_name_on_transfers' => ['sometimes', 'boolean'],
+            'notify_transfer_expiring' => ['sometimes', 'boolean'],
+            'notify_transfer_downloaded' => ['sometimes', 'boolean'],
+        ];
     }
 }

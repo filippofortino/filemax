@@ -16,7 +16,7 @@ it('saves the profile name and renders settings on desktop and phone', function 
     $this->actingAs($user);
 
     $page = visit('/account/settings')->resize(1280, 1512)
-        ->assertSee('Your profile, your privacy, your password, and the devices you sign in with.')
+        ->assertSee('Your profile, privacy, notifications, password, and the devices you sign in with.')
         ->assertSee('Upload photo')
         ->assertSee('Update password')
         ->assertSee('Add passkey')
@@ -96,12 +96,12 @@ it('hides the sender name on transfers with the privacy switch', function (): vo
 
     visit('/account/settings')
         ->assertSee('Sent by Filippo Fortino')
-        ->assertAttribute('[role="switch"]', 'aria-checked', 'true')
-        ->click('[role="switch"]')
+        ->assertAttribute('[aria-labelledby="show-name-label"]', 'aria-checked', 'true')
+        ->click('[aria-labelledby="show-name-label"]')
         ->assertSee('No sender shown, only the files')
         ->assertSeeIn('[data-slot="toast"]', 'Privacy saved')
         ->assertSee('Recipients no longer see your name or photo.')
-        ->assertAttribute('[role="switch"]', 'aria-checked', 'false')
+        ->assertAttribute('[aria-labelledby="show-name-label"]', 'aria-checked', 'false')
         ->assertNoJavascriptErrors()
         ->screenshot(filename: 'settings-privacy-hidden');
 
@@ -112,6 +112,26 @@ it('hides the sender name on transfers with the privacy switch', function (): vo
         ->assertDontSee('Filippo Fortino')
         ->assertNoJavascriptErrors()
         ->screenshot(filename: 'filemax-recipient-sender-hidden');
+});
+
+it('turns on the first-download email and keeps the expiry reminder on', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    visit('/account/settings')
+        ->assertSee("Emails about your transfers, sent to {$user->email}.")
+        ->assertAttribute('[aria-labelledby="notify-expiry-label"]', 'aria-checked', 'true')
+        ->assertAttribute('[aria-labelledby="notify-download-label"]', 'aria-checked', 'false')
+        ->click('[aria-labelledby="notify-download-label"]')
+        ->assertSeeIn('[data-slot="toast"]', 'Notifications saved')
+        ->assertSee('We’ll email you the first time someone downloads a transfer.')
+        ->assertAttribute('[aria-labelledby="notify-download-label"]', 'aria-checked', 'true')
+        ->assertAttribute('[aria-labelledby="notify-expiry-label"]', 'aria-checked', 'true')
+        ->assertNoJavascriptErrors()
+        ->screenshot(filename: 'settings-notifications');
+
+    expect($user->settings()->sole()->only(['notify_transfer_expiring', 'notify_transfer_downloaded']))
+        ->toBe(['notify_transfer_expiring' => true, 'notify_transfer_downloaded' => true]);
 });
 
 it('shows password errors separately and keeps the current session after updating', function (): void {

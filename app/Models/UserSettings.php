@@ -15,10 +15,12 @@ use Illuminate\Database\Eloquent\Model;
  * @property-read string $id
  * @property-read string $user_id
  * @property-read bool $show_name_on_transfers
+ * @property-read bool $notify_transfer_expiring
+ * @property-read bool $notify_transfer_downloaded
  * @property-read CarbonInterface $created_at
  * @property-read CarbonInterface $updated_at
  */
-#[Fillable(['show_name_on_transfers'])]
+#[Fillable(['show_name_on_transfers', 'notify_transfer_expiring', 'notify_transfer_downloaded'])]
 final class UserSettings extends Model
 {
     /** @use HasFactory<UserSettingsFactory> */
@@ -27,7 +29,7 @@ final class UserSettings extends Model
     use HasUuids;
 
     /** @var array<string, mixed> */
-    protected $attributes = ['show_name_on_transfers' => true];
+    protected $attributes = ['show_name_on_transfers' => true, 'notify_transfer_expiring' => true, 'notify_transfer_downloaded' => false];
 
     /**
      * @return array<string, string>
@@ -36,6 +38,8 @@ final class UserSettings extends Model
     {
         return [
             'show_name_on_transfers' => 'boolean',
+            'notify_transfer_expiring' => 'boolean',
+            'notify_transfer_downloaded' => 'boolean',
         ];
     }
 }
