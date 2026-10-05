@@ -1,12 +1,14 @@
-import { Key01Icon } from '@hugeicons/core-free-icons';
+import { AnonymousIcon, Key01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Form, Head, router, useForm, usePage } from '@inertiajs/react';
 import { usePasskeyRegister } from '@laravel/passkeys/react';
 import { useEffect, useRef, useState } from 'react';
+import { update as updateSettings } from '@/actions/App/Http/Controllers/AccountSettingsController';
 import { Avatar } from '@/components/avatar';
 import { ErrorMessage, Shell } from '@/components/filemax';
 import { sessionExpired } from '@/components/passkey-button';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/toast';
 import { date, passwordHint } from '@/lib/format';
 import type { SharedProps, User } from '@/lib/types';
@@ -22,7 +24,15 @@ type Passkey = {
     last_used_at: string | null;
 };
 
-export default function Settings({ passkeys }: { passkeys: Passkey[] }) {
+type AccountSettings = { show_name_on_transfers: boolean };
+
+export default function Settings({
+    passkeys,
+    settings,
+}: {
+    passkeys: Passkey[];
+    settings: AccountSettings;
+}) {
     const { auth, passwordRequirements } = usePage<SharedProps>().props;
 
     return (
@@ -33,11 +43,14 @@ export default function Settings({ passkeys }: { passkeys: Passkey[] }) {
                     <div className="flex flex-col gap-2">
                         <h1>Settings</h1>
                         <p className="text-muted-foreground">
-                            Your profile, your password, and the devices you
-                            sign in with.
+                            Your profile, your privacy, your password, and the
+                            devices you sign in with.
                         </p>
                     </div>
                     {auth.user && <Profile user={auth.user} />}
+                    {auth.user && (
+                        <Privacy user={auth.user} settings={settings} />
+                    )}
                     <section
                         aria-labelledby="password-title"
                         className="flex flex-col gap-5 rounded-xl border bg-background p-6"
@@ -350,6 +363,96 @@ function Profile({ user }: { user: User }) {
                     {profile.processing ? 'Saving…' : 'Save profile'}
                 </Button>
             </form>
+        </section>
+    );
+}
+
+function Privacy({
+    user,
+    settings,
+}: {
+    user: User;
+    settings: AccountSettings;
+}) {
+    const showName = settings.show_name_on_transfers;
+
+    return (
+        <section
+            aria-labelledby="privacy-title"
+            className="flex flex-col gap-5 rounded-xl border bg-background p-6"
+        >
+            <div className="flex flex-col gap-1.5">
+                <h2 id="privacy-title" className="text-xl">
+                    Privacy
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                    Choose what recipients see about you on the transfers you
+                    send.
+                </p>
+            </div>
+            <div className="flex items-start justify-between gap-6">
+                <div className="flex flex-col gap-1">
+                    <span id="show-name-label" className="font-semibold">
+                        Show my name on transfers
+                    </span>
+                    <p
+                        id="show-name-hint"
+                        className="text-sm text-muted-foreground"
+                    >
+                        When off, the download page doesn’t say who sent the
+                        transfer: no name, no photo. This applies to transfers
+                        you’ve already sent too.
+                    </p>
+                </div>
+                <Switch
+                    checked={showName}
+                    aria-labelledby="show-name-label"
+                    aria-describedby="show-name-hint"
+                    onCheckedChange={(checked) =>
+                        router.put(
+                            updateSettings.url(),
+                            { show_name_on_transfers: checked },
+                            {
+                                preserveScroll: true,
+                                optimistic: () => ({
+                                    settings: {
+                                        ...settings,
+                                        show_name_on_transfers: checked,
+                                    },
+                                }),
+                                onSuccess: () =>
+                                    toast.add({ title: 'Privacy saved' }),
+                            },
+                        )
+                    }
+                />
+            </div>
+            <div className="flex items-center gap-3 rounded-lg bg-muted px-4 py-3">
+                {showName ? (
+                    <Avatar
+                        name={user.name}
+                        url={user.avatar_url}
+                        className="size-9"
+                    />
+                ) : (
+                    <span
+                        aria-hidden="true"
+                        className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-dashed border-input text-muted-foreground"
+                    >
+                        <HugeiconsIcon icon={AnonymousIcon} size={18} />
+                    </span>
+                )}
+                <div className="flex flex-col gap-0.5" aria-live="polite">
+                    <span className="text-xs text-muted-foreground">
+                        What recipients see
+                    </span>
+                    <span className="text-sm font-semibold">
+                        {showName
+                            ? `Sent by ${user.name}`
+                            : 'No sender shown, only the files'}
+                    </span>
+                </div>
+            </div>
         </section>
     );
 }

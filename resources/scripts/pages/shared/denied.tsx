@@ -11,7 +11,7 @@ import { show } from '@/routes/shared';
 import { notice } from '@/routes/verification';
 
 type DeniedProps = {
-    sender: { name: string; email: string };
+    sender: { name: string; email: string } | null;
     token: string;
     url: string;
     own_teams: Team[];
@@ -27,7 +27,7 @@ export default function AccessDenied({
 }: DeniedProps) {
     const { auth } = usePage<SharedProps>().props;
     const returnTo = show.url(token);
-    const firstName = sender.name.split(' ')[0];
+    const firstName = sender?.name.split(' ')[0];
     const subject = encodeURIComponent('Access to your Filemax transfer');
     const body = encodeURIComponent(
         `Hi ${firstName},\n\nCould you help me access the files in your Filemax transfer?\n${url}\n\nThanks!`,
@@ -49,7 +49,9 @@ export default function AccessDenied({
                     </span>
                     <h1>You don&apos;t have access to these files</h1>
                     <p className="max-w-md text-base text-muted-foreground">
-                        {sender.name} shared this transfer with selected teams.
+                        {sender
+                            ? `${sender.name} shared this transfer with selected teams.`
+                            : 'This transfer is shared with selected teams.'}{' '}
                         You&apos;re signed in as{' '}
                         <span className="break-all">{auth.user?.email}</span>,{' '}
                         {requires_verification
@@ -77,12 +79,14 @@ export default function AccessDenied({
                                 Verify your email
                             </Link>
                         ) : (
-                            <a
-                                className={cn(buttonVariants())}
-                                href={`mailto:${sender.email}?subject=${subject}&body=${body}`}
-                            >
-                                Ask {firstName} for access
-                            </a>
+                            sender && (
+                                <a
+                                    className={cn(buttonVariants())}
+                                    href={`mailto:${sender.email}?subject=${subject}&body=${body}`}
+                                >
+                                    Ask {firstName} for access
+                                </a>
+                            )
                         )}
                         <Link
                             href={home()}

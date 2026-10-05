@@ -16,7 +16,7 @@ it('saves the profile name and renders settings on desktop and phone', function 
     $this->actingAs($user);
 
     $page = visit('/account/settings')->resize(1280, 1512)
-        ->assertSee('Your profile, your password, and the devices you sign in with.')
+        ->assertSee('Your profile, your privacy, your password, and the devices you sign in with.')
         ->assertSee('Upload photo')
         ->assertSee('Update password')
         ->assertSee('Add passkey')
@@ -87,6 +87,30 @@ it('previews saves and removes a photo in settings and on sent transfers', funct
         ->assertNoJavascriptErrors();
     expect($user->refresh()->avatar_path)->toBeNull();
     Storage::disk('local')->assertMissing($path);
+});
+
+it('hides the sender name on transfers with the privacy switch', function (): void {
+    $user = User::factory()->create(['name' => 'Filippo Fortino']);
+    $transfer = Transfer::factory()->for($user, 'user')->create(['title' => 'Spot autunno']);
+    $this->actingAs($user);
+
+    visit('/account/settings')
+        ->assertSee('Sent by Filippo Fortino')
+        ->assertAttribute('[role="switch"]', 'aria-checked', 'true')
+        ->click('[role="switch"]')
+        ->assertSee('No sender shown, only the files')
+        ->assertSeeIn('[data-slot="toast"]', 'Privacy saved')
+        ->assertAttribute('[role="switch"]', 'aria-checked', 'false')
+        ->assertNoJavascriptErrors()
+        ->screenshot(filename: 'settings-privacy-hidden');
+
+    expect($user->settings()->sole()->show_name_on_transfers)->toBeFalse();
+
+    visit(route('shared.show', $transfer->token))->resize(1280, 940)
+        ->assertSee('Spot autunno')
+        ->assertDontSee('Filippo Fortino')
+        ->assertNoJavascriptErrors()
+        ->screenshot(filename: 'filemax-recipient-sender-hidden');
 });
 
 it('shows password errors separately and keeps the current session after updating', function (): void {

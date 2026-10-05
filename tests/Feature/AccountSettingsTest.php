@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Transfer;
 use App\Models\User;
+use App\Models\UserSettings;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\UploadedFile;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Image;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function (): void {
@@ -33,18 +35,18 @@ test('settings opens without reconfirmation and the old passkeys page is removed
     $this->get('/account/passkeys')->assertNotFound();
 });
 
-test('guests cannot update their profile or password', function (string $route): void {
+test('guests cannot update their profile, password or settings', function (string $route): void {
     $this->put(route($route))->assertRedirect(route('login'));
-})->with(['user-profile-information.update', 'user-password.update']);
+})->with(['user-profile-information.update', 'user-password.update', 'account.settings.update']);
 
-test('profile and password updates require an eligible verified account', function (string $route, bool $verified): void {
+test('profile, password and settings updates require an eligible verified account', function (string $route, bool $verified): void {
     $user = User::factory()->create([
         'email' => $verified ? 'person@example.com' : 'person@mediamaxcommunication.it',
         'email_verified_at' => $verified ? now() : null,
     ]);
 
     $this->actingAs($user)->putJson(route($route))->assertForbidden();
-})->with(['user-profile-information.update', 'user-password.update'])->with([true, false]);
+})->with(['user-profile-information.update', 'user-password.update', 'account.settings.update'])->with([true, false]);
 
 test('profile updates only the current users name and preserves immutable attributes', function (): void {
     $user = User::factory()->create(['avatar_path' => 'avatars/original.webp']);
@@ -187,6 +189,43 @@ test('avatar URLs are shared with the owner and authorized transfer recipients',
     $this->actingAs(User::factory()->create())->get(route('shared.show', $transfer->token))
         ->assertForbidden()->assertInertia(fn (Assert $page): Assert => $page->missing('sender.avatar_url'));
 });
+
+test('hiding the name removes the sender from earlier transfers until it is shown again', function (): void {
+    $user = User::factory()->create();
+    $public = Transfer::factory()->for($user)->create();
+    $restricted = Transfer::factory()->for($user)->create(['visibility' => 'teams']);
+    $other = UserSettings::factory()->create();
+    $showOnTransfers = fn (bool $shown): TestResponse => $this->actingAs($user)->from(route('account.settings'))
+        ->put(route('account.settings.update'), ['show_name_on_transfers' => $shown])
+        ->assertRedirect(route('account.settings'))->assertSessionHasNoErrors();
+
+    $this->actingAs($user)->get(route('account.settings'))->assertInertia(fn (Assert $page): Assert => $page
+        ->where('settings', ['show_name_on_transfers' => true]));
+    $showOnTransfers(false);
+    $this->get(route('account.settings'))->assertInertia(fn (Assert $page): Assert => $page
+        ->where('settings', ['show_name_on_transfers' => false]));
+
+    expect($user->settings()->sole()->show_name_on_transfers)->toBeFalse()
+        ->and($other->refresh()->show_name_on_transfers)->toBeTrue();
+    Auth::logout();
+    session()->flush();
+    $this->get(route('shared.show', $public->token))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
+        ->where('transfer.sender', null));
+    $this->actingAs(User::factory()->create())->get(route('shared.show', $restricted->token))
+        ->assertForbidden()->assertInertia(fn (Assert $page): Assert => $page->where('sender', null));
+
+    Auth::logout();
+    session()->flush();
+    $showOnTransfers(true);
+    expect(UserSettings::query()->count())->toBe(2);
+    $this->get(route('shared.show', $public->token))->assertInertia(fn (Assert $page): Assert => $page
+        ->where('transfer.sender.name', $user->name));
+});
+
+test('the privacy setting must be a boolean', function (mixed $value): void {
+    $this->actingAs(User::factory()->create())->putJson(route('account.settings.update'), ['show_name_on_transfers' => $value])
+        ->assertUnprocessable()->assertJsonValidationErrors('show_name_on_transfers');
+})->with([null, 'maybe', [['invalid']]]);
 
 test('password updates apply the environment policy and verify the current password', function (string $environment, string $password, string $current, bool $valid): void {
     $this->app->instance('env', $environment);

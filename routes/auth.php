@@ -11,3 +11,6 @@ Route::post('switch-account', SwitchAccountController::class)->middleware('auth'
 Route::get('account/settings', [AccountSettingsController::class, 'index'])
     ->middleware(['auth', EnsureEligibleEmail::class, 'verified'])
     ->name('account.settings');
+Route::put('account/settings', [AccountSettingsController::class, 'update'])
+    ->middleware(['auth', EnsureEligibleEmail::class, 'verified'])
+    ->name('account.settings.update');

@@ -102,6 +102,20 @@ it('shows denied and expired states without disclosing the file list', function 
         ->assertNoJavascriptErrors();
 });
 
+it('keeps a hidden sender off the denied page', function (): void {
+    $sender = User::factory()->create(['name' => 'Filippo Fortino']);
+    $sender->settings()->create(['show_name_on_transfers' => false]);
+    $transfer = Transfer::factory()->for($sender, 'user')->create(['visibility' => 'teams']);
+    $this->actingAs(User::factory()->create(['name' => 'Marta Bianchi', 'email' => 'marta@mediamaxcommunication.it']));
+
+    visit(route('shared.show', $transfer->token))
+        ->assertSee('This transfer is shared with selected teams.')
+        ->assertDontSee('Filippo')
+        ->assertMissing('a[href^="mailto:"]')
+        ->assertSee('Go to Filemax')
+        ->assertNoJavascriptErrors();
+});
+
 it('shows the first four files until the recipient asks for all of them', function (): void {
     $transfer = Transfer::factory()->create();
     foreach (range(0, 5) as $position) {
