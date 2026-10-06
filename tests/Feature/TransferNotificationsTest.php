@@ -7,7 +7,11 @@ use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Notifications\TransferDownloaded;
 use App\Notifications\TransferExpiring;
+use Illuminate\Mail\Transport\ArrayTransport;
+use Illuminate\Notifications\ChannelManager;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -55,6 +59,34 @@ it('retries an expiry reminder when enqueueing fails', function (): void {
     Notification::assertSentToTimes($transfer->user, TransferExpiring::class, 1);
     expect($transfer->refresh()->expiry_reminder_sent_at)->not->toBeNull();
 });
+
+it('rechecks expiry reminder eligibility when queued mail is delivered', function (array $attributes, bool $optOut, int $emails): void {
+    Notification::swap(new ChannelManager(app()));
+    config(['queue.default' => 'database']);
+    $transfer = Transfer::factory()->create(['expires_at' => now()->addHours(23)]);
+    $this->artisan('filemax:send-expiry-reminders')->assertSuccessful();
+    expect(DB::table('jobs')->count())->toBe(1);
+
+    $transfer->update($attributes);
+    if ($optOut) {
+        $transfer->user->settings()->create(['notify_transfer_expiring' => false]);
+    }
+
+    $this->artisan('queue:work', ['connection' => 'database', '--once' => true, '--tries' => 1, '--sleep' => 0])->assertSuccessful();
+
+    $transport = Mail::getSymfonyTransport();
+    expect($transport)->toBeInstanceOf(ArrayTransport::class);
+    expect($transport->messages())->toHaveCount($emails)
+        ->and(DB::table('jobs')->count())->toBe(0)
+        ->and(DB::table('failed_jobs')->count())->toBe(0);
+})->with([
+    'still available with default preference' => [[], false, 1],
+    'revoked' => fn (): array => [['revoked_at' => now()], false, 0],
+    'purged' => fn (): array => [['purged_at' => now()], false, 0],
+    'expired' => fn (): array => [['expires_at' => now()], false, 0],
+    'extended outside the reminder window' => fn (): array => [['expires_at' => now()->addDays(8)], false, 0],
+    'notifications disabled after enqueueing' => [[], true, 0],
+]);
 
 it('only reminds transfers that are still available', function (array $attributes): void {
     Transfer::factory()->create($attributes);

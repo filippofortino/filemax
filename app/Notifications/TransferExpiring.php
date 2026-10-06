@@ -23,6 +23,14 @@ final class TransferExpiring extends Notification implements ShouldQueue
         return ['mail'];
     }
 
+    public function shouldSend(object $notifiable, string $channel): bool
+    {
+        return $this->transfer->isAvailable()
+            && $this->transfer->expires_in_days > 1
+            && $this->transfer->expires_at?->lte(now()->addDay()) === true
+            && $this->transfer->user->settings->notify_transfer_expiring;
+    }
+
     public function toMail(object $notifiable): MailMessage
     {
         $title = $this->transfer->displayTitle();
