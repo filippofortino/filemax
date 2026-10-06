@@ -41,6 +41,21 @@ it('reminds the owner once when a transfer has 24 hours left', function (): void
         ->and((string) $mail->render())->toContain('href="'.route('account.settings').'"');
 });
 
+it('retries an expiry reminder when enqueueing fails', function (): void {
+    $transfer = Transfer::factory()->create(['expires_at' => now()->addHours(23)]);
+    Notification::shouldReceive('send')->once()->andThrow(new RuntimeException('Queue unavailable'));
+
+    expect(fn () => $this->artisan('filemax:send-expiry-reminders')->run())->toThrow(RuntimeException::class, 'Queue unavailable');
+    expect($transfer->refresh()->expiry_reminder_sent_at)->toBeNull();
+
+    Notification::fake();
+    $this->artisan('filemax:send-expiry-reminders')->assertSuccessful();
+    $this->artisan('filemax:send-expiry-reminders')->assertSuccessful();
+
+    Notification::assertSentToTimes($transfer->user, TransferExpiring::class, 1);
+    expect($transfer->refresh()->expiry_reminder_sent_at)->not->toBeNull();
+});
+
 it('only reminds transfers that are still available', function (array $attributes): void {
     Transfer::factory()->create($attributes);
     $this->travel(6)->days();

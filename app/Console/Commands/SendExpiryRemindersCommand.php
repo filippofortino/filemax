@@ -24,8 +24,8 @@ final class SendExpiryRemindersCommand extends Command
             ->where('expires_in_days', '>', 1)->where('expires_at', '>', now())->where('expires_at', '<=', now()->addDay())
             ->whereDoesntHave('user.settings', fn (Builder $settings) => $settings->where('notify_transfer_expiring', false))
             ->lazyById()->each(function (Transfer $transfer) use (&$count): void {
-                $transfer->update(['expiry_reminder_sent_at' => now()]);
                 $transfer->user->notify(new TransferExpiring($transfer));
+                $transfer->update(['expiry_reminder_sent_at' => now()]);
                 $count++;
             });
 
