@@ -138,3 +138,24 @@ it('sends no download email by default, even when turned on after the first down
     Notification::assertNothingSent();
     expect($transfer->refresh()->first_downloaded_at)->not->toBeNull();
 });
+
+it('does not announce a historical download as the first download', function (string $download): void {
+    Queue::fake([PrepareTransferArchive::class]);
+    $transfer = Transfer::factory()->create(['download_count' => 3, 'last_downloaded_at' => now()->subDay()]);
+    $file = TransferFile::factory()->for($transfer)->create();
+    $untouched = Transfer::factory()->create();
+    $recorded = Transfer::factory()->create(['download_count' => 2, 'first_downloaded_at' => now()->subDays(2), 'last_downloaded_at' => now()->subDay()]);
+
+    $migration = require database_path('migrations/2026_10_06_220037_backfill_first_downloaded_at_on_transfers.php');
+    $migration->up();
+
+    $transfer->user->settings()->create(['notify_transfer_downloaded' => true]);
+    $url = $download === 'file' ? route('shared.files.download', [$transfer->token, $file]) : route('shared.download', $transfer->token);
+    $this->postJson($url)->assertOk();
+
+    Notification::assertNothingSent();
+    expect($transfer->refresh()->first_downloaded_at?->equalTo(now()->subDay()))->toBeTrue()
+        ->and($transfer->download_count)->toBe(4)
+        ->and($untouched->refresh()->first_downloaded_at)->toBeNull()
+        ->and($recorded->refresh()->first_downloaded_at?->equalTo(now()->subDays(2)))->toBeTrue();
+})->with(['a single file' => 'file', 'the whole transfer' => 'archive']);
