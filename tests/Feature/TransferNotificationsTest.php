@@ -7,6 +7,8 @@ use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Notifications\TransferDownloaded;
 use App\Notifications\TransferExpiring;
+use Illuminate\Console\Scheduling\Event;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Mail\Transport\ArrayTransport;
 use Illuminate\Notifications\ChannelManager;
 use Illuminate\Support\Facades\Auth;
@@ -25,6 +27,14 @@ beforeEach(function (): void {
     $this->extend = fn (Transfer $transfer): TestResponse => $this->actingAs($transfer->user)
         ->postJson(route('transfers.extend', $transfer), ['expected_expires_at' => $transfer->expires_at?->toIso8601String()])
         ->assertOk();
+});
+
+it('schedules expiry reminders every three hours', function (): void {
+    $this->artisan('schedule:list')->assertSuccessful();
+    $reminder = collect(app(Schedule::class)->events())
+        ->first(fn (Event $event): bool => str_contains($event->command ?? '', 'filemax:send-expiry-reminders'));
+
+    expect($reminder?->expression)->toBe('0 */3 * * *');
 });
 
 it('reminds the owner once when a transfer has 24 hours left', function (): void {
