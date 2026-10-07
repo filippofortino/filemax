@@ -24,7 +24,7 @@ final class TransferFileDownloadController
             $transfer = Transfer::query()->lockForUpdate()->findOrFail($transfer->id);
             Gate::forUser($request->user())->authorize('download', $transfer);
             abort_unless($file->status === 'ready', 404);
-            $transfer->increment('download_count', 1, ['last_downloaded_at' => now()]);
+            $transfer->recordDownload($request->user());
             $file->increment('download_count');
 
             return $transfer;

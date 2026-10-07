@@ -17,6 +17,8 @@ final class UserSettingsFactory extends Factory
         return [
             'user_id' => User::factory(),
             'show_name_on_transfers' => true,
+            'notify_transfer_expiring' => true,
+            'notify_transfer_downloaded' => false,
         ];
     }
 }

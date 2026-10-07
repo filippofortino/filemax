@@ -24,7 +24,11 @@ type Passkey = {
     last_used_at: string | null;
 };
 
-type AccountSettings = { show_name_on_transfers: boolean };
+type AccountSettings = {
+    show_name_on_transfers: boolean;
+    notify_transfer_expiring: boolean;
+    notify_transfer_downloaded: boolean;
+};
 
 export default function Settings({
     passkeys,
@@ -43,13 +47,16 @@ export default function Settings({
                     <div className="flex flex-col gap-2">
                         <h1>Settings</h1>
                         <p className="text-muted-foreground">
-                            Your profile, your privacy, your password, and the
-                            devices you sign in with.
+                            Your profile, privacy, notifications, password, and
+                            the devices you sign in with.
                         </p>
                     </div>
                     {auth.user && <Profile user={auth.user} />}
                     {auth.user && (
                         <Privacy user={auth.user} settings={settings} />
+                    )}
+                    {auth.user && (
+                        <Notifications user={auth.user} settings={settings} />
                     )}
                     <section
                         aria-labelledby="password-title"
@@ -409,24 +416,15 @@ function Privacy({
                     aria-labelledby="show-name-label"
                     aria-describedby="show-name-hint"
                     onCheckedChange={(checked) =>
-                        router.put(
-                            updateSettings.url(),
-                            { show_name_on_transfers: checked },
+                        saveSetting(
+                            settings,
+                            'show_name_on_transfers',
+                            checked,
                             {
-                                preserveScroll: true,
-                                optimistic: () => ({
-                                    settings: {
-                                        ...settings,
-                                        show_name_on_transfers: checked,
-                                    },
-                                }),
-                                onSuccess: () =>
-                                    toast.add({
-                                        title: 'Privacy saved',
-                                        description: checked
-                                            ? 'Recipients see your name and photo again.'
-                                            : 'Recipients no longer see your name or photo.',
-                                    }),
+                                title: 'Privacy saved',
+                                description: checked
+                                    ? 'Recipients see your name and photo again.'
+                                    : 'Recipients no longer see your name or photo.',
                             },
                         )
                     }
@@ -459,6 +457,102 @@ function Privacy({
                 </div>
             </div>
         </section>
+    );
+}
+
+const notificationSwitches = [
+    {
+        key: 'notify_transfer_expiring',
+        id: 'notify-expiry',
+        label: 'Transfer about to expire',
+        hint: '24 hours before one of your transfers expires, so you still have time to extend it.',
+        enabled: 'We’ll email you 24 hours before a transfer expires.',
+        disabled: 'You won’t get an email before a transfer expires.',
+    },
+    {
+        key: 'notify_transfer_downloaded',
+        id: 'notify-download',
+        label: 'Transfer downloaded',
+        hint: 'The first time someone downloads your transfer, whether a single file or all of it. Once per transfer.',
+        enabled: 'We’ll email you the first time someone downloads a transfer.',
+        disabled: 'You won’t get an email when a transfer is downloaded.',
+    },
+] as const;
+
+function Notifications({
+    user,
+    settings,
+}: {
+    user: User;
+    settings: AccountSettings;
+}) {
+    return (
+        <section
+            aria-labelledby="notifications-title"
+            className="flex flex-col gap-5 rounded-xl border bg-background p-6"
+        >
+            <div className="flex flex-col gap-1.5">
+                <h2 id="notifications-title" className="text-xl">
+                    Notifications
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                    Emails about your transfers, sent to {user.email}.
+                </p>
+            </div>
+            <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                {notificationSwitches.map((option) => (
+                    <li
+                        key={option.key}
+                        className="flex items-start justify-between gap-6 py-5"
+                    >
+                        <div className="flex flex-col gap-1">
+                            <span
+                                id={`${option.id}-label`}
+                                className="font-semibold"
+                            >
+                                {option.label}
+                            </span>
+                            <p
+                                id={`${option.id}-hint`}
+                                className="text-sm text-muted-foreground"
+                            >
+                                {option.hint}
+                            </p>
+                        </div>
+                        <Switch
+                            checked={settings[option.key]}
+                            aria-labelledby={`${option.id}-label`}
+                            aria-describedby={`${option.id}-hint`}
+                            onCheckedChange={(checked) =>
+                                saveSetting(settings, option.key, checked, {
+                                    title: 'Notifications saved',
+                                    description: checked
+                                        ? option.enabled
+                                        : option.disabled,
+                                })
+                            }
+                        />
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
+
+function saveSetting(
+    settings: AccountSettings,
+    key: keyof AccountSettings,
+    value: boolean,
+    saved: { title: string; description: string },
+) {
+    router.put(
+        updateSettings.url(),
+        { [key]: value },
+        {
+            preserveScroll: true,
+            optimistic: () => ({ settings: { ...settings, [key]: value } }),
+            onSuccess: () => toast.add(saved),
+        },
     );
 }
 
