@@ -31,7 +31,7 @@ beforeEach(function (): void {
 
 it('schedules expiry reminders every three hours', function (): void {
     $this->artisan('schedule:list')->assertSuccessful();
-    $reminder = collect(app(Schedule::class)->events())
+    $reminder = collect(resolve(Schedule::class)->events())
         ->first(fn (Event $event): bool => str_contains($event->command ?? '', 'filemax:send-expiry-reminders'));
 
     expect($reminder?->expression)->toBe('0 */3 * * *');
