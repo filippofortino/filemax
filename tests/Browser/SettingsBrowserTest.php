@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\URL;
 
 it('saves the profile name and renders settings on desktop and phone', function (): void {
     $user = User::factory()->create(['name' => 'Filippo Fortino']);
-    $this->actingAs($user);
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => now()->timestamp]);
 
     $page = visit('/account/settings')->resize(1280, 1512)
         ->assertTitle('Profile · Settings · Filemax')
@@ -53,7 +53,7 @@ it('saves the profile name and renders settings on desktop and phone', function 
 });
 
 it('keeps the active settings tab in view on a narrow phone', function (): void {
-    $this->actingAs(User::factory()->create());
+    $this->actingAs(User::factory()->create())->withSession(['auth.password_confirmed_at' => now()->timestamp]);
 
     visit('/account/settings/security')->resize(360, 740)->refresh()
         ->assertScript(<<<'JS'
@@ -166,7 +166,7 @@ it('turns on the first-download email and keeps the expiry reminder on', functio
 
 it('shows password errors separately and keeps the current session after updating', function (): void {
     $user = User::factory()->create();
-    $this->actingAs($user);
+    $this->actingAs($user)->withSession(['auth.password_confirmed_at' => now()->timestamp]);
 
     $page = visit('/account/settings/security')
         ->fill('#password-current', 'incorrect-password')

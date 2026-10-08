@@ -107,7 +107,7 @@ test('password confirmation permits management for three hours and lists only sa
     filemaxPasskey(User::factory()->create());
     $this->actingAs($user);
 
-    $this->get(route('account.settings.security'))->assertOk();
+    $this->get(route('account.settings.security'))->assertRedirect(route('password.confirm'));
     $this->getJson(route('passkey.registration-options'))->assertStatus(423);
     $this->postJson(route('passkey.store'), [])->assertStatus(423);
     $this->deleteJson(route('passkey.destroy', $passkey))->assertStatus(423);
@@ -133,7 +133,7 @@ test('password confirmation permits management for three hours and lists only sa
     $this->travel(3)->hours();
     $this->getJson(route('passkey.registration-options'))->assertOk();
     $this->travel(1)->seconds();
-    $this->get(route('account.settings.security'))->assertOk();
+    $this->get(route('account.settings.security'))->assertRedirect(route('password.confirm'));
     $this->getJson(route('passkey.registration-options'))->assertStatus(423);
     $this->postJson(route('passkey.store'), [])->assertStatus(423);
     $this->deleteJson(route('passkey.destroy', $passkey))->assertStatus(423);

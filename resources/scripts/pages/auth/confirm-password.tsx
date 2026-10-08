@@ -13,7 +13,7 @@ export default function ConfirmPassword({
     return (
         <AuthLayout
             title="Confirm it’s you"
-            description="Confirm your identity to manage passkeys. Then retry the action you were taking."
+            description="Confirm your identity to manage your password and passkeys."
             footer={<Link href={home()}>Back to Filemax</Link>}
         >
             <Head title="Confirm your identity" />

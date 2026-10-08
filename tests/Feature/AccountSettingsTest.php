@@ -27,18 +27,33 @@ beforeEach(function (): void {
     Storage::fake('transfers');
 });
 
-test('each settings section opens without reconfirmation and the old passkeys page is removed', function (string $route, string $section, string $prop, string $otherProp): void {
+test('profile and notification settings open without reconfirmation and the old passkeys page is removed', function (string $route, string $section): void {
     $this->actingAs(User::factory()->create())->get(route($route))
         ->assertOk()->assertInertia(fn (Assert $page): Assert => $page
-        ->component('account/settings')->where('section', $section)->has($prop)->missing($otherProp)
+        ->component('account/settings')->where('section', $section)->has('settings')->missing('passkeys')
         ->where('auth.user.avatar_url', null));
 
     $this->get('/account/passkeys')->assertNotFound();
 })->with([
-    'profile' => ['account.settings', 'profile', 'settings', 'passkeys'],
-    'notifications' => ['account.settings.notifications', 'notifications', 'settings', 'passkeys'],
-    'security' => ['account.settings.security', 'security', 'passkeys', 'settings'],
+    'profile' => ['account.settings', 'profile'],
+    'notifications' => ['account.settings.notifications', 'notifications'],
 ]);
+
+test('security settings ask to confirm identity first and return there for three hours', function (): void {
+    $this->actingAs(User::factory()->create())->get(route('account.settings.security'))
+        ->assertRedirect(route('password.confirm'))
+        ->assertSessionHas('url.intended', route('account.settings.security'));
+
+    $this->post(route('password.confirm.store'), ['password' => 'password'])
+        ->assertRedirect(route('account.settings.security'));
+    $this->get(route('account.settings.security'))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
+        ->component('account/settings')->where('section', 'security')->has('passkeys')->missing('settings'));
+
+    $this->travel(3)->hours();
+    $this->get(route('account.settings.security'))->assertOk();
+    $this->travel(1)->seconds();
+    $this->get(route('account.settings.security'))->assertRedirect(route('password.confirm'));
+});
 
 test('settings sections require an eligible verified account', function (string $route, bool $verified): void {
     $this->get(route($route))->assertRedirect(route('login'));
