@@ -52,7 +52,7 @@ it('reminds the owner once when a transfer has 24 hours left', function (): void
     expect($mail->subject)->toBe('“Spot autunno” expires in 1 day')
         ->and($mail->actionText)->toBe('Extend transfer')
         ->and($mail->actionUrl)->toBe(route('transfers.show', $transfer))
-        ->and((string) $mail->render())->toContain('href="'.route('account.settings').'"');
+        ->and((string) $mail->render())->toContain('href="'.route('account.settings.notifications').'"');
 });
 
 it('retries an expiry reminder when enqueueing fails', function (): void {
@@ -166,7 +166,8 @@ it('emails the owner once when someone else first downloads the transfer', funct
     expect($transfer->refresh()->first_downloaded_at)->not->toBeNull()->and($transfer->download_count)->toBe(3);
     $mail = new TransferDownloaded($transfer)->toMail($transfer->user);
     expect($mail->subject)->toBe('“Spot autunno” was downloaded')
-        ->and($mail->actionUrl)->toBe(route('transfers.show', $transfer));
+        ->and($mail->actionUrl)->toBe(route('transfers.show', $transfer))
+        ->and((string) $mail->render())->toContain('href="'.route('account.settings.notifications').'"');
 })->with(['a single file' => 'file', 'the whole transfer' => 'archive']);
 
 it('sends no download email by default, even when turned on after the first download', function (): void {

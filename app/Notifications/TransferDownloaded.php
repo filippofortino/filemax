@@ -30,6 +30,6 @@ final class TransferDownloaded extends Notification implements ShouldQueueAfterC
             ->subject("“{$title}” was downloaded")
             ->line("Someone downloaded your transfer “{$title}” for the first time.")
             ->action('View transfer', route('transfers.show', $this->transfer))
-            ->line('We only email you about the first download of each transfer. You can turn these emails off in [Settings]('.route('account.settings').').');
+            ->line('We only email you about the first download of each transfer. You can turn these emails off in [Settings]('.route('account.settings.notifications').').');
     }
 }
