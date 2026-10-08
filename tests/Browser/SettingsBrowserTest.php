@@ -51,6 +51,21 @@ it('saves the profile name and renders settings on desktop and phone', function 
     expect($user->refresh()->name)->toBe('Alice Updated');
 });
 
+it('keeps the active settings tab in view on a narrow phone', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    visit('/account/settings/security')->resize(360, 740)->refresh()
+        ->assertScript(<<<'JS'
+() => {
+    const nav = document.querySelector('nav[aria-label="Settings"]');
+    const tab = nav.querySelector('[aria-current="page"]').getBoundingClientRect();
+    const strip = nav.getBoundingClientRect();
+    return nav.scrollWidth > nav.clientWidth && tab.left >= strip.left && tab.right <= strip.right;
+}
+JS)
+        ->assertNoJavascriptErrors();
+});
+
 it('previews saves and removes a photo in settings and on sent transfers', function (): void {
     $disk = Storage::fake('local');
     $disk->buildTemporaryUrlsUsing(fn (string $path, DateTimeInterface $expiration): string => URL::temporarySignedRoute('storage.local', $expiration, ['path' => $path], absolute: false));

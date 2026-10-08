@@ -64,8 +64,19 @@ export default function Settings(
         | { section: 'security'; passkeys: Passkey[] },
 ) {
     const { auth } = usePage<SharedProps>().props;
+    const nav = useRef<HTMLElement>(null);
     const current =
         sections.find((section) => section.id === props.section) ?? sections[0];
+
+    // Below md the tabs can overflow narrow phones; keep the active one in view without scrolling the page.
+    useEffect(() => {
+        const tab = nav.current?.querySelector('[aria-current="page"]');
+        if (nav.current && tab) {
+            nav.current.scrollLeft +=
+                tab.getBoundingClientRect().right -
+                nav.current.getBoundingClientRect().right;
+        }
+    }, [props.section]);
 
     return (
         <Shell active="account">
@@ -75,6 +86,7 @@ export default function Settings(
                     <h1>Settings</h1>
                     <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-10">
                         <nav
+                            ref={nav}
                             aria-label="Settings"
                             className="flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-border)] md:w-48 md:shrink-0 md:flex-col md:gap-0 md:shadow-[inset_1px_0_0_var(--color-border)]"
                         >
