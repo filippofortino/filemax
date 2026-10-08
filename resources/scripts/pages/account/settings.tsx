@@ -83,7 +83,13 @@ export default function Settings(
             <Head title={`${current.label} · Settings`} />
             <main className="flex-1 bg-muted">
                 <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-5 py-12 sm:px-8">
-                    <h1>Settings</h1>
+                    <div className="flex flex-col gap-2">
+                        <h1>Settings</h1>
+                        <p className="text-muted-foreground">
+                            Your profile, privacy, notifications, password, and
+                            the devices you sign in with.
+                        </p>
+                    </div>
                     <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-10">
                         <nav
                             ref={nav}

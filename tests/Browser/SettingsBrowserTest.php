@@ -17,6 +17,7 @@ it('saves the profile name and renders settings on desktop and phone', function 
 
     $page = visit('/account/settings')->resize(1280, 1512)
         ->assertTitle('Profile · Settings · Filemax')
+        ->assertSee('Your profile, privacy, notifications, password, and the devices you sign in with.')
         ->assertSeeIn('nav[aria-label="Settings"] [aria-current="page"]', 'Profile')
         ->assertSee('Upload photo')
         ->assertSee('Show my name on transfers')
