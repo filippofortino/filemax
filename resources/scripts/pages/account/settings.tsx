@@ -1,6 +1,12 @@
-import { AnonymousIcon, Key01Icon } from '@hugeicons/core-free-icons';
+import {
+    AnonymousIcon,
+    Key01Icon,
+    LockKeyIcon,
+    Notification01Icon,
+    UserIcon,
+} from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Form, Head, router, useForm, usePage } from '@inertiajs/react';
+import { Form, Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { usePasskeyRegister } from '@laravel/passkeys/react';
 import { useEffect, useRef, useState } from 'react';
 import { update as updateSettings } from '@/actions/App/Http/Controllers/AccountSettingsController';
@@ -12,6 +18,12 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/toast';
 import { date, passwordHint } from '@/lib/format';
 import type { SharedProps, User } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import { settings as profileSettings } from '@/routes/account';
+import {
+    notifications as notificationSettings,
+    security as securitySettings,
+} from '@/routes/account/settings';
 import { destroy, registrationOptions, store } from '@/routes/passkey';
 import { confirm as confirmPassword } from '@/routes/password';
 import { update as updatePassword } from '@/routes/user-password';
@@ -30,160 +42,209 @@ type AccountSettings = {
     notify_transfer_downloaded: boolean;
 };
 
-export default function Settings({
-    passkeys,
-    settings,
-}: {
-    passkeys: Passkey[];
-    settings: AccountSettings;
-}) {
-    const { auth, passwordRequirements } = usePage<SharedProps>().props;
+const sections = [
+    { id: 'profile', label: 'Profile', icon: UserIcon, href: profileSettings },
+    {
+        id: 'notifications',
+        label: 'Notifications',
+        icon: Notification01Icon,
+        href: notificationSettings,
+    },
+    {
+        id: 'security',
+        label: 'Security',
+        icon: LockKeyIcon,
+        href: securitySettings,
+    },
+] as const;
+
+export default function Settings(
+    props:
+        | { section: 'profile' | 'notifications'; settings: AccountSettings }
+        | { section: 'security'; passkeys: Passkey[] },
+) {
+    const { auth } = usePage<SharedProps>().props;
+    const current =
+        sections.find((section) => section.id === props.section) ?? sections[0];
 
     return (
         <Shell active="account">
-            <Head title="Settings" />
+            <Head title={`${current.label} · Settings`} />
             <main className="flex-1 bg-muted">
-                <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-5 py-12 sm:px-8">
-                    <div className="flex flex-col gap-2">
-                        <h1>Settings</h1>
-                        <p className="text-muted-foreground">
-                            Your profile, privacy, notifications, password, and
-                            the devices you sign in with.
-                        </p>
-                    </div>
-                    {auth.user && <Profile user={auth.user} />}
-                    {auth.user && (
-                        <Privacy user={auth.user} settings={settings} />
-                    )}
-                    {auth.user && (
-                        <Notifications user={auth.user} settings={settings} />
-                    )}
-                    <section
-                        aria-labelledby="password-title"
-                        className="flex flex-col gap-5 rounded-xl border bg-background p-6"
-                    >
-                        <div className="flex flex-col gap-1.5">
-                            <h2 id="password-title" className="text-xl">
-                                Password
-                            </h2>
-                            <p className="text-sm text-muted-foreground">
-                                Used when you sign in without a passkey.
-                            </p>
-                        </div>
-                        <Form
-                            id="password-form"
-                            action={updatePassword()}
-                            errorBag="updatePassword"
-                            options={{ preserveScroll: true }}
-                            resetOnSuccess
-                            onSuccess={() =>
-                                toast.add({
-                                    title: 'Password updated',
-                                    description:
-                                        'You’re signed out everywhere else.',
-                                })
-                            }
-                            className="flex flex-col gap-5"
+                <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-5 py-12 sm:px-8">
+                    <h1>Settings</h1>
+                    <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-10">
+                        <nav
+                            aria-label="Settings"
+                            className="flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-border)] md:w-48 md:shrink-0 md:flex-col md:gap-0 md:shadow-[inset_1px_0_0_var(--color-border)]"
                         >
-                            {({ errors, processing }) => (
+                            {sections.map((section) => (
+                                <Link
+                                    key={section.id}
+                                    href={section.href()}
+                                    aria-current={
+                                        section === current ? 'page' : undefined
+                                    }
+                                    className={cn(
+                                        'flex min-h-11 shrink-0 items-center gap-2.5 border-b-2 border-transparent px-3 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors duration-160 ease-out hover:text-foreground focus-visible:-outline-offset-2 md:border-b-0 md:border-l-2 md:px-4',
+                                        section === current &&
+                                            'border-primary font-semibold text-primary hover:text-primary',
+                                    )}
+                                >
+                                    <HugeiconsIcon
+                                        icon={section.icon}
+                                        size={18}
+                                        aria-hidden="true"
+                                    />
+                                    {section.label}
+                                </Link>
+                            ))}
+                        </nav>
+                        <div className="flex min-w-0 flex-1 flex-col gap-6">
+                            {props.section === 'profile' && auth.user && (
                                 <>
-                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                        <div className="flex flex-col gap-2">
-                                            <label
-                                                htmlFor="password-current"
-                                                className="text-sm font-semibold"
-                                            >
-                                                Current password
-                                            </label>
-                                            <input
-                                                id="password-current"
-                                                name="current_password"
-                                                type="password"
-                                                autoComplete="current-password"
-                                                required
-                                                aria-invalid={
-                                                    !!errors.current_password
-                                                }
-                                            />
-                                            <ErrorMessage>
-                                                {errors.current_password}
-                                            </ErrorMessage>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                        <div className="flex flex-col gap-2">
-                                            <label
-                                                htmlFor="password-new"
-                                                className="text-sm font-semibold"
-                                            >
-                                                New password
-                                            </label>
-                                            <input
-                                                id="password-new"
-                                                name="password"
-                                                type="password"
-                                                autoComplete="new-password"
-                                                minLength={
-                                                    passwordRequirements.min
-                                                }
-                                                required
-                                                aria-describedby="password-requirements"
-                                                aria-invalid={!!errors.password}
-                                            />
-                                            <ErrorMessage>
-                                                {errors.password}
-                                            </ErrorMessage>
-                                        </div>
-                                        <div className="flex flex-col gap-2">
-                                            <label
-                                                htmlFor="password-repeat"
-                                                className="text-sm font-semibold"
-                                            >
-                                                Repeat new password
-                                            </label>
-                                            <input
-                                                id="password-repeat"
-                                                name="password_confirmation"
-                                                type="password"
-                                                autoComplete="new-password"
-                                                minLength={
-                                                    passwordRequirements.min
-                                                }
-                                                required
-                                                aria-invalid={
-                                                    !!errors.password_confirmation
-                                                }
-                                            />
-                                            <ErrorMessage>
-                                                {errors.password_confirmation}
-                                            </ErrorMessage>
-                                        </div>
-                                    </div>
-                                    <p
-                                        id="password-requirements"
-                                        className="text-sm text-muted-foreground"
-                                    >
-                                        {passwordHint(passwordRequirements)}{' '}
-                                        Changing it keeps your passkeys and
-                                        signs you out everywhere else.
-                                    </p>
-                                    <Button
-                                        type="submit"
-                                        className="self-start"
-                                        disabled={processing}
-                                    >
-                                        {processing
-                                            ? 'Updating…'
-                                            : 'Update password'}
-                                    </Button>
+                                    <Profile user={auth.user} />
+                                    <Privacy
+                                        user={auth.user}
+                                        settings={props.settings}
+                                    />
                                 </>
                             )}
-                        </Form>
-                    </section>
-                    <Passkeys passkeys={passkeys} />
+                            {props.section === 'notifications' && auth.user && (
+                                <Notifications
+                                    user={auth.user}
+                                    settings={props.settings}
+                                />
+                            )}
+                            {props.section === 'security' && (
+                                <>
+                                    <Password />
+                                    <Passkeys passkeys={props.passkeys} />
+                                </>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </main>
         </Shell>
+    );
+}
+
+function Password() {
+    const { passwordRequirements } = usePage<SharedProps>().props;
+
+    return (
+        <section
+            aria-labelledby="password-title"
+            className="flex flex-col gap-5 rounded-xl border bg-background p-6"
+        >
+            <div className="flex flex-col gap-1.5">
+                <h2 id="password-title" className="text-xl">
+                    Password
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                    Used when you sign in without a passkey.
+                </p>
+            </div>
+            <Form
+                id="password-form"
+                action={updatePassword()}
+                errorBag="updatePassword"
+                options={{ preserveScroll: true }}
+                resetOnSuccess
+                onSuccess={() =>
+                    toast.add({
+                        title: 'Password updated',
+                        description: 'You’re signed out everywhere else.',
+                    })
+                }
+                className="flex flex-col gap-5"
+            >
+                {({ errors, processing }) => (
+                    <>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="flex flex-col gap-2">
+                                <label
+                                    htmlFor="password-current"
+                                    className="text-sm font-semibold"
+                                >
+                                    Current password
+                                </label>
+                                <input
+                                    id="password-current"
+                                    name="current_password"
+                                    type="password"
+                                    autoComplete="current-password"
+                                    required
+                                    aria-invalid={!!errors.current_password}
+                                />
+                                <ErrorMessage>
+                                    {errors.current_password}
+                                </ErrorMessage>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="flex flex-col gap-2">
+                                <label
+                                    htmlFor="password-new"
+                                    className="text-sm font-semibold"
+                                >
+                                    New password
+                                </label>
+                                <input
+                                    id="password-new"
+                                    name="password"
+                                    type="password"
+                                    autoComplete="new-password"
+                                    minLength={passwordRequirements.min}
+                                    required
+                                    aria-describedby="password-requirements"
+                                    aria-invalid={!!errors.password}
+                                />
+                                <ErrorMessage>{errors.password}</ErrorMessage>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <label
+                                    htmlFor="password-repeat"
+                                    className="text-sm font-semibold"
+                                >
+                                    Repeat new password
+                                </label>
+                                <input
+                                    id="password-repeat"
+                                    name="password_confirmation"
+                                    type="password"
+                                    autoComplete="new-password"
+                                    minLength={passwordRequirements.min}
+                                    required
+                                    aria-invalid={
+                                        !!errors.password_confirmation
+                                    }
+                                />
+                                <ErrorMessage>
+                                    {errors.password_confirmation}
+                                </ErrorMessage>
+                            </div>
+                        </div>
+                        <p
+                            id="password-requirements"
+                            className="text-sm text-muted-foreground"
+                        >
+                            {passwordHint(passwordRequirements)} Changing it
+                            keeps your passkeys and signs you out everywhere
+                            else.
+                        </p>
+                        <Button
+                            type="submit"
+                            className="self-start"
+                            disabled={processing}
+                        >
+                            {processing ? 'Updating…' : 'Update password'}
+                        </Button>
+                    </>
+                )}
+            </Form>
+        </section>
     );
 }
 

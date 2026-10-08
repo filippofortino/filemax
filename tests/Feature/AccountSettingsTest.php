@@ -27,13 +27,29 @@ beforeEach(function (): void {
     Storage::fake('transfers');
 });
 
-test('settings opens without reconfirmation and the old passkeys page is removed', function (): void {
-    $this->actingAs(User::factory()->create())->get(route('account.settings'))
+test('each settings section opens without reconfirmation and the old passkeys page is removed', function (string $route, string $section, string $prop, string $otherProp): void {
+    $this->actingAs(User::factory()->create())->get(route($route))
         ->assertOk()->assertInertia(fn (Assert $page): Assert => $page
-        ->component('account/settings')->where('auth.user.avatar_url', null));
+        ->component('account/settings')->where('section', $section)->has($prop)->missing($otherProp)
+        ->where('auth.user.avatar_url', null));
 
     $this->get('/account/passkeys')->assertNotFound();
-});
+})->with([
+    'profile' => ['account.settings', 'profile', 'settings', 'passkeys'],
+    'notifications' => ['account.settings.notifications', 'notifications', 'settings', 'passkeys'],
+    'security' => ['account.settings.security', 'security', 'passkeys', 'settings'],
+]);
+
+test('settings sections require an eligible verified account', function (string $route, bool $verified): void {
+    $this->get(route($route))->assertRedirect(route('login'));
+
+    $user = User::factory()->create([
+        'email' => $verified ? 'person@example.com' : 'person@mediamaxcommunication.it',
+        'email_verified_at' => $verified ? now() : null,
+    ]);
+
+    $this->actingAs($user)->getJson(route($route))->assertForbidden();
+})->with(['account.settings', 'account.settings.notifications', 'account.settings.security'])->with([true, false]);
 
 test('guests cannot update their profile, password or settings', function (string $route): void {
     $this->put(route($route))->assertRedirect(route('login'));
@@ -224,14 +240,14 @@ test('hiding the name removes the sender from earlier transfers until it is show
 
 test('each notification switch saves without changing the other settings', function (): void {
     $user = User::factory()->create();
-    $save = fn (array $setting): TestResponse => $this->actingAs($user)->from(route('account.settings'))
+    $save = fn (array $setting): TestResponse => $this->actingAs($user)->from(route('account.settings.notifications'))
         ->put(route('account.settings.update'), $setting)
-        ->assertRedirect(route('account.settings'))->assertSessionHasNoErrors();
+        ->assertRedirect(route('account.settings.notifications'))->assertSessionHasNoErrors();
 
     $save(['notify_transfer_downloaded' => true]);
     $save(['notify_transfer_expiring' => false]);
 
-    $this->get(route('account.settings'))->assertInertia(fn (Assert $page): Assert => $page
+    $this->get(route('account.settings.notifications'))->assertInertia(fn (Assert $page): Assert => $page
         ->where('settings', ['show_name_on_transfers' => true, 'notify_transfer_expiring' => false, 'notify_transfer_downloaded' => true]));
     expect(UserSettings::query()->count())->toBe(1);
 });

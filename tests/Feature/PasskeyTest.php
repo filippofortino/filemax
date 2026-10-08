@@ -75,7 +75,7 @@ test('passkey relying party and allowed origins come from the configured applica
 test('guests cannot manage passkeys or confirm their identity', function (): void {
     [$passkey] = filemaxPasskey(User::factory()->create());
 
-    $this->get(route('account.settings'))->assertRedirect(route('login'));
+    $this->get(route('account.settings.security'))->assertRedirect(route('login'));
     $this->getJson(route('passkey.registration-options'))->assertUnauthorized();
     $this->postJson(route('passkey.store'), [])->assertUnauthorized();
     $this->deleteJson(route('passkey.destroy', $passkey))->assertUnauthorized();
@@ -91,7 +91,7 @@ test('passkey management requires a currently eligible verified account', functi
     [$passkey] = filemaxPasskey($user);
     $this->actingAs($user)->withSession(['auth.password_confirmed_at' => now()->timestamp]);
 
-    $this->getJson(route('account.settings'))->assertForbidden();
+    $this->getJson(route('account.settings.security'))->assertForbidden();
     $this->getJson(route('passkey.registration-options'))->assertForbidden();
     $this->postJson(route('passkey.store'), [])->assertForbidden();
     $this->deleteJson(route('passkey.destroy', $passkey))->assertForbidden();
@@ -107,7 +107,7 @@ test('password confirmation permits management for three hours and lists only sa
     filemaxPasskey(User::factory()->create());
     $this->actingAs($user);
 
-    $this->get(route('account.settings'))->assertOk();
+    $this->get(route('account.settings.security'))->assertOk();
     $this->getJson(route('passkey.registration-options'))->assertStatus(423);
     $this->postJson(route('passkey.store'), [])->assertStatus(423);
     $this->deleteJson(route('passkey.destroy', $passkey))->assertStatus(423);
@@ -116,7 +116,7 @@ test('password confirmation permits management for three hours and lists only sa
     $this->postJson(route('password.confirm.store'), ['password' => 'password'])
         ->assertCreated()->assertSessionHas('auth.password_confirmed_at', now()->timestamp);
 
-    $this->get(route('account.settings'))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
+    $this->get(route('account.settings.security'))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
         ->component('account/settings')
         ->has('passkeys', 1)
         ->where('passkeys.0.id', $passkey->id)
@@ -133,7 +133,7 @@ test('password confirmation permits management for three hours and lists only sa
     $this->travel(3)->hours();
     $this->getJson(route('passkey.registration-options'))->assertOk();
     $this->travel(1)->seconds();
-    $this->get(route('account.settings'))->assertOk();
+    $this->get(route('account.settings.security'))->assertOk();
     $this->getJson(route('passkey.registration-options'))->assertStatus(423);
     $this->postJson(route('passkey.store'), [])->assertStatus(423);
     $this->deleteJson(route('passkey.destroy', $passkey))->assertStatus(423);
@@ -170,7 +170,7 @@ test('expired passkey management returns to settings after confirming identity',
     $response = $json
         ? $this->getJson(route('passkey.registration-options'))
         : $this->get(route('passkey.registration-options'));
-    $response->assertSessionHas('url.intended', route('account.settings'));
+    $response->assertSessionHas('url.intended', route('account.settings.security'));
 
     if ($json) {
         $response->assertStatus(423);
@@ -182,10 +182,10 @@ test('expired passkey management returns to settings after confirming identity',
         $options = $this->getJson(route('passkey.confirm-options'))->assertOk()->json('options');
         $this->postJson(route('passkey.confirm'), [
             'credential' => filemaxPasskeyAssertion($passkey, $privateKey, $options['challenge']),
-        ])->assertOk()->assertJsonPath('redirect', route('account.settings'));
+        ])->assertOk()->assertJsonPath('redirect', route('account.settings.security'));
     } else {
         $this->post(route('password.confirm.store'), ['password' => 'password'])
-            ->assertRedirect(route('account.settings'));
+            ->assertRedirect(route('account.settings.security'));
     }
 
     $this->getJson(route('passkey.registration-options'))->assertOk()->assertSessionMissing('url.intended');

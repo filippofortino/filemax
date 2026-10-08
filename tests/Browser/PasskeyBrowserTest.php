@@ -14,7 +14,8 @@ it('opens settings with keyboard and confirms identity only when adding a passke
         ->assertSee('Transfer details')
         ->keys('[aria-label$="account menu"]', 'Enter')
         ->keys('a[href$="/account/settings"]', 'Enter')
-        ->assertSee('Profile')
+        ->assertSee('Upload photo')
+        ->keys('a[href$="/account/settings/security"]', 'Enter')
         ->assertSee('You haven’t added any passkeys yet.')
         ->fill('#passkey-name', 'Work MacBook')
         ->press('Add passkey')
@@ -38,7 +39,7 @@ it('confirms passkey removal only after password confirmation and deletion', fun
         'auth.password_confirmed_at' => now()->subHours(4)->timestamp,
     ]);
 
-    $page = visit('/account/settings')
+    $page = visit('/account/settings/security')
         ->press('[aria-label="Remove Work MacBook"]')
         ->assertSee('Confirm it’s you')
         ->assertDontSee('Passkey removed');
@@ -47,7 +48,7 @@ it('confirms passkey removal only after password confirmation and deletion', fun
 
     $page->fill('password', 'password')
         ->press('Confirm password')
-        ->assertPathIs('/account/settings')
+        ->assertPathIs('/account/settings/security')
         ->assertDontSee('Passkey removed')
         ->press('[aria-label="Remove Work MacBook"]')
         ->assertSeeIn('[data-slot="toast"]', 'Passkey removed')
@@ -62,7 +63,7 @@ it('keeps a cancelled named passkey registration recoverable on mobile', functio
     $user = User::factory()->create();
     $this->actingAs($user)->withSession(['auth.password_confirmed_at' => now()->timestamp]);
 
-    $page = visit('/account/settings')->resize(390, 844)
+    $page = visit('/account/settings/security')->resize(390, 844)
         ->assertSee('You haven’t added any passkeys yet.');
     $page->script(<<<'JS'
 () => {

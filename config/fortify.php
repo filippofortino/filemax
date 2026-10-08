@@ -18,7 +18,7 @@ return [
     'middleware' => ['web', 'throttle:filemax-auth', ProtectFortifyRequests::class],
     'views' => true,
     'limiters' => ['login' => 'login', 'passkeys' => 'passkeys'],
-    'redirects' => ['logout' => '/login', 'password-reset' => '/login', 'password-confirmation' => '/account/settings'],
+    'redirects' => ['logout' => '/login', 'password-reset' => '/login', 'password-confirmation' => '/account/settings/security'],
     'passkeys' => [
         'relying_party_id' => parse_url($appUrl, PHP_URL_HOST),
         'allowed_origins' => [$appUrl],

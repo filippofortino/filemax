@@ -16,10 +16,11 @@ it('saves the profile name and renders settings on desktop and phone', function 
     $this->actingAs($user);
 
     $page = visit('/account/settings')->resize(1280, 1512)
-        ->assertSee('Your profile, privacy, notifications, password, and the devices you sign in with.')
+        ->assertTitle('Profile · Settings · Filemax')
+        ->assertSeeIn('nav[aria-label="Settings"] [aria-current="page"]', 'Profile')
         ->assertSee('Upload photo')
-        ->assertSee('Update password')
-        ->assertSee('Add passkey')
+        ->assertSee('Show my name on transfers')
+        ->assertDontSee('Update password')
         ->assertNoJavascriptErrors();
 
     expect($page->script('() => document.querySelector("#account-email").readOnly'))->toBeTrue();
@@ -27,6 +28,19 @@ it('saves the profile name and renders settings on desktop and phone', function 
     $page->screenshot(filename: 'settings-desktop');
     $page->resize(390, 844)->screenshot(filename: 'settings-phone');
     expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+
+    $page->click('nav[aria-label="Settings"] a:has-text("Security")')
+        ->assertPathIs('/account/settings/security')
+        ->assertTitle('Security · Settings · Filemax')
+        ->assertSeeIn('nav[aria-label="Settings"] [aria-current="page"]', 'Security')
+        ->assertSee('Update password')
+        ->assertSee('Add passkey')
+        ->click('nav[aria-label="Settings"] a:has-text("Notifications")')
+        ->assertPathIs('/account/settings/notifications')
+        ->assertSee('Transfer about to expire')
+        ->click('nav[aria-label="Settings"] a:has-text("Profile")')
+        ->assertPathIs('/account/settings')
+        ->assertNoJavascriptErrors();
 
     $page->fill('#full-name', 'Alice Updated')->press('Save profile')
         ->assertSeeIn('[data-slot="toast"]', 'Profile saved')
@@ -118,7 +132,7 @@ it('turns on the first-download email and keeps the expiry reminder on', functio
     $user = User::factory()->create();
     $this->actingAs($user);
 
-    visit('/account/settings')
+    visit('/account/settings/notifications')
         ->assertSee("Emails about your transfers, sent to {$user->email}.")
         ->assertAttribute('[aria-labelledby="notify-expiry-label"]', 'aria-checked', 'true')
         ->assertAttribute('[aria-labelledby="notify-download-label"]', 'aria-checked', 'false')
@@ -138,18 +152,17 @@ it('shows password errors separately and keeps the current session after updatin
     $user = User::factory()->create();
     $this->actingAs($user);
 
-    $page = visit('/account/settings')
+    $page = visit('/account/settings/security')
         ->fill('#password-current', 'incorrect-password')
         ->fill('#password-new', 'new-password')
         ->fill('#password-repeat', 'new-password')
         ->press('Update password')
-        ->assertSee('The password is incorrect.');
+        ->assertSeeIn('#password-form', 'The password is incorrect.');
 
-    expect($page->script('() => document.querySelector("#profile-form [role=alert]") === null'))->toBeTrue();
     $page->fill('#password-current', 'password')->press('Update password')
         ->assertSeeIn('[data-slot="toast"]', 'Password updated')
         ->assertSee('You’re signed out everywhere else.')
-        ->assertSee('Profile')
+        ->assertSee('Add passkey')
         ->assertNoJavascriptErrors();
 
     expect(Hash::check('new-password', $user->refresh()->password))->toBeTrue();
@@ -171,15 +184,14 @@ it('shows one connection toast when saves cannot reach the server and fans the s
 }
 JS);
 
-    $page->fill('#password-current', 'password')
-        ->fill('#password-new', 'new-password')
-        ->fill('#password-repeat', 'new-password')
-        ->press('Update password')
+    $page->fill('#full-name', 'Alice Updated')
+        ->press('Save profile')
         ->assertSeeIn('[data-slot="toast"]', 'Connection lost')
         ->assertSee('Check your connection and try again.')
-        ->press('Save profile')
+        ->click('[aria-labelledby="show-name-label"]')
         ->wait(0.3)
         ->assertCount('[data-slot="toast"]', 1)
+        ->assertAttribute('[aria-labelledby="show-name-label"]', 'aria-checked', 'true')
         ->assertNoJavascriptErrors();
 
     $page->script('() => { XMLHttpRequest.prototype.send = window.realSend; }');
@@ -197,28 +209,29 @@ JS)
         ->assertCount('[data-slot="toast"]', 1)
         ->assertNoJavascriptErrors();
 
-    $page->press('Update password')
-        ->assertSeeIn('[data-slot="toast"]', 'Password updated')
+    $page->click('[aria-labelledby="show-name-label"]')
+        ->assertSeeIn('[data-slot="toast"]', 'Privacy saved')
         ->assertCount('[data-slot="toast"]', 2)
         ->assertMissing('[data-slot="toast-viewport"][data-expanded]')
         ->wait(0.3)
         ->screenshot(fullPage: false, filename: 'toast-stacked')
-        ->hover('[data-slot="toast"]:has-text("Password updated")')
+        ->hover('[data-slot="toast"]:has-text("Privacy saved")')
         ->assertPresent('[data-slot="toast-viewport"][data-expanded]')
         ->wait(0.3)
         ->screenshot(fullPage: false, filename: 'toast-expanded')
         ->assertNoJavascriptErrors();
     $page->resize(390, 844)->wait(0.3)->screenshot(fullPage: false, filename: 'toast-phone');
 
-    expect(Hash::check('new-password', $user->refresh()->password))->toBeTrue();
+    expect($user->refresh()->name)->toBe('Alice Updated')
+        ->and($user->settings()->sole()->show_name_on_transfers)->toBeFalse();
 });
 
-it('tabs from the header straight to Upload photo, which announces the photo requirements', function (): void {
+it('tabs from the settings navigation straight to Upload photo, which announces the photo requirements', function (): void {
     $this->actingAs(User::factory()->create());
 
     visit('/account/settings')
         ->keys('#profile-form button:has-text("Upload photo")', 'Shift+Tab')
-        ->assertScript('Boolean(document.activeElement.closest("header"))')
+        ->assertScript('document.activeElement.closest("nav")?.getAttribute("aria-label")', 'Settings')
         ->keys(':focus', 'Tab')
         ->assertScript('document.activeElement.innerText', 'Upload photo')
         ->assertScript('document.getElementById(document.activeElement.getAttribute("aria-describedby"))?.innerText.startsWith("JPG or PNG")')
