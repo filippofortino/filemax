@@ -6,6 +6,7 @@ use App\Models\Team;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
 describe('concurrent upload chunks', function (): void {
@@ -17,6 +18,80 @@ describe('concurrent upload chunks', function (): void {
             $file->part_size = 4;
         });
     });
+
+    it('offers password protection only for public links and clears it when disabled or switching audience', function (): void {
+        $user = User::factory()->create();
+        $user->teams()->attach(Team::factory()->create());
+        $this->actingAs($user);
+
+        $page = visit('/')->resize(1280, 1140)
+            ->assertAttribute('[aria-labelledby="protect-label"]', 'aria-checked', 'false')
+            ->assertMissing('#transfer-password')
+            ->click('[aria-labelledby="protect-label"]')
+            ->fill('#transfer-password', 'private-delivery')
+            ->assertAttribute('#transfer-password', 'type', 'password')
+            ->press('[aria-label="Show password"]')
+            ->assertAttribute('#transfer-password', 'type', 'text')
+            ->press('[aria-label="Hide password"]')
+            ->assertAttribute('#transfer-password', 'type', 'password')
+            ->screenshot(filename: 'password-create-desktop')
+            ->resize(390, 844)
+            ->assertSee('Require a password')
+            ->screenshot(filename: 'password-create-phone');
+        expect($page->script('document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+
+        $page->click('[aria-labelledby="protect-label"]')
+            ->assertMissing('#transfer-password')
+            ->click('[aria-labelledby="protect-label"]')
+            ->assertValue('#transfer-password', '')
+            ->fill('#transfer-password', 'private-delivery')
+            ->click('Specific teams')
+            ->assertMissing('[aria-labelledby="protect-label"]')
+            ->assertMissing('#transfer-password')
+            ->click('Public link')
+            ->assertAttribute('[aria-labelledby="protect-label"]', 'aria-checked', 'false')
+            ->click('[aria-labelledby="protect-label"]')
+            ->assertValue('#transfer-password', '')
+            ->assertAttribute('#transfer-password', 'type', 'password')
+            ->assertNoJavascriptErrors();
+    });
+
+    it('freezes password protection on the draft through upload retries and resets it for another transfer', function (bool $protected): void {
+        $page = visit('/')->assertSee('Browse files');
+        if ($protected) {
+            $page->click('[aria-labelledby="protect-label"]')->fill('#transfer-password', 'private-delivery');
+        }
+
+        $page->script(controlledTransferUploads());
+        $page->script('() => window.dropUploadFiles([4])');
+        $page->press('Create transfer')->assertScript('window.uploads.length', 1)
+            ->assertMissing('#transfer-password')
+            ->assertMissing('[aria-labelledby="protect-label"]');
+        $page->script('() => window.uploads[0].fail()');
+        $page->assertSee('Some files could not be uploaded.')
+            ->assertMissing('#transfer-password')
+            ->assertMissing('[aria-labelledby="protect-label"]');
+        $transfer = Transfer::query()->sole();
+        $passwordHash = $transfer->password_hash;
+
+        expect($protected ? Hash::check('private-delivery', $passwordHash) : $passwordHash === null)->toBeTrue();
+
+        $page->script('() => { window.autoReleaseUploads = true; }');
+        $page->press('Retry and create link')
+            ->assertVisible('h1:has-text("Your link is ready")')
+            ->assertMissing('#transfer-password');
+        expect(Transfer::query()->count())->toBe(1)
+            ->and($transfer->refresh()->password_hash)->toBe($passwordHash)
+            ->and($transfer->status)->toBe('ready');
+
+        $page->click('Send another')
+            ->assertSee('Browse files')
+            ->assertAttribute('[aria-labelledby="protect-label"]', 'aria-checked', 'false')
+            ->assertMissing('#transfer-password')
+            ->click('[aria-labelledby="protect-label"]')
+            ->assertValue('#transfer-password', '')
+            ->assertNoJavascriptErrors();
+    })->with(['protected draft' => true, 'unprotected draft' => false]);
 
     it('replaces the last failed draft file after cleanup without losing transfer details', function (bool $cleanupFails): void {
         $user = User::factory()->create();
