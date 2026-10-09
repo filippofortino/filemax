@@ -51,7 +51,7 @@ final class ProtectFortifyRequests
 
         if ($request->routeIs('passkey.registration-options', 'passkey.store', 'passkey.destroy')
             && ($response->getStatusCode() === 423 || $response->isRedirect(route('password.confirm')))) {
-            $request->session()->put('url.intended', route('account.settings'));
+            $request->session()->put('url.intended', route('account.settings.security'));
         }
 
         return $response;

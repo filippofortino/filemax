@@ -5,7 +5,7 @@ import { usePasskeyVerify } from '@laravel/passkeys/react';
 import { ErrorMessage } from '@/components/filemax';
 import { Button } from '@/components/ui/button';
 import { home } from '@/routes';
-import { settings } from '@/routes/account';
+import { security } from '@/routes/account/settings';
 import { confirm, confirmOptions, login, loginOptions } from '@/routes/passkey';
 
 export function sessionExpired(error: string | null): boolean {
@@ -47,7 +47,7 @@ export function PasskeyButton({
         },
         onSuccess: ({ redirect }) =>
             window.location.assign(
-                redirect ?? (confirmation ? settings.url() : home.url()),
+                redirect ?? (confirmation ? security.url() : home.url()),
             ),
     });
 

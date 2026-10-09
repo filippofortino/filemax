@@ -40,6 +40,6 @@ final class TransferExpiring extends Notification implements ShouldQueue
             ->subject("“{$title}” expires in {$remaining}")
             ->line("Your transfer “{$title}” expires in {$remaining}. After that, the download link stops working.")
             ->action('Extend transfer', route('transfers.show', $this->transfer))
-            ->line('Extending it keeps it available for 7 more days. You can turn these emails off in [Settings]('.route('account.settings').').');
+            ->line('Extending it keeps it available for 7 more days. You can turn these emails off in [Settings]('.route('account.settings.notifications').').');
     }
 }

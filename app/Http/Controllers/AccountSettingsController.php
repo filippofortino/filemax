@@ -13,18 +13,25 @@ use Laravel\Passkeys\Passkey;
 
 final class AccountSettingsController
 {
-    public function index(Request $request): Response
+    public function show(Request $request, string $section = 'profile'): Response
     {
         $user = $request->user() ?? abort(403);
 
+        if ($section === 'security') {
+            return Inertia::render('account/settings', [
+                'section' => $section,
+                'passkeys' => $user->passkeys()->latest()->get()
+                    ->map(fn (Passkey $passkey): array => [
+                        'id' => $passkey->id,
+                        'name' => $passkey->name,
+                        'created_at' => $passkey->created_at?->toIso8601String(),
+                        'last_used_at' => $passkey->last_used_at?->toIso8601String(),
+                    ]),
+            ]);
+        }
+
         return Inertia::render('account/settings', [
-            'passkeys' => $user->passkeys()->latest()->get()
-                ->map(fn (Passkey $passkey): array => [
-                    'id' => $passkey->id,
-                    'name' => $passkey->name,
-                    'created_at' => $passkey->created_at?->toIso8601String(),
-                    'last_used_at' => $passkey->last_used_at?->toIso8601String(),
-                ]),
+            'section' => $section,
             'settings' => $user->settings->only(['show_name_on_transfers', 'notify_transfer_expiring', 'notify_transfer_downloaded']),
         ]);
     }

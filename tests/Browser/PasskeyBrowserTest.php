@@ -4,30 +4,49 @@ declare(strict_types=1);
 
 use App\Models\User;
 
-it('opens settings with keyboard and confirms identity only when adding a passkey', function (): void {
+it('confirms identity with keyboard before security settings and keeps the passkey name when adding one', function (): void {
     $user = User::factory()->create();
 
-    visit('/login')->resize(1280, 940)
+    $page = visit('/login')->resize(1280, 940)
         ->fill('email', $user->email)
         ->fill('password', 'password')
         ->press('form button[data-slot="button"]')
         ->assertSee('Transfer details')
         ->keys('[aria-label$="account menu"]', 'Enter')
         ->keys('a[href$="/account/settings"]', 'Enter')
-        ->assertSee('Profile')
-        ->assertSee('You haven’t added any passkeys yet.')
-        ->fill('#passkey-name', 'Work MacBook')
-        ->press('Add passkey')
+        ->assertSee('Upload photo')
+        ->keys('a[href$="/account/settings/security"]', 'Enter')
         ->assertSee('Confirm it’s you')
+        ->assertSee('Confirm your identity to manage your password and passkeys.')
         ->fill('password', 'password')
         ->press('Confirm password')
-        ->assertSee('You haven’t added any passkeys yet.')
-        ->assertSee('Add passkey')
-        ->assertDisabled('#passkey-form button')
+        ->assertPathIs('/account/settings/security')
+        ->assertSee('You haven’t added any passkeys yet.');
+    $page->script(<<<'JS'
+() => {
+    window.passkeyCreateCalls = 0;
+    Object.defineProperty(navigator.credentials, 'create', {
+        configurable: true,
+        value: async () => {
+            window.passkeyCreateCalls++;
+            throw new DOMException('User cancelled the prompt', 'NotAllowedError');
+        },
+    });
+}
+JS);
+
+    $page->fill('#passkey-name', 'Work MacBook')
+        ->press('Add passkey')
+        ->assertSeeIn('[data-slot="toast"]', 'Passkey not added')
+        ->assertPathIs('/account/settings/security')
+        ->assertDontSee('Confirm it’s you')
         ->assertNoJavascriptErrors();
+
+    expect($page->script('() => window.passkeyCreateCalls'))->toBe(1)
+        ->and($page->script('() => document.querySelector("#passkey-name").value'))->toBe('Work MacBook');
 });
 
-it('confirms passkey removal only after password confirmation and deletion', function (): void {
+it('confirms identity before showing passkeys and then removes one without asking again', function (): void {
     $user = User::factory()->create();
     $passkey = $user->passkeys()->create([
         'name' => 'Work MacBook',
@@ -38,17 +57,15 @@ it('confirms passkey removal only after password confirmation and deletion', fun
         'auth.password_confirmed_at' => now()->subHours(4)->timestamp,
     ]);
 
-    $page = visit('/account/settings')
-        ->press('[aria-label="Remove Work MacBook"]')
+    $page = visit('/account/settings/security')
         ->assertSee('Confirm it’s you')
-        ->assertDontSee('Passkey removed');
+        ->assertDontSee('Work MacBook');
 
     $this->assertModelExists($passkey);
 
     $page->fill('password', 'password')
         ->press('Confirm password')
-        ->assertPathIs('/account/settings')
-        ->assertDontSee('Passkey removed')
+        ->assertPathIs('/account/settings/security')
         ->press('[aria-label="Remove Work MacBook"]')
         ->assertSeeIn('[data-slot="toast"]', 'Passkey removed')
         ->assertSee('“Work MacBook” can no longer sign you in.')
@@ -62,7 +79,7 @@ it('keeps a cancelled named passkey registration recoverable on mobile', functio
     $user = User::factory()->create();
     $this->actingAs($user)->withSession(['auth.password_confirmed_at' => now()->timestamp]);
 
-    $page = visit('/account/settings')->resize(390, 844)
+    $page = visit('/account/settings/security')->resize(390, 844)
         ->assertSee('You haven’t added any passkeys yet.');
     $page->script(<<<'JS'
 () => {
