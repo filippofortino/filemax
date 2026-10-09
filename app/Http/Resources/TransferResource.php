@@ -22,6 +22,7 @@ final class TransferResource extends JsonResource
             'title' => $this->displayTitle(),
             'message' => $this->message,
             'visibility' => $this->visibility,
+            'password_protected' => $this->password_hash !== null,
             'status' => $this->status,
             'created_at' => $this->created_at->toIso8601String(),
             'expires_at' => $this->expires_at?->toIso8601String(),
