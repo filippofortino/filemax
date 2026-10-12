@@ -25,6 +25,7 @@ use Illuminate\Support\Str;
  * @property ?string $title
  * @property ?string $message
  * @property string $visibility
+ * @property ?string $password_hash
  * @property string $status
  * @property int $expires_in_days
  * @property ?CarbonInterface $expires_at
@@ -46,7 +47,7 @@ use Illuminate\Support\Str;
  * @property-read Collection<int, Team> $teams
  */
 #[Guarded(['id'])]
-#[Hidden(['token', 'archive_path'])]
+#[Hidden(['token', 'archive_path', 'password_hash'])]
 final class Transfer extends Model
 {
     /** @use HasFactory<TransferFactory> */

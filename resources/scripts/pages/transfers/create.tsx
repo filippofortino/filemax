@@ -4,6 +4,8 @@ import {
     Tick02Icon,
     Upload01Icon,
     UserGroupIcon,
+    ViewIcon,
+    ViewOffIcon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Head, Link, router } from '@inertiajs/react';
@@ -12,11 +14,13 @@ import {
     CopyLink,
     ErrorMessage,
     FileRow,
+    PasswordBadge,
     Shell,
     TeamBadges,
     TeamPicker,
 } from '@/components/filemax';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { bytes, dateTime } from '@/lib/format';
 import { request, uploadPart } from '@/lib/http';
 import type { Team, Transfer, TransferFile } from '@/lib/types';
@@ -53,6 +57,9 @@ export default function Create({ teams }: { teams: Team[] }) {
     const [title, setTitle] = useState('');
     const [message, setMessage] = useState('');
     const [visibility, setVisibility] = useState<'public' | 'teams'>('public');
+    const [passwordProtected, setPasswordProtected] = useState(false);
+    const [password, setPassword] = useState('');
+    const [passwordVisible, setPasswordVisible] = useState(false);
     const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
     const [expiry, setExpiry] = useState(7);
     const [busy, setBusy] = useState(false);
@@ -201,6 +208,11 @@ export default function Create({ teams }: { teams: Team[] }) {
                         title,
                         message,
                         visibility,
+                        password_protected:
+                            visibility === 'public' && passwordProtected,
+                        ...(visibility === 'public' && passwordProtected
+                            ? { password }
+                            : {}),
                         team_ids: selectedTeams,
                         expires_in_days: expiry,
                         files: currentEntries.current.map((entry) => ({
@@ -211,6 +223,8 @@ export default function Create({ teams }: { teams: Team[] }) {
                     },
                 );
                 draft.current = result.transfer;
+                setPassword('');
+                setPasswordVisible(false);
                 changeEntries(
                     currentEntries.current.map((entry, index) => ({
                         ...entry,
@@ -495,9 +509,21 @@ export default function Create({ teams }: { teams: Team[] }) {
                                 </p>
                             </div>
                         ) : (
-                            <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-slate-700">
-                                Anyone with the link. No account needed.
-                            </p>
+                            <div className="flex flex-col gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-slate-700">
+                                {ready.password_protected && <PasswordBadge />}
+                                <p>
+                                    {ready.password_protected
+                                        ? 'Anyone with the link and password. No account needed.'
+                                        : 'Anyone with the link. No account needed.'}
+                                </p>
+                                {ready.password_protected && (
+                                    <p className="text-sm">
+                                        The password can’t be changed, removed
+                                        or recovered. Send it separately from
+                                        the link.
+                                    </p>
+                                )}
+                            </div>
                         )}
                         <div>
                             {ready.files
@@ -541,6 +567,9 @@ export default function Create({ teams }: { teams: Team[] }) {
                                     changeEntries([]);
                                     setTitle('');
                                     setMessage('');
+                                    setPasswordProtected(false);
+                                    setPassword('');
+                                    setPasswordVisible(false);
                                 }}
                             >
                                 Send another
@@ -848,6 +877,15 @@ export default function Create({ teams }: { teams: Team[] }) {
                                     </span>
                                 </div>
                             </div>
+                            {draft.current?.password_protected && (
+                                <div className="flex flex-col gap-2">
+                                    <PasswordBadge />
+                                    <p className="text-sm text-muted-foreground">
+                                        The password can’t be changed, removed
+                                        or recovered.
+                                    </p>
+                                </div>
+                            )}
                         </>
                     ) : (
                         <>
@@ -904,7 +942,9 @@ export default function Create({ teams }: { teams: Team[] }) {
                                                 value: 'public',
                                                 icon: Globe02Icon,
                                                 label: 'Public link',
-                                                text: 'Anyone with the link. No account needed.',
+                                                text: passwordProtected
+                                                    ? 'Anyone with the link and the password.'
+                                                    : 'Anyone with the link. No account needed.',
                                             },
                                             {
                                                 value: 'teams',
@@ -950,6 +990,15 @@ export default function Create({ teams }: { teams: Team[] }) {
                                                             setSelectedTeams(
                                                                 [],
                                                             );
+                                                        else {
+                                                            setPasswordProtected(
+                                                                false,
+                                                            );
+                                                            setPassword('');
+                                                            setPasswordVisible(
+                                                                false,
+                                                            );
+                                                        }
                                                     }}
                                                 />
                                             </span>
@@ -976,6 +1025,118 @@ export default function Create({ teams }: { teams: Team[] }) {
                                         ? `You belong to ${teams.length} ${teams.length === 1 ? 'team' : 'teams'}: ${teams.map((team) => team.name).join(', ')}.`
                                         : 'No team memberships yet. You can share public links, or ask an admin to add you to a team.'}
                                 </p>
+                                {visibility === 'public' && (
+                                    <div className="flex flex-col gap-4 rounded-lg border border-input p-4">
+                                        <div className="flex items-start justify-between gap-6">
+                                            <div className="flex flex-col gap-1">
+                                                <span
+                                                    id="protect-label"
+                                                    className="font-semibold"
+                                                >
+                                                    Require a password
+                                                </span>
+                                                <p
+                                                    id="protect-hint"
+                                                    className="text-sm text-muted-foreground"
+                                                >
+                                                    Anyone opening the link
+                                                    types it before they see any
+                                                    file.
+                                                </p>
+                                            </div>
+                                            <Switch
+                                                id="password-protected"
+                                                checked={passwordProtected}
+                                                disabled={busy}
+                                                aria-labelledby="protect-label"
+                                                aria-describedby="protect-hint"
+                                                onCheckedChange={(checked) => {
+                                                    setPasswordProtected(
+                                                        checked,
+                                                    );
+                                                    setPassword('');
+                                                    setPasswordVisible(false);
+                                                }}
+                                            />
+                                        </div>
+                                        {passwordProtected && (
+                                            <div className="flex flex-col gap-2">
+                                                <label
+                                                    className="text-sm font-semibold"
+                                                    htmlFor="transfer-password"
+                                                >
+                                                    Password
+                                                </label>
+                                                <div className="relative">
+                                                    <input
+                                                        id="transfer-password"
+                                                        type={
+                                                            passwordVisible
+                                                                ? 'text'
+                                                                : 'password'
+                                                        }
+                                                        autoComplete="new-password"
+                                                        spellCheck={false}
+                                                        minLength={8}
+                                                        maxLength={72}
+                                                        required
+                                                        disabled={busy}
+                                                        aria-describedby="transfer-password-hint"
+                                                        className="pr-12"
+                                                        value={password}
+                                                        onChange={(event) =>
+                                                            setPassword(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="absolute top-0 right-0 text-muted-foreground"
+                                                        aria-label={
+                                                            passwordVisible
+                                                                ? 'Hide password'
+                                                                : 'Show password'
+                                                        }
+                                                        aria-pressed={
+                                                            passwordVisible
+                                                        }
+                                                        disabled={busy}
+                                                        onClick={() =>
+                                                            setPasswordVisible(
+                                                                !passwordVisible,
+                                                            )
+                                                        }
+                                                    >
+                                                        <HugeiconsIcon
+                                                            icon={
+                                                                passwordVisible
+                                                                    ? ViewOffIcon
+                                                                    : ViewIcon
+                                                            }
+                                                            size={20}
+                                                            aria-hidden="true"
+                                                        />
+                                                    </Button>
+                                                </div>
+                                                <p
+                                                    id="transfer-password-hint"
+                                                    className="text-sm text-muted-foreground"
+                                                >
+                                                    At least 8 characters. Send
+                                                    it separately, by phone or
+                                                    chat, not in the same email
+                                                    as the link. The password
+                                                    can’t be changed, removed or
+                                                    recovered.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 {visibility === 'teams' && (
                                     <>
                                         <TeamPicker

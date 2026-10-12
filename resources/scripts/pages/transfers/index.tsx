@@ -12,7 +12,7 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Shell, TeamBadges } from '@/components/filemax';
+import { PasswordBadge, Shell, TeamBadges } from '@/components/filemax';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { bytes, date, dateTime } from '@/lib/format';
@@ -446,7 +446,7 @@ export default function Index({
                                                 />
                                             </p>
                                         </div>
-                                        <span className="min-w-0 text-xs md:col-span-2">
+                                        <span className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs md:col-span-2">
                                             {transfer.visibility ===
                                             'public' ? (
                                                 <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 font-semibold text-primary">
@@ -467,6 +467,9 @@ export default function Index({
                                                 <span className="text-destructive">
                                                     Sharing needs repair
                                                 </span>
+                                            )}
+                                            {transfer.password_protected && (
+                                                <PasswordBadge compact />
                                             )}
                                         </span>
                                         <span

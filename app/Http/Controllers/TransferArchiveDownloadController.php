@@ -24,7 +24,7 @@ final class TransferArchiveDownloadController
             return redirect()->away($storage->disk()->temporaryUrl($transfer->archive_path, now()->addMinutes(5)->min($transfer->expires_at), [
                 'ResponseContentDisposition' => HeaderUtils::makeDisposition('attachment', $name, str_replace('%', '', Str::ascii($name)) ?: 'download'),
                 'ResponseContentType' => 'application/zip',
-            ]));
+            ]))->header('Cache-Control', 'private, no-store');
         }
 
         return $storage->disk()->download($transfer->archive_path, $name, ['Content-Type' => 'application/zip', 'Cache-Control' => 'private, no-store']);

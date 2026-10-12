@@ -2,7 +2,7 @@ import { Head } from '@inertiajs/react';
 import { useState } from 'react';
 import { Avatar } from '@/components/avatar';
 import { DownloadAll, FileDownload } from '@/components/downloads';
-import { FileRow, Shell } from '@/components/filemax';
+import { FileRow, PasswordBadge, Shell } from '@/components/filemax';
 import { Button } from '@/components/ui/button';
 import { dateTime } from '@/lib/format';
 
@@ -10,6 +10,7 @@ type SharedTransfer = {
     token: string;
     title: string;
     message: string | null;
+    password_protected: boolean;
     sender: { name: string; email: string; avatar_url: string | null } | null;
     files: { id: string; name: string; size: number; mime_type: string }[];
     total_size: number;
@@ -54,6 +55,7 @@ export default function SharedTransferPage({
                         <h1 className="text-3xl leading-tight text-pretty wrap-anywhere">
                             {transfer.title}
                         </h1>
+                        {transfer.password_protected && <PasswordBadge />}
                         {transfer.message && (
                             <p className="text-base wrap-anywhere whitespace-pre-wrap text-muted-foreground">
                                 {transfer.message}

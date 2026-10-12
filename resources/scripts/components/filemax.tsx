@@ -5,6 +5,7 @@ import {
     File01Icon,
     FileZipIcon,
     Image01Icon,
+    LockKeyIcon,
     Logout01Icon,
     Settings01Icon,
     Tick02Icon,
@@ -296,6 +297,20 @@ export function ErrorMessage({
             {children}
         </p>
     ) : null;
+}
+export function PasswordBadge({ compact = false }: { compact?: boolean }) {
+    return (
+        <span
+            className={cn(
+                'inline-flex w-fit items-center gap-1.5 rounded-full bg-muted font-semibold text-slate-700',
+                compact ? 'px-2.5 py-1 text-xs' : 'min-h-7 px-3 text-sm',
+            )}
+            title="Recipients need the password to open the link."
+        >
+            <HugeiconsIcon icon={LockKeyIcon} size={13} aria-hidden="true" />
+            {compact ? 'Password' : 'Password protected'}
+        </span>
+    );
 }
 export function TeamBadges({
     teams,

@@ -13,6 +13,7 @@ import {
     CopyLink,
     ErrorMessage,
     FileRow,
+    PasswordBadge,
     Shell,
     TeamPicker,
 } from '@/components/filemax';
@@ -67,7 +68,9 @@ export default function Show({
                             className="inline-flex min-h-7 items-center gap-1.5 rounded-full bg-primary/10 px-3 text-sm font-semibold text-primary"
                             title={
                                 transfer.visibility === 'public'
-                                    ? 'Anyone with the link. No account needed.'
+                                    ? transfer.password_protected
+                                        ? 'Anyone with the link and password. No account needed.'
+                                        : 'Anyone with the link. No account needed.'
                                     : undefined
                             }
                         >
@@ -84,6 +87,7 @@ export default function Show({
                                 ? `${transfer.teams.length} ${transfer.teams.length === 1 ? 'team' : 'teams'}`
                                 : 'Public link'}
                         </span>
+                        {transfer.password_protected && <PasswordBadge />}
                         {!transfer.available && (
                             <span className="inline-flex items-center gap-1 rounded-full border bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
                                 {transfer.revoked_at ? 'Deleted' : 'Expired'}
@@ -157,7 +161,19 @@ export default function Show({
                 </Form>
                 <div className="grid grid-cols-1 items-start gap-7 md:grid-cols-3 md:gap-10">
                     <section className="flex min-w-0 flex-col gap-7 md:col-span-2">
-                        {transfer.url && <CopyLink url={transfer.url} />}
+                        {transfer.url && (
+                            <div className="flex flex-col gap-2.5">
+                                <CopyLink url={transfer.url} />
+                                {transfer.password_protected && (
+                                    <p className="text-sm text-muted-foreground">
+                                        Recipients need the password you set. It
+                                        can’t be changed, removed or recovered.
+                                        Filemax doesn’t keep a readable copy, so
+                                        it can’t show it again.
+                                    </p>
+                                )}
+                            </div>
+                        )}
                         {transfer.visibility === 'teams' && (
                             <section className="flex flex-col gap-2">
                                 <div className="flex items-center justify-between gap-3">

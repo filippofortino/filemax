@@ -28,6 +28,16 @@ final class SharedTransferController
         $sender = $transfer->user->settings->show_name_on_transfers ? $transfer->user : null;
 
         if (! Gate::forUser($request->user())->allows('download', $transfer)) {
+            if ($transfer->visibility === 'public' && $transfer->password_hash !== null) {
+                $response = Inertia::render('shared/password', [
+                    'token' => $transfer->token,
+                    'sender' => $sender?->only(['name', 'email']),
+                ])->toResponse($request);
+                $response->headers->set('Cache-Control', 'private, no-store');
+
+                return $response;
+            }
+
             $request->session()->put('url.intended', route('shared.show', $transfer->token));
 
             return Inertia::render('shared/denied', [
@@ -58,6 +68,7 @@ final class SharedTransferController
                 'total_size' => $transfer->files->sum('size'),
                 'expires_at' => $transfer->expires_at?->toIso8601String(),
                 'visibility' => $transfer->visibility,
+                'password_protected' => $transfer->password_hash !== null,
             ],
         ])->toResponse($request);
         $response->headers->set('Cache-Control', 'private, no-store');
