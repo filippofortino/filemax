@@ -191,3 +191,23 @@ it('shows the first four files until the recipient asks for all of them', functi
         ->assertDontSee('file5.pdf')
         ->assertNoJavascriptErrors();
 });
+
+it('shows a scannable QR code of the shared link at desktop and phone sizes', function (): void {
+    $transfer = Transfer::factory()->create();
+    TransferFile::factory()->for($transfer)->create();
+    $url = route('shared.show', $transfer->token);
+    $displayUrl = preg_replace('#^https?://#', '', $url);
+
+    $page = visit($url)->resize(1280, 940)
+        ->assertSee('Need it on your phone?')
+        ->press('Show QR code')
+        ->assertSee('Scan with a phone camera')
+        ->assertVisible('[role="dialog"] svg[aria-label="QR code for '.$displayUrl.'"]')
+        ->assertSeeIn('[role="dialog"]', $displayUrl)
+        ->keys(':focus', 'Escape')
+        ->assertDontSee('Scan with a phone camera')
+        ->assertNoJavascriptErrors();
+
+    $page->resize(390, 844)->assertSee('Need it on another phone?')->press('Show QR code')->assertSee('Scan with a phone camera');
+    expect($page->script('document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+});

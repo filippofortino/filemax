@@ -56,6 +56,7 @@ final class SharedTransferController
             'transfer' => [
                 'id' => $transfer->id,
                 'token' => $transfer->token,
+                'url' => route('shared.show', $transfer->token),
                 'title' => $transfer->displayTitle(),
                 'message' => $transfer->message,
                 'sender' => $sender ? [...$sender->only(['name', 'email']), 'avatar_url' => $sender->avatarUrl()] : null,
