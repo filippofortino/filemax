@@ -484,14 +484,14 @@ it('restores an expired transfer on mobile and supports a second intentional ext
         ->assertSee('Expired 19 Sept 2026, 14:00')
         ->assertSee('This transfer has expired')
         ->assertSee('Your files are kept until 19 Oct 2026.')
-        ->assertMissing('button:has-text("Download all")')
+        ->assertMissing('button:has-text("Download · 4 B")')
         ->assertMissing('[aria-label="Download extended.pdf"]')
         ->press('Reactivate for 7 days')
         ->assertSee('Expires 27 Sept 2026, 14:00')
         ->assertDontSee('Expired')
         ->assertSeeIn('[data-slot="toast"]', 'Transfer extended')
         ->assertSeeIn('[data-slot="toast"]', 'Now expires 27 Sept 2026, 14:00.')
-        ->assertEnabled('Download all · 4 B')
+        ->assertEnabled('Download · 4 B')
         ->assertEnabled('[aria-label="Download extended.pdf"]')
         ->assertEnabled('Extend by 7 days');
 

@@ -65,6 +65,11 @@ export default function SharedTransferPage({
                     <DownloadAll
                         token={transfer.token}
                         totalSize={transfer.total_size}
+                        singleFileId={
+                            transfer.files.length === 1
+                                ? transfer.files[0].id
+                                : undefined
+                        }
                     />
                     <div>
                         <ul className="border-y border-border">

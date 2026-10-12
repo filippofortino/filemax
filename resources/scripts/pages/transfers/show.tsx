@@ -449,6 +449,11 @@ export default function Show({
                                 <DownloadAll
                                     token={transfer.token}
                                     totalSize={transfer.total_size}
+                                    singleFileId={
+                                        transfer.files.length === 1
+                                            ? transfer.files[0].id
+                                            : undefined
+                                    }
                                     variant="outline"
                                     size="default"
                                     onDownload={refresh}
