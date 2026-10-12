@@ -28,6 +28,7 @@ it('records the first public page opening without counting a download or exposin
 
     $this->get(route('shared.show', $transfer->token))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
         ->component('shared/show', false)
+        ->where('transfer.url', route('shared.show', $transfer->token))
         ->where('transfer.title', $file->original_name)
         ->where('transfer.files.0.name', $file->original_name)
         ->missing('csrf_token')
