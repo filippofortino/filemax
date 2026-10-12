@@ -103,6 +103,27 @@ it('requires verified eligibility and current membership while allowing any sele
     expect($transfer->refresh()->download_count)->toBe(2);
 });
 
+it('includes shared page data for missing transfer links', function (bool $authenticated): void {
+    $user = $authenticated ? User::factory()->create() : null;
+    if ($user) {
+        $this->actingAs($user);
+    }
+
+    $url = route('shared.show', 'random-string');
+    $response = $this->get($url)->assertNotFound()->assertInertia(fn (Assert $page): Assert => $page
+        ->component('shared/unavailable', false)
+        ->where('reason', 'unavailable')
+        ->where($user ? 'auth.user.id' : 'auth.user', $user?->id)
+        ->has('passwordRequirements')
+        ->missing('transfer'));
+
+    $this->get($url, ['X-Inertia' => 'true', 'X-Inertia-Version' => $response->viewData('page')['version']])
+        ->assertNotFound()->assertHeader('X-Inertia', 'true')
+        ->assertJsonPath('component', 'shared/unavailable')
+        ->assertJsonPath('props.reason', 'unavailable')
+        ->assertJsonPath($user ? 'props.auth.user.id' : 'props.auth.user', $user?->id);
+})->with(['guest' => false, 'signed in' => true]);
+
 it('blocks expiry, deletion, missing tokens and foreign file ids without counting them', function (): void {
     $transfer = Transfer::factory()->create();
     $file = TransferFile::factory()->for($transfer)->create();

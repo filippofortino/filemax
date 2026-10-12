@@ -15,6 +15,17 @@ beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-09-20 12:00:00'));
 });
 
+it('renders missing shared links instead of a blank page', function (bool $authenticated): void {
+    if ($authenticated) {
+        $this->actingAs(User::factory()->create());
+    }
+
+    visit(route('shared.show', 'missing-transfer'))
+        ->assertSee('This link is no longer available')
+        ->assertSee('This transfer is unavailable or the link is incorrect.')
+        ->assertNoJavascriptErrors();
+})->with(['guest' => false, 'signed in' => true]);
+
 it('renders the public recipient at desktop and phone sizes without horizontal overflow', function (): void {
     $sender = User::factory()->create(['name' => 'Filippo Fortino']);
     $transfer = Transfer::factory()->for($sender, 'user')->create([
