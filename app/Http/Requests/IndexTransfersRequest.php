@@ -22,6 +22,7 @@ final class IndexTransfersRequest extends FormRequest
             'filter' => ['bail', 'nullable', 'string', Rule::anyOf([[Rule::in(['all', 'public'])], ['uuid']])],
             'status' => ['bail', 'nullable', 'string', Rule::in(['all', 'active', 'soon', 'expired'])],
             'search' => ['nullable', 'string', 'max:255'],
+            'kind' => ['bail', 'nullable', 'string', Rule::in(['all', 'transfer', 'secret'])],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
     }

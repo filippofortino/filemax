@@ -7,8 +7,10 @@ namespace App\Http\Controllers;
 use App\Http\Requests\IndexTransfersRequest;
 use App\Http\Requests\StoreTransferRequest;
 use App\Http\Requests\UpdateTransferSharingRequest;
+use App\Http\Resources\SecretResource;
 use App\Http\Resources\TransferResource;
 use App\Jobs\PurgeTransfer;
+use App\Models\Secret;
 use App\Models\Team;
 use App\Models\Transfer;
 use App\Services\TransferStorage;
@@ -18,6 +20,9 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Http\Resources\Json\ResourceCollection;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -72,32 +77,47 @@ final class TransferController
     public function index(IndexTransfersRequest $request): Response|RedirectResponse
     {
         $user = $request->user() ?? abort(403);
-        /** @var array{filter?: ?string, status?: ?string, search?: ?string} $filters */
+        /** @var array{filter?: ?string, status?: ?string, search?: ?string, kind?: ?string} $filters */
         $filters = $request->validated();
         $filter = $filters['filter'] ?? 'all';
         $status = $filters['status'] ?? 'all';
         $search = $filters['search'] ?? '';
+        $kind = $filters['kind'] ?? 'all';
         $now = now();
 
         $historyQuery = Transfer::query()->where('user_id', $user->id)->where('status', 'ready');
+        $secretQuery = Secret::query()->whereBelongsTo($user);
         $totals = [
-            'total' => (clone $historyQuery)->count(),
-            'active' => $this->applyHistoryStatus(clone $historyQuery, 'active', $now)->count(),
+            'transfers' => (clone $historyQuery)->count(),
+            'secrets' => (clone $secretQuery)->count(),
+            'active' => $this->applyHistoryStatus(clone $historyQuery, 'active', $now)->count() + $this->applySecretStatus(clone $secretQuery, 'active', $now)->count(),
         ];
 
-        $matchingQuery = $this->applyHistoryFilters(clone $historyQuery, $filter, $search);
-        $statusCounts = $this->historyStatusCounts($matchingQuery, $now);
-        $resultsQuery = $this->applyHistoryStatus(clone $matchingQuery, $status, $now);
-        $transfers = $resultsQuery
-            ->with(['files', 'teams' => fn (Relation $query) => $query->withCount('users')])
-            ->latest()
-            ->latest('id')
-            ->paginate(8)
-            ->withQueryString();
+        // Secrets have no audience, so a public or team filter only matches transfers.
+        $matchingQuery = $kind === 'secret' ? null : $this->applyHistoryFilters(clone $historyQuery, $filter, $search);
+        $matchingSecrets = $kind === 'transfer' || ($kind === 'all' && $filter !== 'all') ? null : $this->applySecretSearch(clone $secretQuery, $search);
+        $statusCounts = array_map(fn (string $option): int => ($matchingQuery instanceof Builder ? $this->applyHistoryStatus(clone $matchingQuery, $option, $now)->count() : 0)
+            + ($matchingSecrets instanceof Builder ? $this->applySecretStatus(clone $matchingSecrets, $option, $now)->count() : 0), ['all' => 'all', 'active' => 'active', 'soon' => 'soon', 'expired' => 'expired']);
 
-        if ($transfers->currentPage() > $transfers->lastPage()) {
-            return redirect($transfers->url($transfers->lastPage()));
+        $transferRows = $matchingQuery instanceof Builder ? $this->applyHistoryStatus(clone $matchingQuery, $status, $now)->toBase()->select(['id', 'created_at'])->selectRaw("'transfer' as kind") : null;
+        $secretRows = $matchingSecrets instanceof Builder ? $this->applySecretStatus(clone $matchingSecrets, $status, $now)->toBase()->select(['id', 'created_at'])->selectRaw("'secret' as kind") : null;
+        $rows = $transferRows && $secretRows ? $transferRows->union($secretRows) : ($transferRows ?? $secretRows ?? abort(500));
+        $page = DB::query()->fromSub($rows, 'history')->latest()->orderByDesc('id')->paginate(8)->withQueryString();
+
+        if ($page->currentPage() > $page->lastPage()) {
+            return redirect($page->url($page->lastPage()));
         }
+
+        /** @var Collection<int, object{id: string, kind: string}> $pageRows */
+        $pageRows = $page->getCollection();
+        $transfers = Transfer::query()
+            ->with(['files', 'teams' => fn (Relation $query) => $query->withCount('users')])
+            ->findMany($pageRows->where('kind', 'transfer')->pluck('id'))
+            ->keyBy('id');
+        $secrets = Secret::query()->findMany($pageRows->where('kind', 'secret')->pluck('id'))->keyBy('id');
+        $page->setCollection($pageRows->map(fn (object $row): JsonResource => $row->kind === 'secret'
+            ? new SecretResource($secrets->get($row->id))
+            : new TransferResource($transfers->get($row->id))));
 
         $historyTeams = Team::query()
             ->whereHas('transfers', fn (Builder $query) => $query->where('user_id', $user->id))
@@ -105,11 +125,12 @@ final class TransferController
             ->get(['id', 'name']);
 
         return Inertia::render('transfers/index', [
-            'transfers' => TransferResource::collection($transfers),
+            'transfers' => new ResourceCollection($page),
             'teams' => $historyTeams,
             'filter' => $filter,
             'status' => $status,
             'search' => $search,
+            'kind' => $kind,
             'statusCounts' => $statusCounts,
             'totals' => $totals,
         ]);
@@ -177,7 +198,6 @@ final class TransferController
         }
 
         if ($search !== '') {
-            $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
             $query->whereRaw(<<<'SQL'
                 LOWER(COALESCE(
                     title,
@@ -190,24 +210,10 @@ final class TransferController
                     ),
                     'Untitled transfer'
                 )) LIKE LOWER(?) ESCAPE '!'
-                SQL, [$pattern]);
+                SQL, [$this->likePattern($search)]);
         }
 
         return $query;
-    }
-
-    /**
-     * @param  Builder<Transfer>  $query
-     * @return array{all: int, active: int, soon: int, expired: int}
-     */
-    private function historyStatusCounts(Builder $query, CarbonInterface $now): array
-    {
-        return [
-            'all' => (clone $query)->count(),
-            'active' => $this->applyHistoryStatus(clone $query, 'active', $now)->count(),
-            'soon' => $this->applyHistoryStatus(clone $query, 'soon', $now)->count(),
-            'expired' => $this->applyHistoryStatus(clone $query, 'expired', $now)->count(),
-        ];
     }
 
     /**
@@ -232,5 +238,42 @@ final class TransferController
         }
 
         return $query;
+    }
+
+    /**
+     * @param  Builder<Secret>  $query
+     * @return Builder<Secret>
+     */
+    private function applySecretSearch(Builder $query, string $search): Builder
+    {
+        if ($search !== '') {
+            $query->whereRaw("LOWER(COALESCE(label, 'Unlabelled secret')) LIKE LOWER(?) ESCAPE '!'", [$this->likePattern($search)]);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Secrets never count as expiring soon: most of them only live for an hour or a day.
+     *
+     * @param  Builder<Secret>  $query
+     * @return Builder<Secret>
+     */
+    private function applySecretStatus(Builder $query, string $status, CarbonInterface $now): Builder
+    {
+        return match ($status) {
+            'active' => $query->whereNull('revoked_at')->whereColumn('view_count', '<', 'max_views')->where('expires_at', '>', $now),
+            'soon' => $query->whereRaw('1 = 0'),
+            'expired' => $query->where(fn (Builder $query) => $query
+                ->whereNotNull('revoked_at')
+                ->orWhereColumn('view_count', '>=', 'max_views')
+                ->orWhere('expires_at', '<=', $now)),
+            default => $query,
+        };
+    }
+
+    private function likePattern(string $search): string
+    {
+        return '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
     }
 }

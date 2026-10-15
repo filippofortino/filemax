@@ -18,6 +18,7 @@ final class TransferResource extends JsonResource
         $available = $this->isAvailable();
 
         return [
+            'kind' => 'transfer',
             'id' => $this->id,
             'title' => $this->displayTitle(),
             'message' => $this->message,

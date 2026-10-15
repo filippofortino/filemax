@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Jobs\PurgeTransfer;
+use App\Models\Secret;
 use App\Models\Team;
 use App\Models\Transfer;
 use App\Models\TransferFile;
@@ -25,14 +26,14 @@ it('lists only owned transfers with historical team filters and availability tot
     Transfer::factory()->for($owner)->expired()->create();
     Transfer::factory()->create();
     $this->actingAs($owner)->get(route('transfers.index'))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
-        ->component('transfers/index', false)->has('transfers.data', 2)->where('totals', ['total' => 2, 'active' => 1])->where('teams.0.id', $team->id));
+        ->component('transfers/index', false)->has('transfers.data', 2)->where('totals', ['transfers' => 2, 'secrets' => 0, 'active' => 1])->where('teams.0.id', $team->id));
     $this->get(route('transfers.index', ['filter' => $team->id]))->assertInertia(fn (Assert $page): Assert => $page->has('transfers.data', 1)->where('transfers.data.0.id', $owned->id));
     $this->get(route('transfers.index', ['filter' => 'public']))->assertInertia(fn (Assert $page): Assert => $page->has('transfers.data', 1));
 });
 
 it('renders an empty owner history', function (): void {
     $this->actingAs(User::factory()->create())->get(route('transfers.index'))->assertInertia(fn (Assert $page): Assert => $page
-        ->has('transfers.data', 0)->where('totals', ['total' => 0, 'active' => 0])
+        ->has('transfers.data', 0)->where('totals', ['transfers' => 0, 'secrets' => 0, 'active' => 0])
         ->where('filter', 'all')->where('status', 'all')->where('search', '')
         ->where('statusCounts', ['all' => 0, 'active' => 0, 'soon' => 0, 'expired' => 0]));
 });
@@ -60,7 +61,7 @@ it('filters availability and counts the inclusive next day without crossing owne
         ->where('transfers.data', fn ($transfers): bool => collect($transfers)->pluck('title')->sort()->values()->all() === collect($expectedTitles)->sort()->values()->all())
         ->where('transfers.data', fn ($transfers): bool => collect($transfers)->every(fn (array $transfer): bool => $transfer['expiring_soon'] === in_array($transfer['title'], ['soon', 'boundary'], true)))
         ->where('statusCounts', ['all' => 7, 'active' => 3, 'soon' => 2, 'expired' => 4])
-        ->where('totals', ['total' => 7, 'active' => 3])
+        ->where('totals', ['transfers' => 7, 'secrets' => 0, 'active' => 3])
         ->where('status', $status));
 })->with([
     'all' => ['all', ['soon', 'boundary', 'later', 'expired', 'revoked', 'purged', 'no expiry']],
@@ -85,11 +86,11 @@ it('counts audience and search matches before the selected status while preservi
     $this->actingAs($owner)->get(route('transfers.index', ['filter' => $team->id, 'search' => 'campaign', 'status' => 'active']))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
         ->has('transfers.data', 1)->where('transfers.data.0.id', $match->id)
         ->where('statusCounts', ['all' => 2, 'active' => 1, 'soon' => 1, 'expired' => 1])
-        ->where('totals', ['total' => 4, 'active' => 3])
+        ->where('totals', ['transfers' => 4, 'secrets' => 0, 'active' => 3])
         ->where('teams.0.id', $team->id));
     $this->get(route('transfers.index', ['filter' => 'public', 'search' => 'campaign']))->assertInertia(fn (Assert $page): Assert => $page
         ->has('transfers.data', 1)->where('transfers.data.0.title', 'Campaign public')
-        ->where('statusCounts.all', 1)->where('totals.total', 4));
+        ->where('statusCounts.all', 1)->where('totals.transfers', 4));
 });
 
 it('searches displayed titles case insensitively with only the first filename as a fallback', function (): void {
@@ -116,7 +117,7 @@ it('searches displayed titles case insensitively with only the first filename as
     $this->get(route('transfers.index', ['search' => '0']))->assertInertia(fn (Assert $page): Assert => $page
         ->has('transfers.data', 1)->where('transfers.data.0.id', $zero->id));
     $this->get(route('transfers.index', ['search' => 'missing title']))->assertInertia(fn (Assert $page): Assert => $page
-        ->has('transfers.data', 0)->where('statusCounts.all', 0)->where('totals.total', 6));
+        ->has('transfers.data', 0)->where('statusCounts.all', 0)->where('totals.transfers', 6));
 });
 
 it('treats search pattern characters literally', function (string $search): void {
@@ -184,12 +185,59 @@ it('redirects stale history pages to the last valid page while preserving filter
     'no matches' => [0, 1, 0],
 ]);
 
+it('lists secrets alongside transfers with kind filters, label search and status counts', function (): void {
+    $owner = User::factory()->create();
+    $oldTransfer = Transfer::factory()->for($owner)->create(['title' => 'Logo pack', 'created_at' => now()->subHours(4)]);
+    $labelled = Secret::factory()->for($owner)->create(['label' => 'Token Google Ads (dev)', 'created_at' => now()->subHours(3)]);
+    $hourly = Secret::factory()->for($owner)->create(['label' => 'Wi-Fi ospiti', 'expires_at' => now()->addMinutes(30), 'created_at' => now()->subHours(2)]);
+    $opened = Secret::factory()->for($owner)->opened()->create(['label' => null, 'created_at' => now()->subHour()]);
+    $newTransfer = Transfer::factory()->for($owner)->create(['title' => 'Master spot']);
+    Secret::factory()->create(['label' => 'Someone else']);
+
+    $ids = fn (array $query = []): array => collect($this->get(route('transfers.index', $query))->assertOk()->inertiaProps('transfers.data'))
+        ->map(fn (array $item): string => $item['kind'].':'.$item['id'])->all();
+
+    $this->actingAs($owner);
+    expect($ids())->toBe(["transfer:{$newTransfer->id}", "secret:{$opened->id}", "secret:{$hourly->id}", "secret:{$labelled->id}", "transfer:{$oldTransfer->id}"])
+        ->and($ids(['kind' => 'secret']))->toBe(["secret:{$opened->id}", "secret:{$hourly->id}", "secret:{$labelled->id}"])
+        ->and($ids(['kind' => 'transfer']))->toBe(["transfer:{$newTransfer->id}", "transfer:{$oldTransfer->id}"])
+        ->and($ids(['search' => 'GOOGLE']))->toBe(["secret:{$labelled->id}"])
+        ->and($ids(['search' => 'unlabelled']))->toBe(["secret:{$opened->id}"])
+        ->and($ids(['filter' => 'public']))->toBe(["transfer:{$newTransfer->id}", "transfer:{$oldTransfer->id}"])
+        ->and($ids(['filter' => 'public', 'kind' => 'secret']))->toHaveCount(3)
+        ->and($ids(['status' => 'expired']))->toBe(["secret:{$opened->id}"])
+        ->and($ids(['status' => 'soon']))->toBe([]);
+
+    $this->get(route('transfers.index'))->assertInertia(fn (Assert $page): Assert => $page
+        ->where('totals', ['transfers' => 2, 'secrets' => 3, 'active' => 4])
+        ->where('statusCounts', ['all' => 5, 'active' => 4, 'soon' => 0, 'expired' => 1])
+        ->where('kind', 'all')
+        ->where('transfers.data.1.title', 'Unlabelled secret')->where('transfers.data.1.reason', 'opened')
+        ->missing('transfers.data.1.payload')->missing('transfers.data.1.token'));
+    $this->get(route('transfers.index', ['kind' => 'secret']))->assertInertia(fn (Assert $page): Assert => $page
+        ->where('kind', 'secret')->where('statusCounts', ['all' => 3, 'active' => 2, 'soon' => 0, 'expired' => 1]));
+});
+
+it('pages through transfers and secrets as one newest-first history', function (): void {
+    $owner = User::factory()->create();
+    $expected = collect(range(1, 10))->map(fn (int $hoursAgo): string => $hoursAgo % 2
+        ? Secret::factory()->for($owner)->create(['created_at' => now()->subHours($hoursAgo)])->id
+        : Transfer::factory()->for($owner)->create(['created_at' => now()->subHours($hoursAgo)])->id);
+
+    $this->actingAs($owner)->get(route('transfers.index'))->assertInertia(fn (Assert $page): Assert => $page
+        ->where('transfers.meta.total', 10)->where('transfers.meta.last_page', 2)
+        ->where('transfers.data', fn ($items): bool => collect($items)->pluck('id')->all() === $expected->take(8)->all()));
+    $this->get(route('transfers.index', ['page' => 2]))->assertInertia(fn (Assert $page): Assert => $page
+        ->where('transfers.data', fn ($items): bool => collect($items)->pluck('id')->all() === $expected->slice(8)->values()->all()));
+});
+
 it('rejects malformed transfer filters', function (array $query, string $field): void {
     $this->actingAs(User::factory()->create())->getJson(route('transfers.index', $query))->assertUnprocessable()->assertJsonValidationErrors($field);
 })->with([
     'invalid audience' => [['filter' => 'unknown'], 'filter'],
     'array audience' => [['filter' => ['public']], 'filter'],
     'invalid status' => [['status' => 'unknown'], 'status'],
+    'invalid kind' => [['kind' => 'files'], 'kind'],
     'array status' => [['status' => ['active']], 'status'],
     'array search' => [['search' => ['title']], 'search'],
     'long search' => [['search' => str_repeat('a', 256)], 'search'],
