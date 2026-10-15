@@ -21,6 +21,9 @@ final class UpdateTransferSharingRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'password' => ['missing'],
+            'password_protected' => ['missing'],
+            'password_hash' => ['missing'],
             'team_ids' => ['required', 'array', 'list', 'min:1'],
             'team_ids.*' => ['required', 'uuid', 'distinct', Rule::in($this->user()?->teams()->pluck('teams.id')->all() ?? [])],
         ];

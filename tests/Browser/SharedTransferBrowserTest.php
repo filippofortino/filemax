@@ -2,16 +2,29 @@
 
 declare(strict_types=1);
 
+use App\Jobs\PrepareTransferArchive;
 use App\Models\Team;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-09-20 12:00:00'));
 });
+
+it('renders missing shared links instead of a blank page', function (bool $authenticated): void {
+    if ($authenticated) {
+        $this->actingAs(User::factory()->create());
+    }
+
+    visit(route('shared.show', 'missing-transfer'))
+        ->assertSee('This link is no longer available')
+        ->assertSee('This transfer is unavailable or the link is incorrect.')
+        ->assertNoJavascriptErrors();
+})->with(['guest' => false, 'signed in' => true]);
 
 it('renders the public recipient at desktop and phone sizes without horizontal overflow', function (): void {
     $sender = User::factory()->create(['name' => 'Filippo Fortino']);
@@ -36,25 +49,72 @@ it('renders the public recipient at desktop and phone sizes without horizontal o
     expect($transfer->refresh()->download_count)->toBe(0);
 });
 
-it('starts individual and all file downloads through the recipient controls', function (): void {
+it('downloads the original single file through both download controls', function (bool $owner): void {
     Storage::fake('local');
+    Queue::fake([PrepareTransferArchive::class]);
     config(['filemax.disk' => 'local']);
     $transfer = Transfer::factory()->create(['title' => 'Browser download']);
     $file = TransferFile::factory()->for($transfer)->create(['original_name' => 'sample.txt']);
     Storage::disk('local')->put($file->path, 'test');
 
-    visit(route('shared.show', $transfer->token))
+    if ($owner) {
+        $this->actingAs($transfer->user);
+    }
+
+    $page = visit($owner ? route('transfers.show', $transfer) : route('shared.show', $transfer->token))
         ->click('[aria-label="Download sample.txt"]')
         ->waitForEvent('networkidle')
         ->assertEnabled('[aria-label="Download sample.txt"]')
-        ->press('Download all · 4 B')
+        ->press('Download · 4 B')
         ->waitForEvent('networkidle')
-        ->assertEnabled('Download all · 4 B')
+        ->assertEnabled('Download · 4 B')
+        ->assertDontSee('Preparing your ZIP')
         ->assertNoJavascriptErrors();
 
+    if ($owner) {
+        $page->assertVisible('aside strong:has-text("2")');
+    }
+
+    $downloadPath = route('shared.files.download', [$transfer->token, $file], absolute: false);
+    expect($page->script('() => performance.getEntriesByType("resource").filter(entry => entry.initiatorType === "fetch").map(entry => new URL(entry.name).pathname)'))
+        ->toBe([$downloadPath, $downloadPath]);
     expect($transfer->refresh()->download_count)->toBe(2)
+        ->and($transfer->archive_status)->toBeNull()
+        ->and($transfer->archive_path)->toBeNull()
+        ->and($transfer->archive_requested_at)->toBeNull()
+        ->and($file->refresh()->download_count)->toBe(2);
+    Queue::assertNotPushed(PrepareTransferArchive::class);
+    expect(Storage::disk('local')->allFiles())->toBe([$file->path]);
+})->with(['recipient' => false, 'owner' => true]);
+
+it('downloads multiple files as a ZIP through the recipient control', function (): void {
+    Storage::fake('local');
+    config(['filemax.disk' => 'local']);
+    $transfer = Transfer::factory()->create();
+    $files = TransferFile::factory()->for($transfer)->count(2)->sequence(
+        ['original_name' => 'first.txt', 'position' => 0],
+        ['original_name' => 'second.txt', 'position' => 1],
+    )->create();
+    foreach ($files as $file) {
+        Storage::disk('local')->put($file->path, 'test');
+    }
+
+    visit(route('shared.show', $transfer->token))
+        ->press('Download all · 8 B')
+        ->waitForEvent('networkidle')
+        ->assertEnabled('Download all · 8 B')
+        ->assertNoJavascriptErrors();
+
+    expect($transfer->refresh()->download_count)->toBe(1)
         ->and($transfer->archive_status)->toBe('ready')
-        ->and($file->refresh()->download_count)->toBe(1);
+        ->and($transfer->files()->sum('download_count'))->toBe(0);
+    Storage::disk('local')->assertExists($transfer->archive_path);
+    $zip = new ZipArchive;
+    expect($zip->open(Storage::disk('local')->path($transfer->archive_path)))->toBeTrue();
+    expect($zip->numFiles)->toBe(2)
+        ->and($zip->getFromName('first.txt'))->toBe('test')
+        ->and($zip->getFromName('second.txt'))->toBe('test');
+    $zip->close();
 });
 
 it('shows denied and expired states without disclosing the file list', function (): void {
@@ -130,4 +190,24 @@ it('shows the first four files until the recipient asks for all of them', functi
         ->press('Show fewer files')
         ->assertDontSee('file5.pdf')
         ->assertNoJavascriptErrors();
+});
+
+it('shows a scannable QR code of the shared link at desktop and phone sizes', function (): void {
+    $transfer = Transfer::factory()->create();
+    TransferFile::factory()->for($transfer)->create();
+    $url = route('shared.show', $transfer->token);
+    $displayUrl = preg_replace('#^https?://#', '', $url);
+
+    $page = visit($url)->resize(1280, 940)
+        ->assertSee('Need it on your phone?')
+        ->press('Show QR code')
+        ->assertSee('Scan with a phone camera')
+        ->assertVisible('[role="dialog"] svg[aria-label="QR code for '.$displayUrl.'"]')
+        ->assertSeeIn('[role="dialog"]', $displayUrl)
+        ->keys(':focus', 'Escape')
+        ->assertDontSee('Scan with a phone camera')
+        ->assertNoJavascriptErrors();
+
+    $page->resize(390, 844)->assertSee('Need it on another phone?')->press('Show QR code')->assertSee('Scan with a phone camera');
+    expect($page->script('document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
 });

@@ -1,15 +1,28 @@
+import { QrCodeIcon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
 import { Head } from '@inertiajs/react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useState } from 'react';
 import { Avatar } from '@/components/avatar';
 import { DownloadAll, FileDownload } from '@/components/downloads';
-import { FileRow, Shell } from '@/components/filemax';
+import { FileRow, PasswordBadge, Shell } from '@/components/filemax';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { dateTime } from '@/lib/format';
 
 type SharedTransfer = {
     token: string;
+    url: string;
     title: string;
     message: string | null;
+    password_protected: boolean;
     sender: { name: string; email: string; avatar_url: string | null } | null;
     files: { id: string; name: string; size: number; mime_type: string }[];
     total_size: number;
@@ -22,6 +35,7 @@ export default function SharedTransferPage({
     transfer: SharedTransfer;
 }) {
     const [allFiles, setAllFiles] = useState(false);
+    const displayUrl = transfer.url.replace(/^https?:\/\//, '');
     return (
         <Shell recipient>
             <Head title={transfer.title}>
@@ -54,16 +68,68 @@ export default function SharedTransferPage({
                         <h1 className="text-3xl leading-tight text-pretty wrap-anywhere">
                             {transfer.title}
                         </h1>
+                        {transfer.password_protected && <PasswordBadge />}
                         {transfer.message && (
                             <p className="text-base wrap-anywhere whitespace-pre-wrap text-muted-foreground">
                                 {transfer.message}
                             </p>
                         )}
                     </div>
-                    <DownloadAll
-                        token={transfer.token}
-                        totalSize={transfer.total_size}
-                    />
+                    <div className="flex flex-col gap-1">
+                        <DownloadAll
+                            token={transfer.token}
+                            totalSize={transfer.total_size}
+                            singleFileId={
+                                transfer.files.length === 1
+                                    ? transfer.files[0].id
+                                    : undefined
+                            }
+                        />
+                        <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
+                            <span className="md:hidden">
+                                Need it on another phone?
+                            </span>
+                            <span className="hidden md:inline">
+                                Need it on your phone?
+                            </span>
+                            <Dialog>
+                                <DialogTrigger
+                                    render={<Button variant="link" />}
+                                    className="gap-1.5 px-1"
+                                >
+                                    <HugeiconsIcon
+                                        icon={QrCodeIcon}
+                                        size={16}
+                                        strokeWidth={1.5}
+                                        aria-hidden="true"
+                                    />
+                                    Show QR code
+                                </DialogTrigger>
+                                <DialogContent className="max-w-85 justify-items-center px-6 pt-12 pb-6 text-center">
+                                    <DialogHeader className="gap-1.5">
+                                        <DialogTitle className="text-xl leading-tight font-bold tracking-tight">
+                                            Scan with a phone camera
+                                        </DialogTitle>
+                                        <DialogDescription>
+                                            This page opens on the phone, ready
+                                            to download.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <QRCodeSVG
+                                        value={transfer.url}
+                                        size={200}
+                                        marginSize={4}
+                                        fgColor="currentColor"
+                                        role="img"
+                                        aria-label={`QR code for ${displayUrl}`}
+                                    />
+                                    <p className="text-xs wrap-anywhere text-muted-foreground">
+                                        {displayUrl}
+                                    </p>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
+                    </div>
                     <div>
                         <ul className="border-y border-border">
                             {transfer.files

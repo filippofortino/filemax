@@ -8,6 +8,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Laravel\Passkeys\Exceptions\InvalidPasskeyException;
 use Webauthn\Exception\AuthenticatorResponseVerificationException;
 
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
+        $middleware->prependToPriorityList(SubstituteBindings::class, HandleInertiaRequests::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->map(

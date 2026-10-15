@@ -46,6 +46,7 @@ export type Transfer = {
     title: string;
     message: string | null;
     visibility: 'public' | 'teams';
+    password_protected: boolean;
     status: string;
     files: TransferFile[];
     teams: Team[];

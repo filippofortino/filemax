@@ -17,6 +17,7 @@ type Archive = {
 export function DownloadAll({
     token,
     totalSize,
+    singleFileId,
     disabled = false,
     onDownload,
     variant = 'default',
@@ -24,6 +25,7 @@ export function DownloadAll({
 }: {
     token: string;
     totalSize: number;
+    singleFileId?: string;
     disabled?: boolean;
     onDownload?: () => void;
     variant?: 'default' | 'outline';
@@ -44,6 +46,18 @@ export function DownloadAll({
         setProgress(0);
         setError('');
         try {
+            if (singleFileId) {
+                const result = await request<{ url: string }>(
+                    downloadFile.url({ transfer: token, file: singleFileId }),
+                    'POST',
+                    undefined,
+                    active.signal,
+                );
+                onDownload?.();
+                window.location.assign(result.url);
+                return;
+            }
+
             let result = await request<Archive>(
                 download.url(token),
                 'POST',
@@ -105,10 +119,12 @@ export function DownloadAll({
                     aria-hidden="true"
                 />
                 {busy
-                    ? `Preparing files… ${progress}%`
-                    : `Download all · ${bytes(totalSize)}`}
+                    ? singleFileId
+                        ? 'Starting download…'
+                        : `Preparing files… ${progress}%`
+                    : `${singleFileId ? 'Download' : 'Download all'} · ${bytes(totalSize)}`}
             </Button>
-            {busy && (
+            {busy && !singleFileId && (
                 <div className="flex flex-col gap-2">
                     <progress
                         value={progress}

@@ -25,6 +25,7 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -49,12 +50,14 @@ final class TransferController
     {
         /** @var array{title?: ?string, message?: ?string, visibility: string, expires_in_days: int, team_ids?: list<string>, files: list<array{name: string, size: int, type?: ?string}>} $data */
         $data = $request->validated();
-        $transfer = DB::transaction(function () use ($request, $data, $storage): Transfer {
+        $passwordHash = $request->boolean('password_protected') ? Hash::make($request->string('password')->toString()) : null;
+        $transfer = DB::transaction(function () use ($request, $data, $storage, $passwordHash): Transfer {
             $transfer = Transfer::query()->create([
                 'user_id' => ($request->user() ?? abort(403))->id,
                 'title' => $data['title'] ?? null,
                 'message' => $data['message'] ?? null,
                 'visibility' => $data['visibility'],
+                'password_hash' => $passwordHash,
                 'expires_in_days' => $data['expires_in_days'],
             ]);
             $transfer->teams()->sync($data['team_ids'] ?? []);

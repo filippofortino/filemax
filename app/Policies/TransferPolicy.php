@@ -37,7 +37,9 @@ final class TransferPolicy
         }
 
         if ($transfer->visibility === 'public') {
-            return true;
+            return $transfer->password_hash === null
+                || $user?->id === $transfer->user_id
+                || (request()->hasSession() && request()->session()->get('unlocked_transfers.'.$transfer->id) === true);
         }
 
         if (! $user instanceof User || ! $this->create($user)) {
