@@ -10,6 +10,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import {
     CopyLink,
+    RadioPill,
     ErrorMessage,
     FileRow,
     Shell,
@@ -1000,20 +1001,15 @@ export default function Create({ teams }: { teams: Team[] }) {
                                 </legend>
                                 <div className="flex flex-wrap gap-2">
                                     {[1, 7, 14, 30].map((days) => (
-                                        <label
+                                        <RadioPill
                                             key={days}
-                                            className="inline-flex h-10 cursor-pointer items-center rounded-full border border-input px-3 has-checked:border-primary has-checked:bg-primary/5 has-checked:font-semibold has-checked:text-primary has-checked:ring-1 has-checked:ring-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary has-disabled:cursor-not-allowed"
+                                            name="expiry"
+                                            checked={expiry === days}
+                                            onChange={() => setExpiry(days)}
+                                            disabled={busy || hasDraft}
                                         >
-                                            <input
-                                                type="radio"
-                                                className="sr-only"
-                                                name="expiry"
-                                                checked={expiry === days}
-                                                onChange={() => setExpiry(days)}
-                                                disabled={busy || hasDraft}
-                                            />
                                             {days} {days === 1 ? 'day' : 'days'}
-                                        </label>
+                                        </RadioPill>
                                     ))}
                                 </div>
                                 <p className="mt-2.5 text-sm text-muted-foreground">

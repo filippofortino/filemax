@@ -28,7 +28,14 @@ it('keeps the main navigation in place and offers a new transfer button outside 
         ->assertVisible('header a[aria-label="New transfer"]');
     expect($page->script($navigationLeft))->toEqualWithDelta($left, 1);
 
-    $page->click('header a[aria-label="New transfer"]')
+    $page->click('nav a:has-text("New secret")')
+        ->assertSee('Create secret link')
+        ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', 'New secret')
+        ->assertMissing('header a[aria-label="New transfer"]');
+    expect($page->script($navigationLeft))->toEqualWithDelta($left, 1);
+
+    $page->click('nav a:has-text("My transfers")')
+        ->click('header a[aria-label="New transfer"]')
         ->assertSee('Drop files here')
         ->assertNoJavascriptErrors();
 });
@@ -59,8 +66,9 @@ it('gives the mobile header controls space above them', function (): void {
                 const nav = document.querySelector('nav[aria-label="Main navigation"]');
                 const button = document.querySelector('header a[aria-label="New transfer"]');
                 const links = [...nav.querySelectorAll('a')];
+                const oneLine = link => { const range = document.createRange(); range.selectNodeContents(link); return range.getClientRects().length === 1; };
                 return nav.getBoundingClientRect().top >= button.getBoundingClientRect().bottom
-                    && links.every(link => link.getBoundingClientRect().top === nav.getBoundingClientRect().top)
+                    && links.every(link => link.getBoundingClientRect().top === nav.getBoundingClientRect().top && oneLine(link))
                     && document.documentElement.scrollWidth <= innerWidth;
             }
             JS))->toBeTrue();
@@ -68,4 +76,39 @@ it('gives the mobile header controls space above them', function (): void {
 
     $page->resize(1280, 940);
     expect($page->script('() => document.querySelector("header").getBoundingClientRect().height'))->toEqual(64);
+});
+
+it('scrolls the phone navigation sideways to keep the active link in view', function (): void {
+    $this->actingAs(User::factory()->admin()->create());
+
+    foreach (['/secrets/create' => 'New secret', '/teams' => 'Teams'] as $path => $label) {
+        visit($path)->resize(320, 740)->refresh()
+            ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', $label)
+            ->assertScript(<<<'JS'
+                () => {
+                    const nav = document.querySelector('nav[aria-label="Main navigation"]');
+                    const link = nav.querySelector('[aria-current="page"]').getBoundingClientRect();
+                    const strip = nav.getBoundingClientRect();
+                    return nav.scrollWidth > nav.clientWidth && link.left >= strip.left && link.right <= strip.right
+                        && document.documentElement.scrollWidth <= innerWidth;
+                }
+                JS)
+            ->assertNoJavascriptErrors();
+    }
+});
+
+it('fits the four admin links beside the header controls on a tablet', function (): void {
+    $this->actingAs(User::factory()->admin()->create());
+
+    visit('/transfers')->resize(768, 1024)
+        ->assertVisible('header a[aria-label="New transfer"]')
+        ->assertScript(<<<'JS'
+            () => {
+                const nav = document.querySelector('nav[aria-label="Main navigation"]');
+                const active = nav.querySelector('[aria-current="page"]').getBoundingClientRect();
+                const strip = nav.getBoundingClientRect();
+                return document.documentElement.scrollWidth <= innerWidth && active.left >= strip.left && active.right <= strip.right;
+            }
+            JS)
+        ->assertNoJavascriptErrors();
 });

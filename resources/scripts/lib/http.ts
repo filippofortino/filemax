@@ -72,10 +72,13 @@ export async function request<T>(
         typeof error.message === 'string' && error.message.trim()
             ? error.message
             : '';
-    throw new Error(
-        validation ||
-            message ||
-            'This request could not be completed. Please try again.',
+    throw Object.assign(
+        new Error(
+            validation ||
+                message ||
+                'This request could not be completed. Please try again.',
+        ),
+        { status: response.status },
     );
 }
 export function uploadPart(
