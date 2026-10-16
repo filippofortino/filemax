@@ -166,3 +166,18 @@ it('lists secrets on their own page, apart from My transfers, and lets the owner
 
     expect(Secret::query()->sole()->revoked_at)->not->toBeNull();
 });
+
+it('keeps the views icon full size when its text wraps', function (): void {
+    $owner = User::factory()->create();
+    Secret::factory()->for($owner)->opened()->create(['label' => 'Secret stuff']);
+    $this->actingAs($owner);
+
+    visit('/secrets')->resize(800, 900)
+        ->assertSee('Deleted after its view')
+        ->assertScript(<<<'JS'
+            () => {
+                const cell = document.querySelector('[title="Times the secret was opened"]');
+                return cell.getBoundingClientRect().height > 30 && cell.querySelector('svg').getBoundingClientRect().width === 16;
+            }
+            JS);
+});
