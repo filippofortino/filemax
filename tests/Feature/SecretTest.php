@@ -212,13 +212,19 @@ it('keeps an opened secret marked as opened when its owner deletes it afterwards
     expect($secret->refresh()->revoked_at)->toBeNull()->and($secret->unavailableReason())->toBe('opened');
 });
 
-it('purges the ciphertext of expired secrets only', function (): void {
+it('purges the ciphertext of expired secrets and of used ones that kept it', function (): void {
     $active = Secret::factory()->create();
+    $partlyOpened = Secret::factory()->views(5)->create(['view_count' => 2]);
     $expired = Secret::factory()->expired()->create();
+    // The view was spent, but the process died before the ciphertext was cleared.
+    $used = Secret::factory()->create(['view_count' => 1, 'last_opened_at' => now()]);
 
-    $this->artisan('filemax:purge-secrets')->expectsOutputToContain('Purged 1 expired secrets.')->assertSuccessful();
+    $this->artisan('filemax:purge-secrets')->expectsOutputToContain('Purged 2 expired or opened secrets.')->assertSuccessful();
 
-    expect($active->refresh()->payload)->not->toBeNull()->and($expired->refresh()->payload)->toBeNull();
+    expect($active->refresh()->payload)->not->toBeNull()
+        ->and($partlyOpened->refresh()->payload)->not->toBeNull()
+        ->and($expired->refresh()->payload)->toBeNull()
+        ->and($used->refresh()->payload)->toBeNull();
 });
 
 it('purges secrets once a day, in the same run as the transfer cleanup', function (): void {
