@@ -17,5 +17,6 @@ require __DIR__.'/auth.php';
 require __DIR__.'/teams.php';
 
 require __DIR__.'/transfers.php';
+require __DIR__.'/secrets.php';
 
 require __DIR__.'/shared.php';

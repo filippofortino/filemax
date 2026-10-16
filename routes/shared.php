@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\OpenSecretController;
+use App\Http\Controllers\SharedSecretController;
 use App\Http\Controllers\SharedTransferController;
 use App\Http\Controllers\TransferArchiveController;
 use App\Http\Controllers\TransferArchiveDownloadController;
@@ -22,3 +24,7 @@ Route::scopeBindings()->prefix('t/{transfer:token}')->name('shared.')->group(fun
     Route::get('/archive', [TransferArchiveController::class, 'show'])->name('archive');
     Route::get('/archive/download', [TransferArchiveDownloadController::class, 'show'])->name('archive.download');
 });
+
+Route::get('/s/{secret:token}', [SharedSecretController::class, 'show'])->name('shared.secrets.show')
+    ->missing(fn (Request $request) => Inertia::render('shared/secret', ['secret' => null])->toResponse($request)->setStatusCode(404));
+Route::post('/s/{secret:token}/open', OpenSecretController::class)->name('shared.secrets.open');

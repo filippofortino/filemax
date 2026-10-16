@@ -6,3 +6,4 @@ use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('filemax:cleanup')->daily()->withoutOverlapping();
 Schedule::command('filemax:send-expiry-reminders')->everyThreeHours()->withoutOverlapping();
+Schedule::command('filemax:purge-secrets')->daily()->withoutOverlapping();

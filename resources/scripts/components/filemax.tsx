@@ -13,7 +13,14 @@ import {
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Link, usePage } from '@inertiajs/react';
-import { useState, type ReactNode, type Ref } from 'react';
+import {
+    useEffect,
+    useRef,
+    useState,
+    type ComponentProps,
+    type ReactNode,
+    type Ref,
+} from 'react';
 import { Avatar } from '@/components/avatar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -27,6 +34,7 @@ import type { SharedProps, Team } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { home, logout } from '@/routes';
 import { settings } from '@/routes/account';
+import { create as newSecret, index as secrets } from '@/routes/secrets';
 import { index as teams } from '@/routes/teams';
 import { index as transfers } from '@/routes/transfers';
 
@@ -73,12 +81,39 @@ export function Shell({
     recipientAccount = false,
 }: {
     children: ReactNode;
-    active?: 'new' | 'transfers' | 'teams' | 'account';
+    active?:
+        | 'new'
+        | 'transfers'
+        | 'secrets'
+        | 'new-secret'
+        | 'teams'
+        | 'account';
     recipient?: boolean;
     recipientAccount?: boolean;
 }) {
     const user = usePage<SharedProps>().props.auth.user;
-    const showsNewTransfer = !recipient && active !== 'new';
+    // The header's primary action creates what the current section lists, and hides on its own form.
+    const action =
+        recipient || active === 'new' || active === 'new-secret'
+            ? null
+            : active === 'secrets'
+              ? { href: newSecret(), label: 'New secret' }
+              : { href: home(), label: 'New transfer' };
+    const nav = useRef<HTMLElement>(null);
+    // Below md the links can overflow narrow phones; keep the active one in view without scrolling the page.
+    useEffect(() => {
+        const link = nav.current?.querySelector('[aria-current="page"]');
+        if (nav.current && link) {
+            nav.current.scrollLeft +=
+                link.getBoundingClientRect().right -
+                nav.current.getBoundingClientRect().right;
+        }
+    }, [active]);
+    const navLinkClass = (current: boolean) =>
+        cn(
+            'flex shrink-0 items-center border-b-2 border-transparent px-3 text-xs font-medium whitespace-nowrap text-muted-foreground focus-visible:-outline-offset-2 md:text-sm',
+            current && 'border-primary font-semibold text-primary',
+        );
     return (
         <div
             className={cn(
@@ -98,26 +133,19 @@ export function Shell({
                 <Brand />
                 {!recipient && (
                     <nav
+                        ref={nav}
                         aria-label="Main navigation"
-                        className="order-last flex h-12 w-full items-stretch justify-center gap-1 md:order-none md:h-full md:w-auto lg:absolute lg:left-1/2 lg:-translate-x-1/2"
+                        className="order-last -mx-5 flex h-12 w-[calc(100%+2.5rem)] [scrollbar-width:none] items-stretch justify-center-safe gap-1 overflow-x-auto px-5 md:order-none md:mx-0 md:h-full md:w-auto md:min-w-0 md:px-0 lg:absolute lg:left-1/2 lg:-translate-x-1/2 lg:overflow-visible [&::-webkit-scrollbar]:hidden"
                     >
                         <Link
-                            className={cn(
-                                'flex items-center border-b-2 border-transparent px-3 text-xs font-medium text-muted-foreground md:text-sm',
-                                active === 'new' &&
-                                    'border-primary font-semibold text-primary',
-                            )}
+                            className={navLinkClass(active === 'new')}
                             href={home()}
                             aria-current={active === 'new' ? 'page' : undefined}
                         >
                             New transfer
                         </Link>
                         <Link
-                            className={cn(
-                                'flex items-center border-b-2 border-transparent px-3 text-xs font-medium text-muted-foreground md:text-sm',
-                                active === 'transfers' &&
-                                    'border-primary font-semibold text-primary',
-                            )}
+                            className={navLinkClass(active === 'transfers')}
                             href={transfers()}
                             aria-current={
                                 active === 'transfers' ? 'page' : undefined
@@ -125,13 +153,22 @@ export function Shell({
                         >
                             My transfers
                         </Link>
+                        <Link
+                            className={navLinkClass(
+                                active === 'secrets' || active === 'new-secret',
+                            )}
+                            href={secrets()}
+                            aria-current={
+                                active === 'secrets' || active === 'new-secret'
+                                    ? 'page'
+                                    : undefined
+                            }
+                        >
+                            Secrets
+                        </Link>
                         {user?.is_admin && (
                             <Link
-                                className={cn(
-                                    'flex items-center border-b-2 border-transparent px-3 text-xs font-medium text-muted-foreground md:text-sm',
-                                    active === 'teams' &&
-                                        'border-primary font-semibold text-primary',
-                                )}
+                                className={navLinkClass(active === 'teams')}
                                 href={teams()}
                                 aria-current={
                                     active === 'teams' ? 'page' : undefined
@@ -143,10 +180,10 @@ export function Shell({
                     </nav>
                 )}
                 <div className="flex items-center gap-2 md:gap-4">
-                    {showsNewTransfer && (
+                    {action && (
                         <Link
-                            href={home()}
-                            aria-label="New transfer"
+                            href={action.href}
+                            aria-label={action.label}
                             className={buttonVariants({
                                 size: 'icon-sm',
                                 className: 'md:h-10 md:w-auto md:px-4',
@@ -158,7 +195,7 @@ export function Shell({
                                 aria-hidden="true"
                             />
                             <span className="hidden md:inline">
-                                New transfer
+                                {action.label}
                             </span>
                         </Link>
                     )}
@@ -176,7 +213,7 @@ export function Shell({
                                     <span
                                         className={cn(
                                             'hidden md:inline',
-                                            showsNewTransfer && 'md:hidden',
+                                            action && 'md:hidden',
                                         )}
                                     >
                                         {user.name.split(' ')[0]}
@@ -474,9 +511,18 @@ export function TeamPicker({
         </div>
     );
 }
-export function CopyLink({ url }: { url: string }) {
+export function CopyLink({
+    url,
+    noun = 'link',
+    hint,
+}: {
+    url: string;
+    noun?: 'link' | 'key';
+    hint?: ReactNode;
+}) {
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState('');
+    const id = noun === 'key' ? 'secret-key' : 'share-link';
     async function copy() {
         try {
             await navigator.clipboard.writeText(url);
@@ -484,24 +530,33 @@ export function CopyLink({ url }: { url: string }) {
             setError('');
         } catch {
             setError(
-                'Copy is unavailable. Select the link and copy it manually.',
+                `Copy is unavailable. Select the ${noun} and copy it manually.`,
             );
         }
     }
     return (
         <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold" htmlFor="share-link">
-                Share this link
+            <label className="text-sm font-semibold" htmlFor={id}>
+                {noun === 'key' ? 'Key' : 'Share this link'}
             </label>
             <div className="flex flex-wrap gap-2 md:flex-nowrap">
                 <input
-                    id="share-link"
+                    id={id}
                     readOnly
                     value={url}
-                    className="basis-48 text-sm md:flex-1"
+                    className={cn(
+                        'basis-48 md:flex-1',
+                        noun === 'key' ? 'font-mono tracking-wide' : 'text-sm',
+                    )}
+                    aria-describedby={hint ? `${id}-hint` : undefined}
                     onFocus={(event) => event.target.select()}
                 />
-                <Button type="button" onClick={copy} className="px-4">
+                <Button
+                    type="button"
+                    variant={noun === 'key' ? 'outline' : 'default'}
+                    onClick={copy}
+                    className="px-4"
+                >
                     <HugeiconsIcon
                         key={copied ? 'copied' : 'copy'}
                         icon={copied ? Tick02Icon : Copy01Icon}
@@ -513,14 +568,38 @@ export function CopyLink({ url }: { url: string }) {
                                 : undefined
                         }
                     />
-                    {copied ? 'Copied' : 'Copy link'}
+                    {copied
+                        ? 'Copied'
+                        : noun === 'key'
+                          ? 'Copy key'
+                          : 'Copy link'}
                 </Button>
             </div>
+            {hint && (
+                <p id={`${id}-hint`} className="text-sm text-muted-foreground">
+                    {hint}
+                </p>
+            )}
             <span role="status" className="sr-only">
-                {copied ? 'Link copied to clipboard' : ''}
+                {copied
+                    ? `${noun === 'key' ? 'Key' : 'Link'} copied to clipboard`
+                    : ''}
             </span>
             <ErrorMessage>{error}</ErrorMessage>
         </div>
+    );
+}
+export function RadioPill({
+    children,
+    ...props
+}: Omit<ComponentProps<'input'>, 'type' | 'className'> & {
+    children: ReactNode;
+}) {
+    return (
+        <label className="inline-flex h-10 cursor-pointer items-center rounded-full border border-input px-3 has-checked:border-primary has-checked:bg-primary/5 has-checked:font-semibold has-checked:text-primary has-checked:ring-1 has-checked:ring-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary has-disabled:cursor-not-allowed">
+            <input type="radio" className="sr-only" {...props} />
+            {children}
+        </label>
     );
 }
 export function FileRow({
