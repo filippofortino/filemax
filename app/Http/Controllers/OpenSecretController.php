@@ -7,7 +7,6 @@ namespace App\Http\Controllers;
 use App\Http\Requests\OpenSecretRequest;
 use App\Models\Secret;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
@@ -34,18 +33,18 @@ final class OpenSecretController
 
         $payload = $secret->payload;
         $now = now();
-        // One conditional update spends the view atomically on every driver; the last view also drops the ciphertext.
+        // One conditional increment spends the view atomically on every driver, so only one request can take the last view.
         $spent = Secret::query()->whereKey($secret->id)
             ->whereNull('revoked_at')
             ->whereColumn('view_count', '<', 'max_views')
             ->where('expires_at', '>', $now)
-            ->update([
-                'payload' => DB::raw('CASE WHEN view_count + 1 >= max_views THEN NULL ELSE payload END'),
-                'view_count' => DB::raw('view_count + 1'),
-                'last_opened_at' => $now,
-            ]);
+            ->increment('view_count', 1, ['last_opened_at' => $now]);
         abort_if($spent === 0 || $payload === null, 410);
         $secret->refresh();
+
+        if ($secret->view_count >= $secret->max_views) {
+            $secret->update(['payload' => null]);
+        }
 
         return response()->json([
             'payload' => $payload,
