@@ -406,6 +406,7 @@ export default function Index({
                                                         icon={ViewIcon}
                                                         size={16}
                                                         aria-hidden="true"
+                                                        className="shrink-0"
                                                     />
                                                     {secret.max_views === 1
                                                         ? `Opened ${date(secret.last_opened_at)}`
