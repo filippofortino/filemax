@@ -160,13 +160,6 @@ export default function CreateSecret() {
                                 className={buttonVariants({
                                     variant: 'outline',
                                 })}
-                                onClick={() => {
-                                    setReady(null);
-                                    setSplit(false);
-                                    setLabel('');
-                                    setMaxViews(1);
-                                    setHours(24);
-                                }}
                             >
                                 Share another secret
                             </Link>

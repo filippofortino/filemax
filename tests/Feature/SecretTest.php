@@ -45,17 +45,19 @@ it('lists only the owner’s secrets, newest first, with label search and status
     $later = Secret::factory()->for($owner)->create(['label' => 'Token Google Ads (dev)', 'expires_at' => now()->addDays(3), 'created_at' => now()->subHours(3)]);
     $soon = Secret::factory()->for($owner)->create(['label' => null, 'expires_at' => now()->addMinutes(30), 'created_at' => now()->subHours(2)]);
     $opened = Secret::factory()->for($owner)->opened()->create(['label' => 'Wi-Fi ospiti', 'created_at' => now()->subHour()]);
+    $deleted = Secret::factory()->for($owner)->revoked()->create(['label' => 'Revoked', 'created_at' => now()->subHours(4)]);
+    $expired = Secret::factory()->for($owner)->expired()->create(['label' => 'Ran out', 'created_at' => now()->subHours(5)]);
     Secret::factory()->create(['label' => 'Someone else']);
 
     $this->actingAs($owner)->get(route('secrets.index'))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
         ->component('secrets/index', false)
-        ->where('secrets.data', fn ($secrets): bool => collect($secrets)->pluck('id')->all() === [$opened->id, $soon->id, $later->id])
-        ->where('totals', ['total' => 3, 'active' => 2])
-        ->where('statusCounts', ['all' => 3, 'active' => 2, 'soon' => 1, 'expired' => 1])
+        ->where('secrets.data', fn ($secrets): bool => collect($secrets)->pluck('id')->all() === [$opened->id, $soon->id, $later->id, $deleted->id, $expired->id])
+        ->where('totals', ['total' => 5, 'active' => 2])
+        ->where('statusCounts', ['all' => 5, 'active' => 2, 'soon' => 1, 'expired' => 3])
         ->where('secrets.data.1.title', 'Unlabelled secret')->where('secrets.data.1.expiring_soon', true)
         ->missing('secrets.data.0.payload')->missing('secrets.data.0.token'));
     $this->get(route('secrets.index', ['search' => 'GOOGLE']))->assertInertia(fn (Assert $page): Assert => $page
-        ->has('secrets.data', 1)->where('secrets.data.0.id', $later->id)->where('statusCounts.all', 1)->where('totals.total', 3));
+        ->has('secrets.data', 1)->where('secrets.data.0.id', $later->id)->where('statusCounts.all', 1)->where('totals.total', 5));
     $this->get(route('secrets.index', ['search' => 'unlabelled', 'status' => 'soon']))->assertInertia(fn (Assert $page): Assert => $page
         ->has('secrets.data', 1)->where('secrets.data.0.id', $soon->id));
     $this->get(route('secrets.index', ['status' => 'expired', 'page' => 3]))->assertRedirect(route('secrets.index', ['status' => 'expired', 'page' => 1]));
@@ -98,6 +100,17 @@ it('rejects malformed secrets', function (array $overrides, string $field): void
     'unsupported expiry' => [['expires_in_hours' => 2], 'expires_in_hours'],
     'long label' => [['label' => str_repeat('a', 121)], 'label'],
 ]);
+
+it('refuses the last view when another request spent it after the secret was loaded', function (): void {
+    $verifier = str_repeat('k', 43);
+    $secret = secretWithVerifier($verifier);
+    // Another recipient takes the only view between route binding and the conditional increment.
+    Secret::retrieved(fn (Secret $loaded) => Secret::query()->whereKey($loaded->id)->update(['view_count' => 1]));
+
+    $this->postJson(route('shared.secrets.open', $secret->token), ['verifier' => $verifier])->assertStatus(410)->assertJsonMissingPath('payload');
+
+    expect($secret->refresh()->view_count)->toBe(1);
+});
 
 it('lets a guest open a once-only secret exactly once', function (): void {
     $verifier = str_repeat('k', 43);

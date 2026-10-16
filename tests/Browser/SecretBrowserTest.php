@@ -56,6 +56,7 @@ it('encrypts a secret in the browser and opens it once from a link that carries 
         ->assertNoJavascriptErrors()
         ->screenshot(fullPage: false, filename: 'secret-open-phone');
     expect($recipient->script('() => location.hash'))->toBe('')
+        ->and($recipient->text('#secret-body'))->toBe($plaintext)
         ->and($recipient->script('() => document.activeElement.textContent'))->toBe('Filippo sent you a secret')
         ->and($secret->refresh()->view_count)->toBe(1)
         ->and($secret->payload)->toBeNull();
@@ -96,6 +97,7 @@ it('unlocks a secret with a key sent separately and rejects a wrong key without 
     $recipient->type('#secret-key', mb_strtolower(str_replace('-', ' ', $key)))
         ->press('Unlock secret')
         ->assertSee('wifi-ospiti-2026')
+        ->assertSeeIn('#secret-body', 'wifi-ospiti-2026')
         ->assertSee('You can open this secret 4 more times')
         ->assertSee('1 of 5 views used')
         ->assertNoJavascriptErrors();

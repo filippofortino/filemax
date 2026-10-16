@@ -107,10 +107,7 @@ final class SecretController
     private function applyStatus(Builder $query, string $status, CarbonInterface $now): Builder
     {
         if ($status === 'expired') {
-            return $query->where(fn (Builder $query) => $query
-                ->whereNotNull('revoked_at')
-                ->orWhereColumn('view_count', '>=', 'max_views')
-                ->orWhere('expires_at', '<=', $now));
+            return $query->whereNot(fn (Builder $query): Builder => $this->applyStatus($query, 'active', $now));
         }
 
         if ($status === 'active' || $status === 'soon') {

@@ -60,7 +60,7 @@ final class Secret extends Model
 
     public function isAvailable(): bool
     {
-        return $this->revoked_at === null && $this->view_count < $this->max_views && $this->expires_at->isFuture();
+        return $this->unavailableReason() === null;
     }
 
     /** Why the secret can no longer be opened, or null while it still can. */
