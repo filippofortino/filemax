@@ -104,6 +104,25 @@ it('unlocks a secret with a key sent separately and rejects a wrong key without 
     expect($secret->view_count)->toBe(1)->and($secret->wrong_key_count)->toBe(1)->and($secret->payload)->not->toBeNull();
 });
 
+it('uses a corrected link fragment without reloading the secret page', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    $page = visit('/secrets/create')->type('#secret-text', 'fragment-change-secret')
+        ->press('Create secret link')->assertSee('Your secret is ready');
+    [$url, $key] = explode('#', $page->value('#share-link'));
+
+    $recipient = visit($url)->assertSee('This secret needs its key');
+    $recipient->script('() => { location.hash = "invalid"; }');
+    $recipient->assertSee('The key in this link doesn’t open this secret.');
+    $recipient->script('() => { location.hash = '.json_encode($key, JSON_THROW_ON_ERROR).'; }');
+    $recipient->assertSee('View secret')->assertDontSee('The key in this link doesn’t open this secret.')
+        ->press('View secret')->assertSee('fragment-change-secret')->assertNoJavascriptErrors();
+
+    $recipient->script('() => { location.hash = "changed-after-opening"; }');
+    $recipient->assertSee('fragment-change-secret')->assertDontSee('This secret needs its key');
+    expect(Secret::query()->sole()->view_count)->toBe(1);
+});
+
 it('shows the opened state when someone else opens the secret first', function (): void {
     $secret = Secret::factory()->for(User::factory()->create(['name' => 'Filippo Fortino']))->create();
 

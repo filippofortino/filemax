@@ -49,13 +49,19 @@ export default function SharedSecretPage({
     const focusHeading = useRef(false);
 
     useEffect(() => {
-        if (!secret?.available) return;
-        const hash = window.location.hash.slice(1);
-        const key = normaliseKey(hash);
-        setLinkKey(key);
-        setMode(key ? 'view' : 'key');
-        if (!key && hash) setKeyError('link');
-    }, [secret?.available]);
+        if (!secret?.available || opened) return;
+        const syncKey = () => {
+            const hash = window.location.hash.slice(1);
+            const key = normaliseKey(hash);
+            setLinkKey(key);
+            setMode(key ? 'view' : 'key');
+            setKeyError(!key && hash ? 'link' : null);
+            setError('');
+        };
+        syncKey();
+        window.addEventListener('hashchange', syncKey);
+        return () => window.removeEventListener('hashchange', syncKey);
+    }, [secret?.available, opened]);
 
     const first = secret?.sender?.name.split(' ')[0] ?? null;
     const once = (secret?.views_left ?? 1) <= 1;
