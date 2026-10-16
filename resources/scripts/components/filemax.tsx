@@ -34,7 +34,7 @@ import type { SharedProps, Team } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { home, logout } from '@/routes';
 import { settings } from '@/routes/account';
-import { create as newSecret } from '@/routes/secrets';
+import { create as newSecret, index as secrets } from '@/routes/secrets';
 import { index as teams } from '@/routes/teams';
 import { index as transfers } from '@/routes/transfers';
 
@@ -81,13 +81,24 @@ export function Shell({
     recipientAccount = false,
 }: {
     children: ReactNode;
-    active?: 'new' | 'secret' | 'transfers' | 'teams' | 'account';
+    active?:
+        | 'new'
+        | 'transfers'
+        | 'secrets'
+        | 'new-secret'
+        | 'teams'
+        | 'account';
     recipient?: boolean;
     recipientAccount?: boolean;
 }) {
     const user = usePage<SharedProps>().props.auth.user;
-    const showsNewTransfer =
-        !recipient && active !== 'new' && active !== 'secret';
+    // The header's primary action creates what the current section lists, and hides on its own form.
+    const action =
+        recipient || active === 'new' || active === 'new-secret'
+            ? null
+            : active === 'secrets'
+              ? { href: newSecret(), label: 'New secret' }
+              : { href: home(), label: 'New transfer' };
     const nav = useRef<HTMLElement>(null);
     // Below md the links can overflow narrow phones; keep the active one in view without scrolling the page.
     useEffect(() => {
@@ -134,15 +145,6 @@ export function Shell({
                             New transfer
                         </Link>
                         <Link
-                            className={navLinkClass(active === 'secret')}
-                            href={newSecret()}
-                            aria-current={
-                                active === 'secret' ? 'page' : undefined
-                            }
-                        >
-                            New secret
-                        </Link>
-                        <Link
                             className={navLinkClass(active === 'transfers')}
                             href={transfers()}
                             aria-current={
@@ -150,6 +152,19 @@ export function Shell({
                             }
                         >
                             My transfers
+                        </Link>
+                        <Link
+                            className={navLinkClass(
+                                active === 'secrets' || active === 'new-secret',
+                            )}
+                            href={secrets()}
+                            aria-current={
+                                active === 'secrets' || active === 'new-secret'
+                                    ? 'page'
+                                    : undefined
+                            }
+                        >
+                            Secrets
                         </Link>
                         {user?.is_admin && (
                             <Link
@@ -165,10 +180,10 @@ export function Shell({
                     </nav>
                 )}
                 <div className="flex items-center gap-2 md:gap-4">
-                    {showsNewTransfer && (
+                    {action && (
                         <Link
-                            href={home()}
-                            aria-label="New transfer"
+                            href={action.href}
+                            aria-label={action.label}
                             className={buttonVariants({
                                 size: 'icon-sm',
                                 className: 'md:h-10 md:w-auto md:px-4',
@@ -180,7 +195,7 @@ export function Shell({
                                 aria-hidden="true"
                             />
                             <span className="hidden md:inline">
-                                New transfer
+                                {action.label}
                             </span>
                         </Link>
                     )}
@@ -198,7 +213,7 @@ export function Shell({
                                     <span
                                         className={cn(
                                             'hidden md:inline',
-                                            showsNewTransfer && 'md:hidden',
+                                            action && 'md:hidden',
                                         )}
                                     >
                                         {user.name.split(' ')[0]}

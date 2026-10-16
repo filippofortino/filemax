@@ -10,8 +10,9 @@ it('encrypts a secret in the browser and opens it once from a link that carries 
     $plaintext = 'Zk3p9QwL7xVb2NcTq8Rm';
 
     $page = visit('/secrets/create')->resize(1280, 940)
-        ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', 'New secret')
+        ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', 'Secrets')
         ->assertMissing('header a[aria-label="New transfer"]')
+        ->assertMissing('header a[aria-label="New secret"]')
         ->assertAttribute('#secret-text', 'spellcheck', 'false')
         ->assertAttributeMissing('#secret-text', 'name')
         ->type('#secret-text', $plaintext)
@@ -135,23 +136,23 @@ it('shows the opened state when someone else opens the secret first', function (
         ->assertNoJavascriptErrors();
 });
 
-it('lists secrets in My transfers and lets the owner delete one', function (): void {
+it('lists secrets on their own page, apart from My transfers, and lets the owner delete one', function (): void {
     $owner = User::factory()->create();
-    Secret::factory()->for($owner)->create(['label' => 'Accesso staging WordPress', 'max_views' => 5, 'view_count' => 2, 'last_opened_at' => now()]);
+    Secret::factory()->for($owner)->create(['label' => 'Accesso staging WordPress', 'max_views' => 5, 'view_count' => 2, 'last_opened_at' => now(), 'expires_at' => now()->addDays(3)]);
     $this->actingAs($owner);
 
-    $page = visit('/transfers')->resize(1280, 940)
-        ->assertSee('0 transfers · 1 secret · 1 active')
+    visit('/transfers')->assertSee('No transfers yet')->assertDontSee('Accesso staging WordPress');
+
+    $page = visit('/secrets')->resize(1280, 940)
+        ->assertSee('1 secret · 1 active')
         ->assertSee('Accesso staging WordPress')
-        ->assertSee('Encrypted')
         ->assertSee('2 of 5 views')
+        ->assertVisible('header a[aria-label="New secret"]')
         ->screenshot(fullPage: false, filename: 'secret-list-desktop')
         ->resize(390, 844)
         ->screenshot(fullPage: false, filename: 'secret-list-phone');
     expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
-    $page->click('Secrets')
-        ->assertSee('Accesso staging WordPress')
-        ->click('Accesso staging WordPress')
+    $page->click('Accesso staging WordPress')
         ->assertSee('Filemax never had the key')
         ->assertSee('Opens up to 5 times')
         ->resize(1280, 940)

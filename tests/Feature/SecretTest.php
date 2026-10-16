@@ -32,11 +32,35 @@ function secretWithVerifier(string $verifier, array $attributes = []): Secret
 }
 
 it('opens the new secret page only for verified colleagues', function (): void {
+    $this->get(route('secrets.index'))->assertRedirect(route('login'));
     $this->get(route('secrets.create'))->assertRedirect(route('login'));
     $this->actingAs(User::factory()->unverified()->create())->get(route('secrets.create'))->assertRedirect(route('verification.notice'));
     $this->flushSession()->actingAs(User::factory()->create(['email' => 'external@example.com']))->get(route('secrets.create'))->assertForbidden();
     $this->flushSession()->actingAs(User::factory()->create())->get(route('secrets.create'))->assertOk()
         ->assertInertia(fn (Assert $page): Assert => $page->component('secrets/create', false));
+});
+
+it('lists only the owner’s secrets, newest first, with label search and status counts', function (): void {
+    $owner = User::factory()->create();
+    $later = Secret::factory()->for($owner)->create(['label' => 'Token Google Ads (dev)', 'expires_at' => now()->addDays(3), 'created_at' => now()->subHours(3)]);
+    $soon = Secret::factory()->for($owner)->create(['label' => null, 'expires_at' => now()->addMinutes(30), 'created_at' => now()->subHours(2)]);
+    $opened = Secret::factory()->for($owner)->opened()->create(['label' => 'Wi-Fi ospiti', 'created_at' => now()->subHour()]);
+    Secret::factory()->create(['label' => 'Someone else']);
+
+    $this->actingAs($owner)->get(route('secrets.index'))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
+        ->component('secrets/index', false)
+        ->where('secrets.data', fn ($secrets): bool => collect($secrets)->pluck('id')->all() === [$opened->id, $soon->id, $later->id])
+        ->where('totals', ['total' => 3, 'active' => 2])
+        ->where('statusCounts', ['all' => 3, 'active' => 2, 'soon' => 1, 'expired' => 1])
+        ->where('secrets.data.1.title', 'Unlabelled secret')->where('secrets.data.1.expiring_soon', true)
+        ->missing('secrets.data.0.payload')->missing('secrets.data.0.token'));
+    $this->get(route('secrets.index', ['search' => 'GOOGLE']))->assertInertia(fn (Assert $page): Assert => $page
+        ->has('secrets.data', 1)->where('secrets.data.0.id', $later->id)->where('statusCounts.all', 1)->where('totals.total', 3));
+    $this->get(route('secrets.index', ['search' => 'unlabelled', 'status' => 'soon']))->assertInertia(fn (Assert $page): Assert => $page
+        ->has('secrets.data', 1)->where('secrets.data.0.id', $soon->id));
+    $this->get(route('secrets.index', ['status' => 'expired', 'page' => 3]))->assertRedirect(route('secrets.index', ['status' => 'expired', 'page' => 1]));
+    $this->getJson(route('secrets.index', ['status' => 'unknown']))->assertUnprocessable()->assertJsonValidationErrors('status');
+    $this->get(route('transfers.index'))->assertInertia(fn (Assert $page): Assert => $page->has('transfers.data', 0));
 });
 
 it('stores the ciphertext with only a hash of the key verifier', function (): void {
@@ -171,7 +195,7 @@ it('shows and deletes a secret only for its owner', function (): void {
     $this->flushSession()->actingAs($owner)->get(route('secrets.show', $secret))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
         ->component('secrets/show', false)->where('secret.title', 'Unlabelled secret')->where('secret.labelled', false)
         ->where('secret.available', true)->missing('secret.payload')->missing('secret.token'));
-    $this->delete(route('secrets.destroy', $secret))->assertRedirect(route('transfers.index'))
+    $this->delete(route('secrets.destroy', $secret))->assertRedirect(route('secrets.index'))
         ->assertInertiaFlash('toast.title', 'Secret deleted');
 
     expect($secret->refresh()->revoked_at?->toIso8601String())->toBe(now()->toIso8601String())->and($secret->payload)->toBeNull();
@@ -183,7 +207,7 @@ it('keeps an opened secret marked as opened when its owner deletes it afterwards
     $owner = User::factory()->create();
     $secret = Secret::factory()->for($owner)->opened()->create();
 
-    $this->actingAs($owner)->delete(route('secrets.destroy', $secret))->assertRedirect(route('transfers.index'));
+    $this->actingAs($owner)->delete(route('secrets.destroy', $secret))->assertRedirect(route('secrets.index'));
 
     expect($secret->refresh()->revoked_at)->toBeNull()->and($secret->unavailableReason())->toBe('opened');
 });

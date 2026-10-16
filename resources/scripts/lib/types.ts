@@ -40,7 +40,6 @@ export type TransferFile = {
     download_count: number;
 };
 export type Transfer = {
-    kind: 'transfer';
     id: string;
     token: string;
     title: string;
@@ -66,7 +65,6 @@ export type Transfer = {
     url: string;
 };
 export type Secret = {
-    kind: 'secret';
     id: string;
     title: string;
     labelled: boolean;
@@ -79,5 +77,7 @@ export type Secret = {
     last_wrong_key_at: string | null;
     revoked_at: string | null;
     available: boolean;
+    expiring_soon: boolean;
+    expires_in: string | null;
     reason: 'opened' | 'expired' | 'deleted' | null;
 };

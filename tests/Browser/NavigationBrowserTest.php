@@ -28,10 +28,16 @@ it('keeps the main navigation in place and offers a new transfer button outside 
         ->assertVisible('header a[aria-label="New transfer"]');
     expect($page->script($navigationLeft))->toEqualWithDelta($left, 1);
 
-    $page->click('nav a:has-text("New secret")')
-        ->assertSee('Create secret link')
-        ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', 'New secret')
+    $page->click('nav a:has-text("Secrets")')
+        ->assertSee('No secrets yet')
+        ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', 'Secrets')
         ->assertMissing('header a[aria-label="New transfer"]');
+    expect($page->script($navigationLeft))->toEqualWithDelta($left, 1);
+
+    $page->click('header a[aria-label="New secret"]')
+        ->assertSee('Create secret link')
+        ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', 'Secrets')
+        ->assertMissing('header a[aria-label="New secret"]');
     expect($page->script($navigationLeft))->toEqualWithDelta($left, 1);
 
     $page->click('nav a:has-text("My transfers")')
@@ -81,7 +87,7 @@ it('gives the mobile header controls space above them', function (): void {
 it('scrolls the phone navigation sideways to keep the active link in view', function (): void {
     $this->actingAs(User::factory()->admin()->create());
 
-    foreach (['/secrets/create' => 'New secret', '/teams' => 'Teams'] as $path => $label) {
+    foreach (['/secrets' => 'Secrets', '/teams' => 'Teams'] as $path => $label) {
         visit($path)->resize(320, 740)->refresh()
             ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', $label)
             ->assertScript(<<<'JS'

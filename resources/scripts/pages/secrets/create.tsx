@@ -8,8 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { dateTime } from '@/lib/format';
 import { request } from '@/lib/http';
 import { encryptSecret, formatKey } from '@/lib/secret';
-import { create, store } from '@/routes/secrets';
-import { index } from '@/routes/transfers';
+import { create, index, store } from '@/routes/secrets';
 
 const expiries = [
     { hours: 1, label: '1 hour' },
@@ -76,7 +75,7 @@ export default function CreateSecret() {
     if (ready) {
         const link = split ? ready.url : `${ready.url}#${ready.key}`;
         return (
-            <Shell active="secret">
+            <Shell active="new-secret">
                 <Head title="Your secret is ready" />
                 <main className="flex flex-1 items-center justify-center bg-muted px-5 py-6 md:p-10">
                     <section
@@ -154,7 +153,7 @@ export default function CreateSecret() {
                         )}
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <Link href={index()} className="font-semibold">
-                                View in My transfers
+                                View in Secrets
                             </Link>
                             <Link
                                 href={create()}
@@ -180,7 +179,7 @@ export default function CreateSecret() {
 
     const until = new Date(Date.now() + hours * 3_600_000).toISOString();
     return (
-        <Shell active="secret">
+        <Shell active="new-secret">
             <Head title="New secret" />
             <main className="flex flex-1 justify-center bg-muted px-5 py-6 md:p-10">
                 <form
@@ -260,7 +259,7 @@ export default function CreateSecret() {
                             id="label-hint"
                             className="text-sm text-muted-foreground"
                         >
-                            Only you see it, in My transfers. It isn’t
+                            Only you see it, on your Secrets page. It isn’t
                             encrypted.
                         </p>
                     </div>

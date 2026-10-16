@@ -22,8 +22,7 @@ import {
 import { dateTime } from '@/lib/format';
 import type { Secret } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { destroy } from '@/routes/secrets';
-import { index } from '@/routes/transfers';
+import { destroy, index } from '@/routes/secrets';
 
 export default function ShowSecret({ secret }: { secret: Secret }) {
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -64,7 +63,7 @@ export default function ShowSecret({ secret }: { secret: Secret }) {
         .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 
     return (
-        <Shell active="transfers">
+        <Shell active="secrets">
             <Head title={secret.title} />
             <main className="mx-auto w-full max-w-6xl px-5 py-7 md:px-10 md:py-8">
                 <Link
@@ -76,7 +75,7 @@ export default function ShowSecret({ secret }: { secret: Secret }) {
                         size={16}
                         aria-hidden="true"
                     />
-                    My transfers
+                    Secrets
                 </Link>
                 <div className="mb-6 flex flex-col gap-2">
                     <div className="flex flex-wrap items-center gap-3">
