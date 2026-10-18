@@ -42,8 +42,11 @@ export async function request<T>(
     });
     if (response.ok) return body as T;
     if (response.status === 401 || response.status === 419) {
-        throw new Error(
-            'Your session expired. Open Filemax in another tab, sign in if needed, then retry here. Keep this tab open.',
+        throw Object.assign(
+            new Error(
+                'Your session expired. Open Filemax in another tab, sign in if needed, then retry here. Keep this tab open.',
+            ),
+            { status: response.status },
         );
     }
     if (response.status >= 500 && response.status < 600) {

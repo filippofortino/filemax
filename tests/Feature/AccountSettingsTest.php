@@ -231,10 +231,10 @@ test('hiding the name removes the sender from earlier transfers until it is show
         ->assertRedirect(route('account.settings'))->assertSessionHasNoErrors();
 
     $this->actingAs($user)->get(route('account.settings'))->assertInertia(fn (Assert $page): Assert => $page
-        ->where('settings', ['show_name_on_transfers' => true, 'notify_transfer_expiring' => true, 'notify_transfer_downloaded' => false]));
+        ->where('settings', ['show_name_on_transfers' => true, 'notify_transfer_expiring' => true, 'notify_transfer_downloaded' => false, 'notify_drop_received' => true]));
     $showOnTransfers(false);
     $this->get(route('account.settings'))->assertInertia(fn (Assert $page): Assert => $page
-        ->where('settings', ['show_name_on_transfers' => false, 'notify_transfer_expiring' => true, 'notify_transfer_downloaded' => false]));
+        ->where('settings', ['show_name_on_transfers' => false, 'notify_transfer_expiring' => true, 'notify_transfer_downloaded' => false, 'notify_drop_received' => true]));
 
     expect($user->settings()->sole()->show_name_on_transfers)->toBeFalse()
         ->and($other->refresh()->show_name_on_transfers)->toBeTrue();
@@ -261,16 +261,17 @@ test('each notification switch saves without changing the other settings', funct
 
     $save(['notify_transfer_downloaded' => true]);
     $save(['notify_transfer_expiring' => false]);
+    $save(['notify_drop_received' => false]);
 
     $this->get(route('account.settings.notifications'))->assertInertia(fn (Assert $page): Assert => $page
-        ->where('settings', ['show_name_on_transfers' => true, 'notify_transfer_expiring' => false, 'notify_transfer_downloaded' => true]));
+        ->where('settings', ['show_name_on_transfers' => true, 'notify_transfer_expiring' => false, 'notify_transfer_downloaded' => true, 'notify_drop_received' => false]));
     expect(UserSettings::query()->count())->toBe(1);
 });
 
 test('settings must be booleans', function (string $setting, mixed $value): void {
     $this->actingAs(User::factory()->create())->putJson(route('account.settings.update'), [$setting => $value])
         ->assertUnprocessable()->assertJsonValidationErrors($setting);
-})->with(['show_name_on_transfers', 'notify_transfer_expiring', 'notify_transfer_downloaded'])->with([null, 'maybe', [['invalid']]]);
+})->with(['show_name_on_transfers', 'notify_transfer_expiring', 'notify_transfer_downloaded', 'notify_drop_received'])->with([null, 'maybe', [['invalid']]]);
 
 test('password updates apply the environment policy and verify the current password', function (string $environment, string $password, string $current, bool $valid): void {
     $this->app->instance('env', $environment);

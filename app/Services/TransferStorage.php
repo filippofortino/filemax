@@ -186,7 +186,9 @@ final class TransferStorage
         if (! $this->disk() instanceof AwsS3V3Adapter) {
             $path = $this->partPath($file, $part);
 
-            return ['url' => route('transfers.uploads.upload', [$file->transfer_id, $file->id, $part]), 'method' => 'PUT', 'headers' => ['Content-Type' => 'application/octet-stream'], 'completed' => $completed || ($this->disk()->exists($path) && $this->disk()->size($path) === $file->partBytes($part))];
+            $route = $file->transfer->drop_id === null ? 'transfers.uploads.upload' : 'shared.drops.uploads.upload';
+
+            return ['url' => route($route, [$file->transfer_id, $file->id, $part]), 'method' => 'PUT', 'headers' => ['Content-Type' => 'application/octet-stream'], 'completed' => $completed || ($this->disk()->exists($path) && $this->disk()->size($path) === $file->partBytes($part))];
         }
 
         if ($completed) {

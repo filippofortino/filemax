@@ -73,6 +73,12 @@ final class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return $this->hasMany(Secret::class);
     }
 
+    /** @return HasMany<Drop, $this> */
+    public function drops(): HasMany
+    {
+        return $this->hasMany(Drop::class);
+    }
+
     /** @return HasOne<UserSettings, $this> */
     public function settings(): HasOne
     {

@@ -32,7 +32,7 @@ final class AccountSettingsController
 
         return Inertia::render('account/settings', [
             'section' => $section,
-            'settings' => $user->settings->only(['show_name_on_transfers', 'notify_transfer_expiring', 'notify_transfer_downloaded']),
+            'settings' => $user->settings->only(['show_name_on_transfers', 'notify_transfer_expiring', 'notify_transfer_downloaded', 'notify_drop_received']),
         ]);
     }
 

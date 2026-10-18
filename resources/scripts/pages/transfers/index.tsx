@@ -1,6 +1,5 @@
 import {
     Add01Icon,
-    ArrowLeft01Icon,
     ArrowRight01Icon,
     Clock01Icon,
     File01Icon,
@@ -12,7 +11,13 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PasswordBadge, Shell, TeamBadges } from '@/components/filemax';
+import {
+    Pagination,
+    PasswordBadge,
+    Shell,
+    TeamBadges,
+    TransferTabs,
+} from '@/components/filemax';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { bytes, date, dateTime } from '@/lib/format';
@@ -28,14 +33,6 @@ const statuses: { value: Status; label: string; dot?: string }[] = [
     { value: 'soon', label: 'Expiring soon', dot: 'bg-amber-600' },
     { value: 'expired', label: 'Expired', dot: 'bg-slate-400' },
 ];
-const pageLinkClass = cn(
-    buttonVariants({ variant: 'ghost', size: 'sm' }),
-    'min-w-9 px-2.5 font-medium text-muted-foreground',
-);
-const pageBoundaryClass = cn(
-    pageLinkClass,
-    'min-h-11 gap-1.5 border-input px-3 text-foreground disabled:border-input md:min-h-9 md:border-transparent md:px-2.5 md:text-muted-foreground md:disabled:border-transparent',
-);
 
 function TransferExpiry({
     transfer,
@@ -106,6 +103,7 @@ type Props = {
         total: number;
         active: number;
     };
+    receivedNew: number;
 };
 export default function Index({
     transfers,
@@ -115,6 +113,7 @@ export default function Index({
     status,
     statusCounts,
     totals,
+    receivedNew,
 }: Props) {
     const { url } = usePage();
     const [query, setQuery] = useState(search);
@@ -208,6 +207,7 @@ export default function Index({
                         </p>
                     )}
                 </div>
+                <TransferTabs current="sent" newCount={receivedNew} />
                 {totals.total > 0 && (
                     <>
                         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -508,131 +508,7 @@ export default function Index({
                         </div>
                     )}
                     {transfers.data.length > 0 && (
-                        <nav
-                            aria-label="Pagination"
-                            className="mt-5 flex flex-wrap items-center justify-between gap-3"
-                        >
-                            <p className="hidden text-sm text-muted-foreground md:block">
-                                Showing{' '}
-                                <span className="font-semibold text-foreground tabular-nums">
-                                    {transfers.meta.from}–{transfers.meta.to}
-                                </span>{' '}
-                                of{' '}
-                                <span className="font-semibold text-foreground tabular-nums">
-                                    {transfers.meta.total}
-                                </span>
-                            </p>
-                            <div className="flex w-full items-center justify-between gap-2 md:w-auto md:flex-wrap md:justify-start md:gap-1">
-                                {transfers.links.prev ? (
-                                    <Link
-                                        {...navigation}
-                                        href={transfers.links.prev}
-                                        className={pageBoundaryClass}
-                                    >
-                                        <HugeiconsIcon
-                                            icon={ArrowLeft01Icon}
-                                            size={16}
-                                            aria-hidden="true"
-                                        />
-                                        Previous
-                                    </Link>
-                                ) : (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className={cn(
-                                            pageBoundaryClass,
-                                            'disabled:bg-transparent disabled:opacity-40',
-                                        )}
-                                        disabled
-                                    >
-                                        <HugeiconsIcon
-                                            icon={ArrowLeft01Icon}
-                                            size={16}
-                                            aria-hidden="true"
-                                        />
-                                        Previous
-                                    </Button>
-                                )}
-                                <p
-                                    className="text-sm whitespace-nowrap text-muted-foreground tabular-nums md:hidden"
-                                    aria-live="polite"
-                                >
-                                    Page{' '}
-                                    <span className="font-semibold text-foreground">
-                                        {transfers.meta.current_page}
-                                    </span>{' '}
-                                    of{' '}
-                                    <span className="font-semibold text-foreground">
-                                        {transfers.meta.last_page}
-                                    </span>
-                                </p>
-                                {transfers.meta.links
-                                    .slice(1, -1)
-                                    .map((page, position) =>
-                                        page.url ? (
-                                            <Link
-                                                {...navigation}
-                                                key={position}
-                                                href={page.url}
-                                                aria-label={`Page ${page.label}`}
-                                                aria-current={
-                                                    page.active
-                                                        ? 'page'
-                                                        : undefined
-                                                }
-                                                className={cn(
-                                                    pageLinkClass,
-                                                    'hidden md:inline-flex',
-                                                    page.active &&
-                                                        'bg-foreground text-background hover:bg-foreground hover:text-background',
-                                                )}
-                                            >
-                                                {page.label}
-                                            </Link>
-                                        ) : (
-                                            <span
-                                                key={position}
-                                                className="hidden px-2 text-muted-foreground md:inline"
-                                                aria-label="More pages"
-                                            >
-                                                …
-                                            </span>
-                                        ),
-                                    )}
-                                {transfers.links.next ? (
-                                    <Link
-                                        {...navigation}
-                                        href={transfers.links.next}
-                                        className={pageBoundaryClass}
-                                    >
-                                        Next
-                                        <HugeiconsIcon
-                                            icon={ArrowRight01Icon}
-                                            size={16}
-                                            aria-hidden="true"
-                                        />
-                                    </Link>
-                                ) : (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className={cn(
-                                            pageBoundaryClass,
-                                            'disabled:bg-transparent disabled:opacity-40',
-                                        )}
-                                        disabled
-                                    >
-                                        Next
-                                        <HugeiconsIcon
-                                            icon={ArrowRight01Icon}
-                                            size={16}
-                                            aria-hidden="true"
-                                        />
-                                    </Button>
-                                )}
-                            </div>
-                        </nav>
+                        <Pagination page={transfers} navigation={navigation} />
                     )}
                 </div>
             </main>

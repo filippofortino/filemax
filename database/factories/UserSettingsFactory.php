@@ -19,6 +19,7 @@ final class UserSettingsFactory extends Factory
             'show_name_on_transfers' => true,
             'notify_transfer_expiring' => true,
             'notify_transfer_downloaded' => false,
+            'notify_drop_received' => true,
         ];
     }
 }

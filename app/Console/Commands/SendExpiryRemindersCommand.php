@@ -20,7 +20,7 @@ final class SendExpiryRemindersCommand extends Command
         $count = 0;
 
         Transfer::query()->with('user')
-            ->where('status', 'ready')->whereNull('revoked_at')->whereNull('purged_at')->whereNull('expiry_reminder_sent_at')
+            ->where('status', 'ready')->whereNull('drop_id')->whereNull('revoked_at')->whereNull('purged_at')->whereNull('expiry_reminder_sent_at')
             ->where('expires_in_days', '>', 1)->where('expires_at', '>', now())->where('expires_at', '<=', now()->addDay())
             ->whereDoesntHave('user.settings', fn (Builder $settings) => $settings->where('notify_transfer_expiring', false))
             ->lazyById()->each(function (Transfer $transfer) use (&$count): void {

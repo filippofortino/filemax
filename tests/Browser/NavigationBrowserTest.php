@@ -40,6 +40,20 @@ it('keeps the main navigation in place and offers a new transfer button outside 
         ->assertMissing('header a[aria-label="New secret"]');
     expect($page->script($navigationLeft))->toEqualWithDelta($left, 1);
 
+    $page->click('nav a:has-text("Drops")')
+        ->assertSee('No Drops here')
+        ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', 'Drops')
+        ->assertVisible('header a[aria-label="New Drop"]')
+        ->assertMissing('header a[aria-label="New transfer"]');
+    expect($page->script($navigationLeft))->toEqualWithDelta($left, 1);
+
+    $page->click('header a[aria-label="New Drop"]')
+        ->assertSee('New Drop')
+        ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', 'Drops')
+        ->assertMissing('header a[aria-label="New Drop"]')
+        ->assertMissing('header a[aria-label="New transfer"]');
+    expect($page->script($navigationLeft))->toEqualWithDelta($left, 1);
+
     $page->click('nav a:has-text("My transfers")')
         ->click('header a[aria-label="New transfer"]')
         ->assertSee('Drop files here')
@@ -87,7 +101,7 @@ it('gives the mobile header controls space above them', function (): void {
 it('scrolls the phone navigation sideways to keep the active link in view', function (): void {
     $this->actingAs(User::factory()->admin()->create());
 
-    foreach (['/secrets' => 'Secrets', '/teams' => 'Teams'] as $path => $label) {
+    foreach (['/secrets' => 'Secrets', '/drops' => 'Drops', '/teams' => 'Teams'] as $path => $label) {
         visit($path)->resize(320, 740)->refresh()
             ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', $label)
             ->assertScript(<<<'JS'
@@ -103,7 +117,7 @@ it('scrolls the phone navigation sideways to keep the active link in view', func
     }
 });
 
-it('fits the four admin links beside the header controls on a tablet', function (): void {
+it('fits the five admin links beside the header controls on a tablet', function (): void {
     $this->actingAs(User::factory()->admin()->create());
 
     visit('/transfers')->resize(768, 1024)

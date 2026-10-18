@@ -12,7 +12,7 @@ use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\File;
 
-#[Description('Purge deleted transfers, expired originals after 30 days, and abandoned uploads')]
+#[Description('Purge deleted transfers, expired originals after 30 days, expired received files, and abandoned uploads')]
 #[Signature('filemax:cleanup')]
 final class CleanupTransfersCommand extends Command
 {
@@ -22,7 +22,8 @@ final class CleanupTransfersCommand extends Command
 
         Transfer::query()->whereNull('purged_at')->where(function (Builder $query): void {
             $query->whereNotNull('revoked_at')
-                ->orWhere(fn (Builder $expired) => $expired->where('status', 'ready')->where('expires_at', '<=', now()->subDays(30)))
+                ->orWhere(fn (Builder $expired) => $expired->where('status', 'ready')->whereNull('drop_id')->where('expires_at', '<=', now()->subDays(30)))
+                ->orWhere(fn (Builder $received) => $received->where('status', 'ready')->whereNotNull('drop_id')->where('expires_at', '<=', now()))
                 ->orWhere(fn (Builder $drafts) => $drafts->where('status', 'uploading')->where('updated_at', '<=', now()->subDay()));
         })->lazyById()->each(function (Transfer $transfer) use (&$count): void {
             dispatch(new PurgeTransfer($transfer->id));

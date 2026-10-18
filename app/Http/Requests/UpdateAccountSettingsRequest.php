@@ -15,6 +15,7 @@ final class UpdateAccountSettingsRequest extends FormRequest
             'show_name_on_transfers' => ['sometimes', 'boolean'],
             'notify_transfer_expiring' => ['sometimes', 'boolean'],
             'notify_transfer_downloaded' => ['sometimes', 'boolean'],
+            'notify_drop_received' => ['sometimes', 'boolean'],
         ];
     }
 }
