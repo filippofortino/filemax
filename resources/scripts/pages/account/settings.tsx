@@ -40,6 +40,7 @@ type AccountSettings = {
     show_name_on_transfers: boolean;
     notify_transfer_expiring: boolean;
     notify_transfer_downloaded: boolean;
+    notify_drop_received: boolean;
 };
 
 const sections = [
@@ -472,22 +473,22 @@ function Privacy({
                     Privacy
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                    Choose what recipients see about you on the transfers you
-                    send.
+                    Choose what people see about you on the transfers, secrets
+                    and Drops you share.
                 </p>
             </div>
             <div className="flex items-start justify-between gap-6">
                 <div className="flex flex-col gap-1">
                     <span id="show-name-label" className="font-semibold">
-                        Show my name on transfers
+                        Show my name and photo
                     </span>
                     <p
                         id="show-name-hint"
                         className="text-sm text-muted-foreground"
                     >
-                        When off, the download page doesn’t say who sent the
-                        transfer: no name, no photo. This applies to transfers
-                        you’ve already sent too.
+                        When off, download pages, secret links and Drop upload
+                        pages don’t say who you are: no name, no photo. This
+                        applies to links you’ve already shared too.
                     </p>
                 </div>
                 <Switch
@@ -502,8 +503,8 @@ function Privacy({
                             {
                                 title: 'Privacy saved',
                                 description: checked
-                                    ? 'Recipients see your name and photo again.'
-                                    : 'Recipients no longer see your name or photo.',
+                                    ? 'People see your name and photo again.'
+                                    : 'People no longer see your name or photo.',
                             },
                         )
                     }
@@ -526,12 +527,12 @@ function Privacy({
                 )}
                 <div className="flex flex-col gap-0.5" aria-live="polite">
                     <span className="text-xs text-muted-foreground">
-                        What recipients see
+                        What people see
                     </span>
                     <span className="text-sm font-semibold">
                         {showName
                             ? `Sent by ${user.name}`
-                            : 'No sender shown, only the files'}
+                            : 'No name or photo, only what you share'}
                     </span>
                 </div>
             </div>
@@ -555,6 +556,14 @@ const notificationSwitches = [
         hint: 'The first time someone downloads your transfer, whether a single file or all of it. Once per transfer.',
         enabled: 'We’ll email you the first time someone downloads a transfer.',
         disabled: 'You won’t get an email when a transfer is downloaded.',
+    },
+    {
+        key: 'notify_drop_received',
+        id: 'notify-drop',
+        label: 'Files received through a Drop',
+        hint: 'When someone sends you files through one of your Drops.',
+        enabled: 'We’ll email you when someone sends you files through a Drop.',
+        disabled: 'You won’t get an email when files arrive through a Drop.',
     },
 ] as const;
 

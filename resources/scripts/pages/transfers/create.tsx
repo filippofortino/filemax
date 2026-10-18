@@ -23,23 +23,15 @@ import {
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { bytes, dateTime } from '@/lib/format';
-import { request, uploadPart } from '@/lib/http';
+import { request } from '@/lib/http';
 import type { Team, Transfer, TransferFile } from '@/lib/types';
+import { uploadEntries, type UploadEntry } from '@/lib/upload';
 import { cn } from '@/lib/utils';
 import { home } from '@/routes';
 import { destroy, show, store, update } from '@/routes/transfers';
 import { complete, finalize, remove, sign } from '@/routes/transfers/uploads';
 
-const UPLOAD_CONCURRENCY = 4;
-
-type Entry = {
-    key: string;
-    file: File;
-    remote?: TransferFile;
-    status: 'waiting' | 'uploading' | 'done' | 'failed';
-    loaded: number;
-    error?: string;
-};
+type Entry = UploadEntry & { remote?: TransferFile };
 export default function Create({ teams }: { teams: Team[] }) {
     const [entries, setEntries] = useState<Entry[]>([]);
     const currentEntries = useRef<Entry[]>([]);
@@ -247,138 +239,37 @@ export default function Create({ teams }: { teams: Team[] }) {
                           },
                 ),
             );
-            const files = currentEntries.current
-                .filter((entry) => entry.status !== 'done')
-                .map((entry) => ({
-                    entry,
-                    count: Math.max(
-                        1,
-                        Math.ceil(entry.file.size / entry.remote!.part_size),
-                    ),
-                    nextPart: 1,
-                    completed: 0,
-                    failed: false,
-                    loaded: new Map<number, number>(),
-                }));
-            let nextFile = 0;
-            function claimPart() {
-                // ponytail: scan files per claim; use a ready-file queue if huge batches make this costly.
-                for (let checked = 0; checked < files.length; checked++) {
-                    const file = files[nextFile];
-                    nextFile = (nextFile + 1) % files.length;
-                    if (!file.failed && file.nextPart <= file.count) {
-                        return { file, part: file.nextPart++ };
-                    }
-                }
-            }
-            async function worker() {
-                while (!controller.signal.aborted) {
-                    const job = claimPart();
-                    if (!job) return;
-                    const { file, part } = job;
-                    const { entry } = file;
-                    const remote = entry.remote!;
-                    if (part === 1) {
-                        patch(entry.key, { status: 'uploading' });
-                    }
-                    try {
-                        const signed = await request<{
-                            url: string;
-                            headers: Record<string, string>;
-                            completed: boolean;
-                        }>(
-                            sign.url({
-                                transfer: transferId,
-                                file: remote.id,
-                                part,
-                            }),
-                            'POST',
-                            undefined,
-                            controller.signal,
-                        );
-                        if (controller.signal.aborted) return;
-                        if (file.failed) continue;
-                        const offset = (part - 1) * remote.part_size;
-                        const blob = entry.file.slice(
-                            offset,
-                            Math.min(
-                                offset + remote.part_size,
-                                entry.file.size,
+            await uploadEntries(
+                currentEntries.current.filter(
+                    (entry) => entry.status !== 'done',
+                ),
+                {
+                    sign: (file, part) =>
+                        sign.url({ transfer: transferId, file, part }),
+                    complete: (file) =>
+                        complete.url({ transfer: transferId, file }),
+                },
+                controller.signal,
+                patch,
+                (bytes) => {
+                    transferred += bytes;
+                    const totalLoaded = currentEntries.current.reduce(
+                        (sum, item) => sum + item.loaded,
+                        0,
+                    );
+                    const elapsed = (Date.now() - started) / 1000;
+                    if (elapsed > 2 && transferred > 0) {
+                        setRemaining(
+                            Math.max(
+                                0,
+                                Math.round(
+                                    (totalSize - totalLoaded) /
+                                        (transferred / elapsed),
+                                ),
                             ),
                         );
-                        function progress(loaded: number) {
-                            if (controller.signal.aborted) return;
-                            const previous = file.loaded.get(part) ?? 0;
-                            const current = Math.max(
-                                previous,
-                                Math.min(blob.size, loaded),
-                            );
-                            file.loaded.set(part, current);
-                            if (!signed.completed)
-                                transferred += current - previous;
-                            patch(entry.key, {
-                                loaded: [...file.loaded.values()].reduce(
-                                    (sum, bytes) => sum + bytes,
-                                    0,
-                                ),
-                            });
-                            const totalLoaded = currentEntries.current.reduce(
-                                (sum, item) => sum + item.loaded,
-                                0,
-                            );
-                            const elapsed = (Date.now() - started) / 1000;
-                            if (elapsed > 2 && transferred > 0) {
-                                setRemaining(
-                                    Math.max(
-                                        0,
-                                        Math.round(
-                                            (totalSize - totalLoaded) /
-                                                (transferred / elapsed),
-                                        ),
-                                    ),
-                                );
-                            }
-                        }
-                        if (!signed.completed) {
-                            await uploadPart(
-                                signed.url,
-                                signed.headers,
-                                blob,
-                                controller.signal,
-                                progress,
-                            );
-                        }
-                        if (controller.signal.aborted) return;
-                        progress(blob.size);
-                        file.completed++;
-                        if (!file.failed && file.completed === file.count) {
-                            await request(
-                                complete.url({
-                                    transfer: transferId,
-                                    file: remote.id,
-                                }),
-                                'POST',
-                                undefined,
-                                controller.signal,
-                            );
-                            if (controller.signal.aborted) return;
-                            patch(entry.key, {
-                                status: 'done',
-                                loaded: entry.file.size,
-                            });
-                        }
-                    } catch (cause) {
-                        if (controller.signal.aborted) return;
-                        file.failed = true;
-                        patch(entry.key, {
-                            status: 'failed',
-                            error: (cause as Error).message,
-                        });
                     }
-                }
-            }
-            await Promise.all(
-                Array.from({ length: UPLOAD_CONCURRENCY }, worker),
+                },
             );
             if (controller.signal.aborted) return;
             if (

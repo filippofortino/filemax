@@ -19,7 +19,7 @@ final readonly class TransferUploadMutation
     /** @param callable(TransferFile): JsonResponse $callback */
     public function run(Transfer $transfer, TransferFile $file, callable $callback): JsonResponse
     {
-        Gate::authorize('update', $transfer);
+        Gate::authorize('upload', $transfer);
 
         return $this->storage->withTransferLock($transfer, function (Transfer $transfer) use ($file, $callback): JsonResponse {
             abort_if($transfer->revoked_at !== null || $transfer->purged_at !== null, 410, 'This transfer was cancelled.');
@@ -27,7 +27,7 @@ final readonly class TransferUploadMutation
             $transfer->touch();
 
             try {
-                return $callback($transfer->files()->findOrFail($file->id));
+                return $callback($transfer->files()->findOrFail($file->id)->setRelation('transfer', $transfer));
             } catch (TransferStorageException|AwsException|FilesystemException $exception) {
                 report($exception);
 

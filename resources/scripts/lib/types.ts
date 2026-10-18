@@ -81,3 +81,48 @@ export type Secret = {
     expires_in: string | null;
     reason: 'opened' | 'expired' | 'deleted' | null;
 };
+export type DropFileType = 'documents' | 'images' | 'videos';
+/** What a Drop accepts. A null size means no limit beyond Filemax's own. */
+export type DropRules = {
+    max_file_size: number | null;
+    max_submission_size: number | null;
+    file_types: DropFileType[];
+    extensions: string[];
+};
+export type Drop = DropRules & {
+    id: string;
+    title: string;
+    instructions: string | null;
+    url: string;
+    open: boolean;
+    closes_at: string;
+    closed_at: string;
+    closed_early: boolean;
+    keep_days: number;
+    uploads_count: number;
+    created_at: string;
+};
+export type ReceivedTransfer = {
+    id: string;
+    token: string | null;
+    sender_name: string | null;
+    title: string;
+    message: string | null;
+    drop: {
+        id: string;
+        title: string;
+        open: boolean;
+        closes_at: string;
+        closed_at: string;
+        closed_early: boolean;
+    } | null;
+    files: TransferFile[];
+    files_count: number;
+    total_size: number;
+    keep_days: number;
+    received_at: string | null;
+    expires_at: string | null;
+    available: boolean;
+    gone_at: string | null;
+    is_new: boolean;
+};

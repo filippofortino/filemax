@@ -67,7 +67,8 @@ final class PurgeTransfer implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
-            $expired = $transfer->status === 'ready' && $transfer->expires_at?->lte(now()->subDays(30));
+            // Received files go when their keep period ends; sent transfers stay 30 more days so they can be extended.
+            $expired = $transfer->status === 'ready' && $transfer->expires_at?->lte($transfer->drop_id === null ? now()->subDays(30) : now());
             $abandoned = $transfer->status === 'uploading' && $transfer->updated_at->lte(now()->subDay());
 
             if (! $transfer->revoked_at && ! $expired && ! $abandoned) {

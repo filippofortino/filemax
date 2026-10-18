@@ -9,6 +9,7 @@ use Carbon\CarbonInterface;
 use Database\Factories\TransferFactory;
 use Illuminate\Database\Eloquent\Attributes\Guarded;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -40,11 +41,15 @@ use Illuminate\Support\Str;
  * @property ?string $archive_path
  * @property int $archive_progress
  * @property ?CarbonInterface $archive_requested_at
+ * @property ?string $drop_id
+ * @property ?string $sender_name
+ * @property ?CarbonInterface $received_at
  * @property CarbonInterface $created_at
  * @property CarbonInterface $updated_at
  * @property-read User $user
  * @property-read Collection<int, TransferFile> $files
  * @property-read Collection<int, Team> $teams
+ * @property-read ?Drop $drop
  */
 #[Guarded(['id'])]
 #[Hidden(['token', 'archive_path', 'password_hash'])]
@@ -64,10 +69,32 @@ final class Transfer extends Model
         });
     }
 
+    /**
+     * Submissions that arrived through one of the owner's Drops.
+     *
+     * @return Builder<self>
+     */
+    public static function receivedBy(User $owner): Builder
+    {
+        return self::query()->whereBelongsTo($owner)->whereNotNull('drop_id')->where('status', 'ready');
+    }
+
+    /** Received submissions the owner hasn't opened yet and can still download. */
+    public static function unopenedCountFor(User $owner): int
+    {
+        return self::receivedBy($owner)->whereNull('first_opened_at')->whereNull('revoked_at')->whereNull('purged_at')->where('expires_at', '>', now())->count();
+    }
+
     /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** @return BelongsTo<Drop, $this> */
+    public function drop(): BelongsTo
+    {
+        return $this->belongsTo(Drop::class);
     }
 
     /** @return HasMany<TransferFile, $this> */
@@ -130,6 +157,7 @@ final class Transfer extends Model
             'purged_at' => 'datetime',
             'archive_requested_at' => 'datetime',
             'archive_progress' => 'integer',
+            'received_at' => 'datetime',
         ];
     }
 }

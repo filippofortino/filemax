@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Models\Drop;
 use App\Models\Transfer;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -21,6 +22,19 @@ final class TransferFactory extends Factory
     public function uploading(): self
     {
         return $this->state(fn (): array => ['status' => 'uploading', 'expires_at' => null]);
+    }
+
+    /** A submission that arrived through a Drop owned by the same user. */
+    public function received(): self
+    {
+        return $this->state(fn (array $attributes): array => [
+            'drop_id' => Drop::factory()->state(['user_id' => $attributes['user_id']]),
+            'visibility' => 'drop',
+            'sender_name' => fake()->name(),
+            'expires_in_days' => 30,
+            'expires_at' => now()->addDays(30),
+            'received_at' => now(),
+        ]);
     }
 
     public function expired(): self

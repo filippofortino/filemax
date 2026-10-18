@@ -82,7 +82,7 @@ final class TransferController
         $search = $filters['search'] ?? '';
         $now = now();
 
-        $historyQuery = Transfer::query()->where('user_id', $user->id)->where('status', 'ready');
+        $historyQuery = Transfer::query()->where('user_id', $user->id)->whereNull('drop_id')->where('status', 'ready');
         $totals = [
             'total' => (clone $historyQuery)->count(),
             'active' => $this->applyHistoryStatus(clone $historyQuery, 'active', $now)->count(),
@@ -115,6 +115,7 @@ final class TransferController
             'search' => $search,
             'statusCounts' => $statusCounts,
             'totals' => $totals,
+            'receivedNew' => Transfer::unopenedCountFor($user),
         ]);
     }
 

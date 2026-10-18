@@ -1,5 +1,7 @@
 import {
     Add01Icon,
+    ArrowLeft01Icon,
+    ArrowRight01Icon,
     Cancel01Icon,
     Copy01Icon,
     File01Icon,
@@ -34,6 +36,8 @@ import type { SharedProps, Team } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { home, logout } from '@/routes';
 import { settings } from '@/routes/account';
+import { create as newDrop, index as drops } from '@/routes/drops';
+import { index as received } from '@/routes/received';
 import { create as newSecret, index as secrets } from '@/routes/secrets';
 import { index as teams } from '@/routes/teams';
 import { index as transfers } from '@/routes/transfers';
@@ -79,6 +83,7 @@ export function Shell({
     active = 'new',
     recipient = false,
     recipientAccount = false,
+    footer = 'Sent with Filemax, the file-sharing tool of Mediamax Communication.',
 }: {
     children: ReactNode;
     active?:
@@ -86,19 +91,27 @@ export function Shell({
         | 'transfers'
         | 'secrets'
         | 'new-secret'
+        | 'drops'
+        | 'new-drop'
         | 'teams'
         | 'account';
     recipient?: boolean;
     recipientAccount?: boolean;
+    footer?: string;
 }) {
     const user = usePage<SharedProps>().props.auth.user;
     // The header's primary action creates what the current section lists, and hides on its own form.
     const action =
-        recipient || active === 'new' || active === 'new-secret'
+        recipient ||
+        active === 'new' ||
+        active === 'new-secret' ||
+        active === 'new-drop'
             ? null
             : active === 'secrets'
               ? { href: newSecret(), label: 'New secret' }
-              : { href: home(), label: 'New transfer' };
+              : active === 'drops'
+                ? { href: newDrop(), label: 'New Drop' }
+                : { href: home(), label: 'New transfer' };
     const nav = useRef<HTMLElement>(null);
     // Below md the links can overflow narrow phones; keep the active one in view without scrolling the page.
     useEffect(() => {
@@ -165,6 +178,19 @@ export function Shell({
                             }
                         >
                             Secrets
+                        </Link>
+                        <Link
+                            className={navLinkClass(
+                                active === 'drops' || active === 'new-drop',
+                            )}
+                            href={drops()}
+                            aria-current={
+                                active === 'drops' || active === 'new-drop'
+                                    ? 'page'
+                                    : undefined
+                            }
+                        >
+                            Drops
                         </Link>
                         {user?.is_admin && (
                             <Link
@@ -271,11 +297,51 @@ export function Shell({
             {children}
             {recipient && (
                 <footer className="min-h-12 px-5 py-3 text-center text-xs text-muted-foreground">
-                    Sent with Filemax, the file-sharing tool of Mediamax
-                    Communication.
+                    {footer}
                 </footer>
             )}
         </div>
+    );
+}
+/** Switches My transfers between what you sent and what people sent you through your Drops. */
+export function TransferTabs({
+    current,
+    newCount,
+}: {
+    current: 'sent' | 'received';
+    newCount: number;
+}) {
+    const tabClass = (active: boolean) =>
+        cn(
+            '-mb-px inline-flex min-h-11 items-center gap-2 border-b-2 border-transparent px-3 text-sm font-medium text-muted-foreground transition-colors duration-160 ease-out hover:text-foreground',
+            active &&
+                'border-primary font-semibold text-primary hover:text-primary',
+        );
+    return (
+        <nav aria-label="Sent or received" className="mb-5 flex gap-1 border-b">
+            <Link
+                href={transfers()}
+                className={tabClass(current === 'sent')}
+                aria-current={current === 'sent' ? 'page' : undefined}
+            >
+                Sent
+            </Link>
+            <Link
+                href={received()}
+                className={tabClass(current === 'received')}
+                aria-current={current === 'received' ? 'page' : undefined}
+            >
+                Received
+                {newCount > 0 && <NewBadge>{newCount} new</NewBadge>}
+            </Link>
+        </nav>
+    );
+}
+export function NewBadge({ children = 'New' }: { children?: ReactNode }) {
+    return (
+        <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-blue-200 bg-blue-50 px-2 text-xs font-semibold text-primary">
+            {children}
+        </span>
     );
 }
 export function AuthLayout({
@@ -616,9 +682,17 @@ export function FileRow({
     const extension = name.split('.').pop()?.toLowerCase() ?? '';
     const icon = ['mp4', 'mov', 'avi', 'webm', 'mkv'].includes(extension)
         ? Video01Icon
-        : ['png', 'jpg', 'jpeg', 'gif', 'webp', 'psd', 'ai', 'svg'].includes(
-                extension,
-            )
+        : [
+                'png',
+                'jpg',
+                'jpeg',
+                'heic',
+                'gif',
+                'webp',
+                'psd',
+                'ai',
+                'svg',
+            ].includes(extension)
           ? Image01Icon
           : ['zip', '7z', 'rar', 'tar', 'gz'].includes(extension)
             ? FileZipIcon
@@ -667,5 +741,155 @@ export function FileRow({
             </span>
             {children}
         </div>
+    );
+}
+
+export type Paginated<T> = {
+    data: T[];
+    links: { prev: string | null; next: string | null };
+    meta: {
+        current_page: number;
+        last_page: number;
+        from: number | null;
+        to: number | null;
+        total: number;
+        links: { url: string | null; label: string; active: boolean }[];
+    };
+};
+const pageLinkClass = cn(
+    buttonVariants({ variant: 'ghost', size: 'sm' }),
+    'min-w-9 px-2.5 font-medium text-muted-foreground',
+);
+const pageBoundaryClass = cn(
+    pageLinkClass,
+    'min-h-11 gap-1.5 border-input px-3 text-foreground disabled:border-input md:min-h-9 md:border-transparent md:px-2.5 md:text-muted-foreground md:disabled:border-transparent',
+);
+export function Pagination({
+    page,
+    navigation,
+}: {
+    page: Paginated<unknown>;
+    navigation: Omit<ComponentProps<typeof Link>, 'href'>;
+}) {
+    return (
+        <nav
+            aria-label="Pagination"
+            className="mt-5 flex flex-wrap items-center justify-between gap-3"
+        >
+            <p className="hidden text-sm text-muted-foreground md:block">
+                Showing{' '}
+                <span className="font-semibold text-foreground tabular-nums">
+                    {page.meta.from}–{page.meta.to}
+                </span>{' '}
+                of{' '}
+                <span className="font-semibold text-foreground tabular-nums">
+                    {page.meta.total}
+                </span>
+            </p>
+            <div className="flex w-full items-center justify-between gap-2 md:w-auto md:flex-wrap md:justify-start md:gap-1">
+                {page.links.prev ? (
+                    <Link
+                        {...navigation}
+                        href={page.links.prev}
+                        className={pageBoundaryClass}
+                    >
+                        <HugeiconsIcon
+                            icon={ArrowLeft01Icon}
+                            size={16}
+                            aria-hidden="true"
+                        />
+                        Previous
+                    </Link>
+                ) : (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                            pageBoundaryClass,
+                            'disabled:bg-transparent disabled:opacity-40',
+                        )}
+                        disabled
+                    >
+                        <HugeiconsIcon
+                            icon={ArrowLeft01Icon}
+                            size={16}
+                            aria-hidden="true"
+                        />
+                        Previous
+                    </Button>
+                )}
+                <p
+                    className="text-sm whitespace-nowrap text-muted-foreground tabular-nums md:hidden"
+                    aria-live="polite"
+                >
+                    Page{' '}
+                    <span className="font-semibold text-foreground">
+                        {page.meta.current_page}
+                    </span>{' '}
+                    of{' '}
+                    <span className="font-semibold text-foreground">
+                        {page.meta.last_page}
+                    </span>
+                </p>
+                {page.meta.links.slice(1, -1).map((link, position) =>
+                    link.url ? (
+                        <Link
+                            {...navigation}
+                            key={position}
+                            href={link.url}
+                            aria-label={`Page ${link.label}`}
+                            aria-current={link.active ? 'page' : undefined}
+                            className={cn(
+                                pageLinkClass,
+                                'hidden md:inline-flex',
+                                link.active &&
+                                    'bg-foreground text-background hover:bg-foreground hover:text-background',
+                            )}
+                        >
+                            {link.label}
+                        </Link>
+                    ) : (
+                        <span
+                            key={position}
+                            className="hidden px-2 text-muted-foreground md:inline"
+                            aria-label="More pages"
+                        >
+                            …
+                        </span>
+                    ),
+                )}
+                {page.links.next ? (
+                    <Link
+                        {...navigation}
+                        href={page.links.next}
+                        className={pageBoundaryClass}
+                    >
+                        Next
+                        <HugeiconsIcon
+                            icon={ArrowRight01Icon}
+                            size={16}
+                            aria-hidden="true"
+                        />
+                    </Link>
+                ) : (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                            pageBoundaryClass,
+                            'disabled:bg-transparent disabled:opacity-40',
+                        )}
+                        disabled
+                    >
+                        Next
+                        <HugeiconsIcon
+                            icon={ArrowRight01Icon}
+                            size={16}
+                            aria-hidden="true"
+                        />
+                    </Button>
+                )}
+            </div>
+        </nav>
     );
 }

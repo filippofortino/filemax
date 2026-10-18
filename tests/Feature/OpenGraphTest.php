@@ -17,6 +17,7 @@ test('pages include the default social preview image in the initial html', funct
 })->with([
     'sign in' => ['/login', 200],
     'unavailable shared link' => ['/t/missing-transfer', 404],
+    'unknown Drop link' => ['/d/missing-drop', 404],
 ]);
 
 test('the social preview image matches its declared dimensions and format', function (): void {

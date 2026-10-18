@@ -20,7 +20,7 @@ it('saves the profile name and renders settings on desktop and phone', function 
         ->assertSee('Your profile, privacy, notifications, password, and the devices you sign in with.')
         ->assertSeeIn('nav[aria-label="Settings"] [aria-current="page"]', 'Profile')
         ->assertSee('Upload photo')
-        ->assertSee('Show my name on transfers')
+        ->assertSee('Show my name and photo')
         ->assertDontSee('Update password')
         ->assertNoJavascriptErrors();
 
@@ -128,9 +128,9 @@ it('hides the sender name on transfers with the privacy switch', function (): vo
         ->assertSee('Sent by Filippo Fortino')
         ->assertAttribute('[aria-labelledby="show-name-label"]', 'aria-checked', 'true')
         ->click('[aria-labelledby="show-name-label"]')
-        ->assertSee('No sender shown, only the files')
+        ->assertSee('No name or photo, only what you share')
         ->assertSeeIn('[data-slot="toast"]', 'Privacy saved')
-        ->assertSee('Recipients no longer see your name or photo.')
+        ->assertSee('People no longer see your name or photo.')
         ->assertAttribute('[aria-labelledby="show-name-label"]', 'aria-checked', 'false')
         ->assertNoJavascriptErrors()
         ->screenshot(filename: 'settings-privacy-hidden');
