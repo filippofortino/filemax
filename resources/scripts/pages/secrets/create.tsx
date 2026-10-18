@@ -1,4 +1,4 @@
-import { LockKeyIcon, Tick02Icon } from '@hugeicons/core-free-icons';
+import { EncryptIcon, Tick02Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Head, Link } from '@inertiajs/react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -107,7 +107,7 @@ export default function CreateSecret() {
                         <div className="flex flex-col gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-slate-700">
                             <strong className="inline-flex items-center gap-2">
                                 <HugeiconsIcon
-                                    icon={LockKeyIcon}
+                                    icon={EncryptIcon}
                                     size={16}
                                     aria-hidden="true"
                                 />
@@ -217,7 +217,7 @@ export default function CreateSecret() {
                         >
                             <span className="inline-flex items-center gap-1.5">
                                 <HugeiconsIcon
-                                    icon={LockKeyIcon}
+                                    icon={EncryptIcon}
                                     size={16}
                                     aria-hidden="true"
                                 />

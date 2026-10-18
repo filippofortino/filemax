@@ -2,7 +2,7 @@ import {
     Alert02Icon,
     ArrowLeft01Icon,
     Delete02Icon,
-    LockKeyIcon,
+    EncryptIcon,
     ViewIcon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
@@ -92,7 +92,7 @@ export default function ShowSecret({ secret }: { secret: Secret }) {
                             title="Only the link and its key can open it."
                         >
                             <HugeiconsIcon
-                                icon={LockKeyIcon}
+                                icon={EncryptIcon}
                                 size={13}
                                 aria-hidden="true"
                             />

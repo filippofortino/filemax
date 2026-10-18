@@ -2,7 +2,7 @@ import {
     Add01Icon,
     ArrowRight01Icon,
     Clock01Icon,
-    LockKeyIcon,
+    EncryptIcon,
     Search01Icon,
     ViewIcon,
 } from '@hugeicons/core-free-icons';
@@ -296,7 +296,7 @@ export default function Index({
                         <div className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-input px-6 py-16 text-center">
                             <span className="flex size-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
                                 <HugeiconsIcon
-                                    icon={LockKeyIcon}
+                                    icon={EncryptIcon}
                                     size={24}
                                     aria-hidden="true"
                                 />
@@ -359,7 +359,7 @@ export default function Index({
                                         )}
                                     >
                                         <HugeiconsIcon
-                                            icon={LockKeyIcon}
+                                            icon={EncryptIcon}
                                             size={20}
                                             aria-hidden="true"
                                         />

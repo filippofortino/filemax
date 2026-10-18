@@ -140,8 +140,13 @@ it('shows the opened state when someone else opens the secret first', function (
 
 it('lists secrets on their own page, apart from My transfers, and lets the owner delete one', function (): void {
     $owner = User::factory()->create();
-    Secret::factory()->for($owner)->create(['label' => 'Accesso staging WordPress', 'max_views' => 5, 'view_count' => 2, 'last_opened_at' => now(), 'expires_at' => now()->addDays(3)]);
     $this->actingAs($owner);
+
+    visit('/secrets')->resize(1280, 940)
+        ->assertSee('No secrets yet')
+        ->screenshot(fullPage: false, filename: 'secret-list-empty');
+
+    Secret::factory()->for($owner)->create(['label' => 'Accesso staging WordPress', 'max_views' => 5, 'view_count' => 2, 'last_opened_at' => now(), 'expires_at' => now()->addDays(3)]);
 
     visit('/transfers')->assertSee('No transfers yet')->assertDontSee('Accesso staging WordPress');
 

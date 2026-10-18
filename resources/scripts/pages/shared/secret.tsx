@@ -1,7 +1,7 @@
 import {
     Clock01Icon,
     Copy01Icon,
-    LockKeyIcon,
+    EncryptIcon,
     Tick02Icon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
@@ -205,7 +205,7 @@ export default function SharedSecretPage({
                             <HugeiconsIcon
                                 icon={
                                     secret?.reason === 'opened'
-                                        ? LockKeyIcon
+                                        ? EncryptIcon
                                         : Clock01Icon
                                 }
                                 size={28}
@@ -271,7 +271,7 @@ export default function SharedSecretPage({
                             <div className="flex flex-col items-center gap-3 rounded-lg bg-muted px-6 py-8 text-center">
                                 <span className="inline-flex size-14 shrink-0 items-center justify-center rounded-full bg-background text-muted-foreground">
                                     <HugeiconsIcon
-                                        icon={LockKeyIcon}
+                                        icon={EncryptIcon}
                                         size={24}
                                         aria-hidden="true"
                                     />
@@ -308,7 +308,7 @@ export default function SharedSecretPage({
                             <div className="flex flex-col items-center gap-4 text-center">
                                 <span className="inline-flex size-16 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                                     <HugeiconsIcon
-                                        icon={LockKeyIcon}
+                                        icon={EncryptIcon}
                                         size={28}
                                         strokeWidth={2}
                                         aria-hidden="true"
