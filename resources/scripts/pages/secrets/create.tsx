@@ -1,4 +1,4 @@
-import { EncryptIcon, Tick02Icon } from '@hugeicons/core-free-icons';
+import { EncryptIcon, LockedIcon, Tick02Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Head, Link } from '@inertiajs/react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -217,7 +217,7 @@ export default function CreateSecret() {
                         >
                             <span className="inline-flex items-center gap-1.5">
                                 <HugeiconsIcon
-                                    icon={EncryptIcon}
+                                    icon={LockedIcon}
                                     size={16}
                                     aria-hidden="true"
                                 />
