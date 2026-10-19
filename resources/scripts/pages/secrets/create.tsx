@@ -1,4 +1,8 @@
-import { EncryptIcon, LockedIcon, Tick02Icon } from '@hugeicons/core-free-icons';
+import {
+    EncryptIcon,
+    LockedIcon,
+    Tick02Icon,
+} from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Head, Link } from '@inertiajs/react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
