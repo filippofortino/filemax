@@ -10,7 +10,6 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Http\Responses\PasswordResetLinkResponse;
 use App\Http\Responses\RegisterResponse;
-use App\Models\User;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -26,8 +25,6 @@ use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
 use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Fortify;
-use Laravel\Passkeys\Contracts\PasskeyUser;
-use Laravel\Passkeys\Passkeys;
 
 final class FortifyServiceProvider extends ServiceProvider
 {
@@ -53,7 +50,7 @@ final class FortifyServiceProvider extends ServiceProvider
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
         Fortify::loginView(fn (): Response => Inertia::render('auth/login'));
-        Fortify::registerView(fn (): Response => Inertia::render('auth/register'));
+        Fortify::registerView(fn (): Response => Inertia::render('auth/register', ['signupOpen' => config()->boolean('filemax.signup_open')]));
         Fortify::requestPasswordResetLinkView(fn (): Response => Inertia::render('auth/forgot-password'));
         Fortify::resetPasswordView(fn (Request $request): Response => Inertia::render('auth/reset-password', [
             'token' => $request->route('token'),
@@ -63,8 +60,6 @@ final class FortifyServiceProvider extends ServiceProvider
         Fortify::confirmPasswordView(fn (Request $request): Response => Inertia::render('auth/confirm-password', [
             'hasPasskeys' => $request->user()?->hasPasskeysEnabled() ?? false,
         ]));
-
-        Passkeys::authorizeLoginUsing(fn (Request $request, PasskeyUser $user): bool => $user instanceof User && $user->isEligible());
 
         RateLimiter::for('login', function (Request $request): Limit {
             $email = $request->input('email');

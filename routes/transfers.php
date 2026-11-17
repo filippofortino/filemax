@@ -7,10 +7,9 @@ use App\Http\Controllers\TransferController;
 use App\Http\Controllers\TransferFileUploadController;
 use App\Http\Controllers\TransferUploadController;
 use App\Http\Controllers\TransferUploadPartController;
-use App\Http\Middleware\EnsureEligibleEmail;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', EnsureEligibleEmail::class, 'verified'])->prefix('transfers')->name('transfers.')->whereUuid('transfer')->group(function (): void {
+Route::middleware(['auth', 'verified'])->prefix('transfers')->name('transfers.')->whereUuid('transfer')->group(function (): void {
     Route::get('/', [TransferController::class, 'index'])->name('index');
     Route::get('/create', [TransferController::class, 'create'])->name('create');
     Route::post('/', [TransferController::class, 'store'])->name('store');

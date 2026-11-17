@@ -9,12 +9,10 @@ use App\Http\Requests\StoreTransferRequest;
 use App\Http\Requests\UpdateTransferSharingRequest;
 use App\Http\Resources\TransferResource;
 use App\Jobs\PurgeTransfer;
-use App\Models\Team;
 use App\Models\Transfer;
 use App\Services\TransferStorage;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -38,12 +36,12 @@ final class TransferController
             return to_route('welcome');
         }
 
-        return Inertia::render('transfers/create', ['teams' => $user->teams()->withCount('users')->orderBy('name')->get(['teams.id', 'name'])]);
+        return Inertia::render('transfers/create');
     }
 
     public function store(StoreTransferRequest $request, TransferStorage $storage): JsonResponse
     {
-        /** @var array{title?: ?string, message?: ?string, visibility: string, expires_in_days: int, team_ids?: list<string>, files: list<array{name: string, size: int, type?: ?string}>} $data */
+        /** @var array{title?: ?string, message?: ?string, visibility: string, expires_in_days: int, files: list<array{name: string, size: int, type?: ?string}>} $data */
         $data = $request->validated();
         $passwordHash = $request->boolean('password_protected') ? Hash::make($request->string('password')->toString()) : null;
         $transfer = DB::transaction(function () use ($request, $data, $storage, $passwordHash): Transfer {
@@ -55,7 +53,6 @@ final class TransferController
                 'password_hash' => $passwordHash,
                 'expires_in_days' => $data['expires_in_days'],
             ]);
-            $transfer->teams()->sync($data['team_ids'] ?? []);
             foreach ($data['files'] as $position => $file) {
                 $transfer->files()->create([
                     'original_name' => $file['name'],
@@ -69,7 +66,7 @@ final class TransferController
             return $transfer;
         });
 
-        return response()->json(['transfer' => new TransferResource($transfer->load(['files', 'teams' => fn (Relation $query) => $query->withCount('users')]))], 201);
+        return response()->json(['transfer' => new TransferResource($transfer->load(['files', 'organization']))], 201);
     }
 
     public function index(IndexTransfersRequest $request): Response|RedirectResponse
@@ -82,7 +79,7 @@ final class TransferController
         $search = $filters['search'] ?? '';
         $now = now();
 
-        $historyQuery = Transfer::query()->where('user_id', $user->id)->whereNull('drop_id')->where('status', 'ready');
+        $historyQuery = Transfer::query()->where('user_id', $user->id)->whereBelongsTo($user->currentOrganization())->whereNull('drop_id')->where('status', 'ready');
         $totals = [
             'total' => (clone $historyQuery)->count(),
             'active' => $this->applyHistoryStatus(clone $historyQuery, 'active', $now)->count(),
@@ -92,7 +89,7 @@ final class TransferController
         $statusCounts = $this->historyStatusCounts($matchingQuery, $now);
         $resultsQuery = $this->applyHistoryStatus(clone $matchingQuery, $status, $now);
         $transfers = $resultsQuery
-            ->with(['files', 'teams' => fn (Relation $query) => $query->withCount('users')])
+            ->with(['files', 'organization'])
             ->latest()
             ->latest('id')
             ->paginate(8)
@@ -102,14 +99,8 @@ final class TransferController
             return redirect($transfers->url($transfers->lastPage()));
         }
 
-        $historyTeams = Team::query()
-            ->whereHas('transfers', fn (Builder $query) => $query->where('user_id', $user->id))
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
         return Inertia::render('transfers/index', [
             'transfers' => TransferResource::collection($transfers),
-            'teams' => $historyTeams,
             'filter' => $filter,
             'status' => $status,
             'search' => $search,
@@ -124,26 +115,25 @@ final class TransferController
         Gate::authorize('view', $transfer);
 
         return Inertia::render('transfers/show', [
-            'transfer' => new TransferResource($transfer->load(['files', 'teams' => fn (Relation $query) => $query->withCount('users')]))->resolve($request),
-            'teams' => ($request->user() ?? abort(403))->teams()->withCount('users')->orderBy('name')->get(['teams.id', 'name']),
+            'transfer' => new TransferResource($transfer->load(['files', 'organization']))->resolve($request),
+            'membersCount' => $transfer->organization->users()->count(),
         ]);
     }
 
+    /** Opens a members-only transfer to anyone with the link. There is no way back: the link may already be out. */
     public function update(UpdateTransferSharingRequest $request, Transfer $transfer): JsonResponse|RedirectResponse
     {
-        DB::transaction(function () use ($request, $transfer): void {
+        DB::transaction(function () use ($transfer): void {
             $transfer = Transfer::query()->lockForUpdate()->findOrFail($transfer->id);
-            abort_unless($transfer->visibility === 'teams' && $transfer->revoked_at === null, 422);
-            /** @var list<string> $teamIds */
-            $teamIds = $request->validated('team_ids');
-            $transfer->teams()->sync($teamIds);
+            abort_unless($transfer->visibility === 'members' && $transfer->revoked_at === null, 422);
+            $transfer->update(['visibility' => 'public']);
         });
 
         if ($request->expectsJson()) {
             return response()->json(['updated' => true]);
         }
 
-        Inertia::flash('toast', ['title' => 'Sharing updated']);
+        Inertia::flash('toast', ['title' => 'Transfer is now public', 'description' => 'Anyone with the link can download it.']);
 
         return back();
     }
@@ -174,10 +164,8 @@ final class TransferController
      */
     private function applyHistoryFilters(Builder $query, string $filter, string $search): Builder
     {
-        if ($filter === 'public') {
-            $query->where('visibility', 'public');
-        } elseif ($filter !== 'all') {
-            $query->whereHas('teams', fn (Builder $query) => $query->whereKey($filter));
+        if ($filter !== 'all') {
+            $query->where('visibility', $filter);
         }
 
         if ($search !== '') {

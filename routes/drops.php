@@ -5,10 +5,9 @@ declare(strict_types=1);
 use App\Http\Controllers\CloseDropController;
 use App\Http\Controllers\DropController;
 use App\Http\Controllers\ReceivedController;
-use App\Http\Middleware\EnsureEligibleEmail;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', EnsureEligibleEmail::class, 'verified'])->group(function (): void {
+Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::prefix('drops')->name('drops.')->group(function (): void {
         Route::get('/', [DropController::class, 'index'])->name('index');
         Route::get('/create', [DropController::class, 'create'])->name('create');

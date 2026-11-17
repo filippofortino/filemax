@@ -2,43 +2,40 @@
 
 declare(strict_types=1);
 
-use App\Models\Team;
+use App\Models\Organization;
 use App\Models\Transfer;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 
-it('permits any current selected team membership but never admin bypass', function (): void {
-    $teams = Team::factory()->count(2)->create();
-    $transfer = Transfer::factory()->create(['visibility' => 'teams']);
-    $transfer->teams()->attach($teams);
+it('permits current members of the organization but never admin bypass', function (): void {
+    $transfer = Transfer::factory()->membersOnly()->create();
     $recipient = User::factory()->create();
     expect(Gate::forUser($recipient)->allows('download', $transfer))->toBeFalse();
-    $recipient->teams()->attach($teams[1]);
+    $transfer->organization->users()->attach($recipient);
     expect(Gate::forUser($recipient)->allows('download', $transfer))->toBeTrue();
-    $recipient->teams()->attach($teams[0]);
-    expect(Gate::forUser($recipient)->allows('download', $transfer))->toBeTrue();
-    $recipient->teams()->detach();
+    $transfer->organization->users()->detach($recipient);
+    expect(Gate::forUser($recipient)->allows('download', $transfer))->toBeFalse();
+    Organization::factory()->create()->users()->attach($recipient);
     expect(Gate::forUser($recipient)->allows('download', $transfer))->toBeFalse();
     expect(Gate::forUser(User::factory()->admin()->create())->allows('download', $transfer))->toBeFalse();
 });
 
-it('requires verified eligible restricted recipients and keeps empty shares private', function (): void {
-    $team = Team::factory()->create();
-    $transfer = Transfer::factory()->create(['visibility' => 'teams']);
-    $transfer->teams()->attach($team);
+it('requires verified members and never opens Drop submissions to them', function (): void {
+    $transfer = Transfer::factory()->membersOnly()->create();
     $unverified = User::factory()->unverified()->create();
-    $external = User::factory()->create(['email' => 'external@example.com']);
-    $unverified->teams()->attach($team);
-    $external->teams()->attach($team);
+    $transfer->organization->users()->attach($unverified);
     expect(Gate::forUser($unverified)->allows('download', $transfer))->toBeFalse();
-    expect(Gate::forUser($external)->allows('download', $transfer))->toBeFalse();
     expect(Gate::forUser(null)->allows('download', $transfer))->toBeFalse();
-    $transfer->teams()->detach();
-    expect(Gate::forUser(User::factory()->create())->allows('download', $transfer))->toBeFalse();
+
+    $member = User::factory()->create();
+    $transfer->organization->users()->attach($member);
+    $transfer->update(['visibility' => 'drop']);
+    expect(Gate::forUser($member)->allows('download', $transfer))->toBeFalse();
 });
 
-it('allows an eligible owner after leaving teams but still checks expiry and revocation', function (): void {
-    $transfer = Transfer::factory()->create(['visibility' => 'teams']);
+it('allows the owner after leaving the organization but still checks expiry and revocation', function (): void {
+    $transfer = Transfer::factory()->membersOnly()->create();
+    $transfer->organization->users()->detach($transfer->user);
     $gate = Gate::forUser($transfer->user);
     expect($gate->allows('download', $transfer))->toBeTrue();
     $transfer->update(['expires_at' => now()]);

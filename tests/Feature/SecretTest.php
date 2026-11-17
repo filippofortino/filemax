@@ -35,7 +35,6 @@ it('opens the new secret page only for verified colleagues', function (): void {
     $this->get(route('secrets.index'))->assertRedirect(route('login'));
     $this->get(route('secrets.create'))->assertRedirect(route('login'));
     $this->actingAs(User::factory()->unverified()->create())->get(route('secrets.create'))->assertRedirect(route('verification.notice'));
-    $this->flushSession()->actingAs(User::factory()->create(['email' => 'external@example.com']))->get(route('secrets.create'))->assertForbidden();
     $this->flushSession()->actingAs(User::factory()->create())->get(route('secrets.create'))->assertOk()
         ->assertInertia(fn (Assert $page): Assert => $page->component('secrets/create', false));
 });

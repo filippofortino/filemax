@@ -84,10 +84,8 @@ test('guests cannot manage passkeys or confirm their identity', function (): voi
     $this->assertModelExists($passkey);
 });
 
-test('passkey management requires a currently eligible verified account', function (bool $verified): void {
-    $user = User::factory()->create($verified
-        ? ['email' => 'former@example.com']
-        : ['email_verified_at' => null]);
+test('passkey management requires a verified account', function (): void {
+    $user = User::factory()->unverified()->create();
     [$passkey] = filemaxPasskey($user);
     $this->actingAs($user)->withSession(['auth.password_confirmed_at' => now()->timestamp]);
 
@@ -98,7 +96,7 @@ test('passkey management requires a currently eligible verified account', functi
     $this->getJson(route('passkey.confirm-options'))->assertForbidden();
     $this->postJson(route('passkey.confirm'), [])->assertForbidden();
     $this->assertModelExists($passkey);
-})->with(['ineligible' => true, 'unverified' => false]);
+});
 
 test('password confirmation permits management for three hours and lists only safe account metadata', function (): void {
     $this->withoutVite();
@@ -262,8 +260,7 @@ test('changing the account password retains existing passkeys', function (): voi
     $this->assertModelExists($passkey);
 });
 
-test('passkey login uses the intended destination and consumes its challenge once', function (array $domains): void {
-    config(['filemax.allowed_email_domains' => $domains]);
+test('passkey login uses the intended destination and consumes its challenge once', function (): void {
     $user = User::factory()->create(['email' => 'alice@example.com']);
     [$passkey, $privateKey] = filemaxPasskey($user);
     $this->withSession(['url.intended' => '/t/shared-transfer']);
@@ -282,7 +279,7 @@ test('passkey login uses the intended destination and consumes its challenge onc
     $this->postJson(route('passkey.login'), ['credential' => $credential])
         ->assertUnprocessable()->assertJsonValidationErrors('credential');
     $this->assertGuest();
-})->with(['open domains' => [[]], 'single domain' => [['example.com']], 'multiple domains' => [['mediamaxcommunication.it', 'example.com']]]);
+});
 
 test('a signed assertion for a different challenge is rejected and cannot be retried', function (): void {
     [$passkey, $privateKey] = filemaxPasskey(User::factory()->create());
@@ -313,16 +310,15 @@ test('signed assertions must match the configured origin including scheme and su
     $this->assertGuest();
 })->with(['https://attacker.example', 'http://filemax.test', 'https://sub.filemax.test']);
 
-test('a valid passkey cannot sign in an account that is no longer eligible', function (): void {
-    $user = User::factory()->create();
+test('a valid passkey still signs in after sign-up closes, whatever the email domain', function (): void {
+    config(['filemax.signup_open' => false]);
+    $user = User::factory()->create(['email' => 'former@example.com']);
     [$passkey, $privateKey] = filemaxPasskey($user);
-    $user->update(['email' => 'former@example.com']);
     $options = $this->getJson(route('passkey.login-options'))->assertOk()->json('options');
 
     $this->postJson(route('passkey.login'), [
         'credential' => filemaxPasskeyAssertion($passkey, $privateKey, $options['challenge']),
-    ])->assertUnprocessable()->assertJsonValidationErrors('credential');
+    ])->assertOk();
 
-    expect($passkey->refresh()->last_used_at?->timestamp)->toBe(now()->timestamp);
-    $this->assertGuest();
+    $this->assertAuthenticatedAs($user);
 });

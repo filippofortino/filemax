@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Models\User;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -19,6 +22,12 @@ final class AppServiceProvider extends ServiceProvider
         Password::defaults(fn (): ?Password => $this->app->isProduction()
             ? Password::min(12)->mixedCase()->numbers()->symbols()
             : null);
+
+        Event::listen(Verified::class, function (Verified $event): void {
+            if ($event->user instanceof User) {
+                $event->user->joinOrganizationsByDomain();
+            }
+        });
 
         RateLimiter::for('drop-submissions', fn (Request $request): Limit => Limit::perHour(30)
             ->by($this->network((string) $request->ip()))

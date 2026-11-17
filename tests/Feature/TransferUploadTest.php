@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Team;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
@@ -92,20 +91,18 @@ it('allows removing failed files but never publishes an empty transfer', functio
     expect(Transfer::query()->findOrFail($id)->status)->toBe('uploading');
 });
 
-it('revalidates memberships when publishing without losing completed bytes', function (): void {
-    $team = Team::factory()->create();
-    $otherTeam = Team::factory()->create();
-    auth()->user()->teams()->attach([$team->id, $otherTeam->id]);
-    $response = $this->postJson(route('transfers.store'), transferUploadPayload(['visibility' => 'teams', 'team_ids' => [$team->id]]))->assertCreated();
+it('revalidates membership when publishing without losing completed bytes', function (): void {
+    $organization = joinOrganization(auth()->user());
+    $response = $this->postJson(route('transfers.store'), transferUploadPayload(['visibility' => 'members']))->assertCreated();
     $id = $response->json('transfer.id');
     $file = TransferFile::query()->findOrFail($response->json('transfer.files.0.id'));
     putTransferPart($id, $file->id, 'hello')->assertOk();
     $this->postJson(route('transfers.uploads.complete', [$id, $file]))->assertOk();
-    auth()->user()->teams()->detach($team);
-    $this->postJson(route('transfers.uploads.finalize', $id))->assertUnprocessable()->assertJsonValidationErrors('team_ids');
+    $organization->users()->detach(auth()->user());
+    $this->postJson(route('transfers.uploads.finalize', $id))->assertUnprocessable()->assertJsonValidationErrors('visibility');
     Storage::disk('local')->assertExists($file->path);
-    $this->patchJson(route('transfers.update', $id), ['team_ids' => [$otherTeam->id]])->assertOk();
-    $this->postJson(route('transfers.uploads.finalize', $id))->assertOk();
+    $organization->users()->attach(auth()->user());
+    $this->postJson(route('transfers.uploads.finalize', $id))->assertOk()->assertJsonPath('transfer.organization', $organization->name);
 });
 
 it('blocks upload changes and publication after cancellation', function (): void {
@@ -156,14 +153,13 @@ it('uses unique private keys for duplicate unsafe names and accepts sizes beyond
     expect($response->json('transfer.files.0'))->not->toHaveKey('path');
 });
 
-it('validates visibility expiry and authorized distinct teams', function (array $invalid): void {
+it('validates visibility and expiry, and keeps Personal to public links', function (array $invalid): void {
     $this->postJson(route('transfers.store'), transferUploadPayload($invalid))->assertUnprocessable();
 })->with([
     'once downloaded' => [['expires_in_days' => 'once']],
     'unknown visibility' => [['visibility' => 'private']],
-    'empty restricted' => [['visibility' => 'teams']],
-    'public with teams' => [['team_ids' => ['00000000-0000-4000-8000-000000000001']]],
-    'foreign team' => [['visibility' => 'teams', 'team_ids' => ['00000000-0000-4000-8000-000000000001']]],
+    'removed teams visibility' => [['visibility' => 'teams']],
+    'members only from Personal' => [['visibility' => 'members']],
     'negative size' => [['files' => [['name' => 'file', 'size' => -1]]]],
     'empty file list' => [['files' => []]],
 ]);

@@ -19,6 +19,7 @@ final class SharedSecretController
             'secret' => [
                 'token' => $secret->token,
                 'sender' => $sender ? ['name' => $sender->name, 'avatar_url' => $sender->avatarUrl()] : null,
+                'organization' => $secret->organization->publicName(),
                 'max_views' => $secret->max_views,
                 'views_left' => max(0, $secret->max_views - $secret->view_count),
                 'expires_at' => $secret->expires_at->toIso8601String(),

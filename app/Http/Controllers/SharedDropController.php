@@ -22,6 +22,7 @@ final class SharedDropController
                 'title' => $drop->title,
                 'instructions' => $drop->instructions,
                 'owner' => $owner ? ['name' => $owner->name, 'avatar_url' => $owner->avatarUrl()] : null,
+                'organization' => $drop->organization->publicName(),
                 'open' => $drop->isOpen(),
                 'closes_at' => $drop->closes_at->toIso8601String(),
                 'closed_at' => $drop->closedAt()->toIso8601String(),

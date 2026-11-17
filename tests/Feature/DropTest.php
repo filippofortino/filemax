@@ -31,7 +31,6 @@ function newDropInput(array $overrides = []): array
 it('opens the Drop pages only for verified colleagues', function (string $route): void {
     $this->get(route($route))->assertRedirect(route('login'));
     $this->actingAs(User::factory()->unverified()->create())->get(route($route))->assertRedirect(route('verification.notice'));
-    $this->flushSession()->actingAs(User::factory()->create(['email' => 'external@example.com']))->get(route($route))->assertForbidden();
     $this->flushSession()->actingAs(User::factory()->create())->get(route($route))->assertOk();
 })->with(['drops.index', 'drops.create', 'received.index']);
 

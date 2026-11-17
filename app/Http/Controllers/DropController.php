@@ -25,7 +25,8 @@ final class DropController
         $status = $filters['status'] ?? 'all';
         $now = now();
 
-        $query = Drop::query()->whereBelongsTo($request->user() ?? abort(403));
+        $user = $request->user() ?? abort(403);
+        $query = Drop::query()->whereBelongsTo($user)->whereBelongsTo($user->currentOrganization());
         $statusCounts = array_map(fn (string $option): int => $this->applyStatus(clone $query, $option, $now)->count(), ['all' => 'all', 'open' => 'open', 'closed' => 'closed']);
         $drops = $this->applyStatus($query, $status, $now)
             ->withCount(['submissions' => fn (Builder $submissions) => $submissions->where('status', 'ready')])

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Rules\AllowedEmailDomain;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -22,7 +21,7 @@ final class ProtectFortifyRequests
             }
 
             $rules = [
-                'email' => ['required', 'string', 'email:filter', 'max:255', new AllowedEmailDomain],
+                'email' => ['required', 'string', 'email:filter', 'max:255'],
             ];
             if ($request->routeIs('login.store')) {
                 $rules['remember'] = ['sometimes', 'boolean'];
@@ -40,8 +39,6 @@ final class ProtectFortifyRequests
         }
 
         if ($request->user() && $request->routeIs('verification.*', 'passkey.confirm*', 'passkey.registration-options', 'passkey.store', 'passkey.destroy', 'user-password.update', 'user-profile-information.update')) {
-            abort_unless($request->user()->isEligible(), 403);
-
             if (! $request->routeIs('verification.*')) {
                 abort_unless($request->user()->hasVerifiedEmail(), 403);
             }

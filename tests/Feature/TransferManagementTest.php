@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Jobs\PurgeTransfer;
-use App\Models\Team;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
@@ -16,18 +15,23 @@ beforeEach(function (): void {
     config(['inertia.testing.ensure_pages_exist' => false]);
 });
 
-it('lists only owned transfers with historical team filters and availability totals', function (): void {
+it('lists only owned transfers of the current organization with audience filters and availability totals', function (): void {
     $owner = User::factory()->create();
-    $team = Team::factory()->create();
-    $owned = Transfer::factory()->for($owner)->create(['visibility' => 'teams']);
-    $owned->teams()->attach($team);
+    $personal = Transfer::factory()->for($owner)->create();
+    $organization = joinOrganization($owner);
+    $owned = Transfer::factory()->for($owner)->create(['visibility' => 'members']);
     TransferFile::factory()->for($owned)->create();
     Transfer::factory()->for($owner)->expired()->create();
-    Transfer::factory()->create();
+    Transfer::factory()->create(['organization_id' => $organization->id]);
     $this->actingAs($owner)->get(route('transfers.index'))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
-        ->component('transfers/index', false)->has('transfers.data', 2)->where('totals', ['total' => 2, 'active' => 1])->where('teams.0.id', $team->id));
-    $this->get(route('transfers.index', ['filter' => $team->id]))->assertInertia(fn (Assert $page): Assert => $page->has('transfers.data', 1)->where('transfers.data.0.id', $owned->id));
+        ->component('transfers/index', false)->has('transfers.data', 2)->where('totals', ['total' => 2, 'active' => 1])
+        ->where('transfers.data.1.organization', $organization->name));
+    $this->get(route('transfers.index', ['filter' => 'members']))->assertInertia(fn (Assert $page): Assert => $page->has('transfers.data', 1)->where('transfers.data.0.id', $owned->id));
     $this->get(route('transfers.index', ['filter' => 'public']))->assertInertia(fn (Assert $page): Assert => $page->has('transfers.data', 1));
+
+    $this->post(route('organizations.switch', $personal->organization))->assertRedirect();
+    $this->get(route('transfers.index'))->assertInertia(fn (Assert $page): Assert => $page
+        ->has('transfers.data', 1)->where('transfers.data.0.id', $personal->id)->where('transfers.data.0.organization', null));
 });
 
 it('renders an empty owner history', function (): void {
@@ -71,22 +75,17 @@ it('filters availability and counts the inclusive next day without crossing owne
 
 it('counts audience and search matches before the selected status while preserving global totals', function (): void {
     $owner = User::factory()->create();
-    $team = Team::factory()->create();
-    $match = Transfer::factory()->for($owner)->create(['title' => 'Campaign active', 'visibility' => 'teams', 'expires_at' => now()->addHour()]);
-    $match->teams()->attach($team);
-    $expired = Transfer::factory()->for($owner)->expired()->create(['title' => 'Campaign expired', 'visibility' => 'teams']);
-    $expired->teams()->attach($team);
+    $organization = joinOrganization($owner);
+    $match = Transfer::factory()->for($owner)->create(['title' => 'Campaign active', 'visibility' => 'members', 'expires_at' => now()->addHour()]);
+    Transfer::factory()->for($owner)->expired()->create(['title' => 'Campaign expired', 'visibility' => 'members']);
     Transfer::factory()->for($owner)->create(['title' => 'Campaign public']);
-    $other = Transfer::factory()->for($owner)->create(['title' => 'Different title', 'visibility' => 'teams']);
-    $other->teams()->attach($team);
-    $foreign = Transfer::factory()->expired()->create(['title' => 'Campaign foreign', 'visibility' => 'teams']);
-    $foreign->teams()->attach($team);
+    Transfer::factory()->for($owner)->create(['title' => 'Different title', 'visibility' => 'members']);
+    Transfer::factory()->expired()->create(['title' => 'Campaign foreign', 'visibility' => 'members', 'organization_id' => $organization->id]);
 
-    $this->actingAs($owner)->get(route('transfers.index', ['filter' => $team->id, 'search' => 'campaign', 'status' => 'active']))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
+    $this->actingAs($owner)->get(route('transfers.index', ['filter' => 'members', 'search' => 'campaign', 'status' => 'active']))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
         ->has('transfers.data', 1)->where('transfers.data.0.id', $match->id)
         ->where('statusCounts', ['all' => 2, 'active' => 1, 'soon' => 1, 'expired' => 1])
-        ->where('totals', ['total' => 4, 'active' => 3])
-        ->where('teams.0.id', $team->id));
+        ->where('totals', ['total' => 4, 'active' => 3]));
     $this->get(route('transfers.index', ['filter' => 'public', 'search' => 'campaign']))->assertInertia(fn (Assert $page): Assert => $page
         ->has('transfers.data', 1)->where('transfers.data.0.title', 'Campaign public')
         ->where('statusCounts.all', 1)->where('totals.total', 4));
@@ -168,17 +167,17 @@ it('searches the full history and preserves filters across stable eight-item pag
 
 it('redirects stale history pages to the last valid page while preserving filters', function (int $matchingCount, int $lastPage, int $visibleCount): void {
     $owner = User::factory()->create();
-    $team = Team::factory()->create();
-    Transfer::factory()->for($owner)->hasAttached($team)->count($matchingCount)->create(['title' => 'Campaign', 'visibility' => 'teams']);
+    joinOrganization($owner);
+    Transfer::factory()->for($owner)->count($matchingCount)->create(['title' => 'Campaign', 'visibility' => 'members']);
     Transfer::factory()->for($owner)->create(['title' => 'Unrelated transfer']);
-    $filters = ['filter' => $team->id, 'status' => 'active', 'search' => 'Campaign'];
+    $filters = ['filter' => 'members', 'status' => 'active', 'search' => 'Campaign'];
     $destination = route('transfers.index', [...$filters, 'page' => $lastPage]);
 
     $this->actingAs($owner)->get(route('transfers.index', [...$filters, 'page' => 3]))->assertRedirect($destination);
     $this->get($destination)->assertOk()->assertInertia(fn (Assert $page): Assert => $page
         ->has('transfers.data', $visibleCount)->where('transfers.meta.current_page', $lastPage)
         ->where('transfers.meta.last_page', $lastPage)->where('transfers.meta.total', $matchingCount)
-        ->where('filter', $team->id)->where('status', 'active')->where('search', 'Campaign'));
+        ->where('filter', 'members')->where('status', 'active')->where('search', 'Campaign'));
 })->with([
     'remaining matches' => [9, 2, 1],
     'no matches' => [0, 1, 0],
@@ -207,25 +206,24 @@ it('separates opened status from download counts and does not expose storage key
 it('never grants ownership via membership or admin status', function (): void {
     $transfer = Transfer::factory()->create();
     $this->actingAs(User::factory()->admin()->create())->get(route('transfers.show', $transfer))->assertForbidden();
-    $this->patchJson(route('transfers.update', $transfer), ['team_ids' => []])->assertForbidden();
+    $this->patchJson(route('transfers.update', $transfer), ['visibility' => 'public'])->assertForbidden();
     $this->deleteJson(route('transfers.destroy', $transfer))->assertForbidden();
 });
 
-it('changes teams atomically without changing files token or expiry', function (): void {
-    $transfer = Transfer::factory()->expired()->create(['visibility' => 'teams']);
-    $teams = Team::factory()->count(2)->create();
-    $transfer->user->teams()->attach($teams);
-    $transfer->teams()->attach($teams[0]);
+it('makes a members-only transfer public once without changing files token or expiry', function (): void {
+    $transfer = Transfer::factory()->membersOnly()->expired()->create();
     $token = $transfer->token;
     $expiry = $transfer->expires_at->toIso8601String();
-    $this->actingAs($transfer->user)->patchJson(route('transfers.update', $transfer), ['team_ids' => []])->assertUnprocessable();
-    expect($transfer->teams()->pluck('teams.id')->all())->toBe([$teams[0]->id]);
-    $this->patchJson(route('transfers.update', $transfer), ['team_ids' => [$teams[1]->id]])->assertOk();
+    $this->actingAs($transfer->user)->patchJson(route('transfers.update', $transfer), [])->assertUnprocessable();
+    $this->patchJson(route('transfers.update', $transfer), ['visibility' => 'members'])->assertUnprocessable();
+    expect($transfer->refresh()->visibility)->toBe('members');
+    $this->patchJson(route('transfers.update', $transfer), ['visibility' => 'public'])->assertOk();
     $transfer->refresh();
-    expect($transfer->teams()->pluck('teams.id')->all())->toBe([$teams[1]->id]);
+    expect($transfer->visibility)->toBe('public');
     expect($transfer->token)->toBe($token);
     expect($transfer->expires_at->toIso8601String())->toBe($expiry);
     expect($transfer->isAvailable())->toBeFalse();
+    $this->patchJson(route('transfers.update', $transfer), ['visibility' => 'public'])->assertUnprocessable();
 });
 
 it('revokes immediately and queues idempotent physical deletion', function (): void {
@@ -241,26 +239,21 @@ it('revokes immediately and queues idempotent physical deletion', function (): v
 
 it('confirms sharing changes and deletions with a toast', function (): void {
     Queue::fake();
-    $transfer = Transfer::factory()->create(['visibility' => 'teams', 'title' => 'Brief Q4']);
-    $team = Team::factory()->create();
-    $transfer->user->teams()->attach($team);
-    $this->actingAs($transfer->user)->from(route('transfers.show', $transfer))->patch(route('transfers.update', $transfer), ['team_ids' => [$team->id]])
-        ->assertRedirect(route('transfers.show', $transfer))->assertInertiaFlash('toast.title', 'Sharing updated');
+    $transfer = Transfer::factory()->membersOnly()->create(['title' => 'Brief Q4']);
+    $this->actingAs($transfer->user)->from(route('transfers.show', $transfer))->patch(route('transfers.update', $transfer), ['visibility' => 'public'])
+        ->assertRedirect(route('transfers.show', $transfer))->assertInertiaFlash('toast.title', 'Transfer is now public');
     $this->delete(route('transfers.destroy', $transfer))->assertRedirect(route('transfers.index'))
         ->assertInertiaFlash('toast.title', 'Transfer deleted')->assertInertiaFlash('toast.description', 'The link to “Brief Q4” no longer works.');
 });
 
 it('revokes and changes sharing immediately while an archive holds the byte lock', function (): void {
     Queue::fake();
-    $transfer = Transfer::factory()->create(['visibility' => 'teams']);
-    $teams = Team::factory()->count(2)->create();
-    $transfer->user->teams()->attach($teams);
-    $transfer->teams()->attach($teams[0]);
+    $transfer = Transfer::factory()->membersOnly()->create();
     $lock = Cache::lock('transfer-bytes:'.$transfer->id, 3700);
     $lock->get();
     try {
-        $this->actingAs($transfer->user)->patchJson(route('transfers.update', $transfer), ['team_ids' => [$teams[1]->id]])->assertOk();
-        expect($transfer->teams()->pluck('teams.id')->all())->toBe([$teams[1]->id]);
+        $this->actingAs($transfer->user)->patchJson(route('transfers.update', $transfer), ['visibility' => 'public'])->assertOk();
+        expect($transfer->refresh()->visibility)->toBe('public');
         $this->deleteJson(route('transfers.destroy', $transfer))->assertOk();
         expect($transfer->refresh()->isAvailable())->toBeFalse();
     } finally {

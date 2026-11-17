@@ -27,7 +27,8 @@ final class SecretController
         $search = $filters['search'] ?? '';
         $now = now();
 
-        $historyQuery = Secret::query()->whereBelongsTo($request->user() ?? abort(403));
+        $user = $request->user() ?? abort(403);
+        $historyQuery = Secret::query()->whereBelongsTo($user)->whereBelongsTo($user->currentOrganization());
         $totals = [
             'total' => (clone $historyQuery)->count(),
             'active' => $this->applyStatus(clone $historyQuery, 'active', $now)->count(),

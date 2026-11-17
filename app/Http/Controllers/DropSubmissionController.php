@@ -28,6 +28,7 @@ final class DropSubmissionController
         $transfer = DB::transaction(function () use ($drop, $data, $storage): Transfer {
             $transfer = $drop->submissions()->create([
                 'user_id' => $drop->user_id,
+                'organization_id' => $drop->organization_id,
                 'title' => $drop->title,
                 'sender_name' => $data['sender_name'],
                 'message' => $data['message'] ?? null,
