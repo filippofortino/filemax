@@ -1,5 +1,6 @@
 import {
     Add01Icon,
+    ArrowDown01Icon,
     Globe02Icon,
     Settings01Icon,
     UserGroupIcon,
@@ -416,23 +417,34 @@ function Members({
                                 </span>
                             ) : (
                                 <>
-                                    <select
-                                        aria-label={`Role of ${member.name}`}
-                                        className="w-33"
-                                        value={member.role}
-                                        onChange={(event) =>
-                                            router.patch(
-                                                updateMember.url(member.id),
-                                                {
-                                                    role: event.target.value,
-                                                },
-                                                { preserveScroll: true },
-                                            )
-                                        }
-                                    >
-                                        <option value="member">Member</option>
-                                        <option value="admin">Admin</option>
-                                    </select>
+                                    <span className="relative inline-flex">
+                                        <select
+                                            aria-label={`Role of ${member.name}`}
+                                            className="w-33 appearance-none pr-9"
+                                            value={member.role}
+                                            onChange={(event) =>
+                                                router.patch(
+                                                    updateMember.url(member.id),
+                                                    {
+                                                        role: event.target
+                                                            .value,
+                                                    },
+                                                    { preserveScroll: true },
+                                                )
+                                            }
+                                        >
+                                            <option value="member">
+                                                Member
+                                            </option>
+                                            <option value="admin">Admin</option>
+                                        </select>
+                                        <HugeiconsIcon
+                                            icon={ArrowDown01Icon}
+                                            size={16}
+                                            className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
+                                            aria-hidden="true"
+                                        />
+                                    </span>
                                     <Button
                                         variant="ghost"
                                         size="sm"
