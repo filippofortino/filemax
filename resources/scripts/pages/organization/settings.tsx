@@ -195,6 +195,7 @@ function General({
     const logoInput = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<string | null>(null);
     const form = useForm({
+        organization_id: organization.id,
         name: organization.name,
         logo: null as File | null,
         remove_logo: false,
@@ -426,6 +427,8 @@ function Members({
                                                 router.patch(
                                                     updateMember.url(member.id),
                                                     {
+                                                        organization_id:
+                                                            organization.id,
                                                         role: event.target
                                                             .value,
                                                     },
@@ -472,8 +475,9 @@ function Members({
                         </DialogTitle>
                         <DialogDescription>
                             They can no longer send as {organization.name} or
-                            open its members-only links. The links they already
-                            sent keep working.
+                            open its members-only links. Their Drops in this
+                            organization close immediately, including uploads in
+                            progress. Transfers they already sent keep working.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -490,6 +494,7 @@ function Members({
                             onClick={() => {
                                 if (!removing) return;
                                 router.delete(removeMember.url(removing.id), {
+                                    data: { organization_id: organization.id },
                                     preserveScroll: true,
                                     onStart: () => setBusy(true),
                                     onFinish: () => {
@@ -511,7 +516,11 @@ function Members({
 function InviteDialog({ organization }: { organization: OrganizationDetails }) {
     const [open, setOpen] = useState(false);
     const [text, setText] = useState('');
-    const form = useForm({ emails: [] as string[], role: 'member' as Role });
+    const form = useForm({
+        organization_id: organization.id,
+        emails: [] as string[],
+        role: 'member' as Role,
+    });
     const emails = [
         ...new Set(
             text
@@ -745,7 +754,7 @@ function Domains({
     organization: OrganizationDetails;
     domains: Domain[];
 }) {
-    const form = useForm({ domain: '' });
+    const form = useForm({ organization_id: organization.id, domain: '' });
 
     return (
         <section

@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -33,7 +34,9 @@ final class AcceptInvitationController
 
         return Inertia::render('invitations/show', [
             'invitation' => [
-                'id' => $invitation->id,
+                'return_path' => $request->getRequestUri(),
+                'accept_url' => URL::signedRoute('invitations.accept', $invitation, absolute: false),
+                'register_url' => URL::signedRoute('invitations.register', $invitation, absolute: false),
                 'email' => $invitation->email,
                 'role' => $invitation->role,
                 'organization' => [...$invitation->organization->only(['name']), 'logo_url' => $invitation->organization->logoUrl()],
@@ -51,10 +54,14 @@ final class AcceptInvitationController
     public function update(Request $request, OrganizationInvitation $invitation): RedirectResponse
     {
         $user = $request->user() ?? abort(403);
-        abort_if($invitation->expires_at->isPast(), 410);
-        abort_unless($user->email === $invitation->email, 403);
+        DB::transaction(function () use ($user, $invitation): void {
+            $invite = $this->activeInvitation($invitation);
+            $member = User::query()->lockForUpdate()->findOrFail($user->id);
+            abort_unless($member->email === $invite->email, 403);
+            $this->join($member, $invite);
+        });
 
-        return $this->join($user, $invitation);
+        return to_route('home');
     }
 
     /** Creates the account for the invited email and joins. */
@@ -62,24 +69,37 @@ final class AcceptInvitationController
     {
         /** @var array{name: string, password: string} $data */
         $data = $request->validated();
-        $user = User::query()->create([...$data, 'email' => $invitation->email]);
+        $user = DB::transaction(function () use ($invitation, $data): User {
+            $invite = $this->activeInvitation($invitation);
+            $user = User::query()->create([...$data, 'email' => $invite->email]);
+            $this->join($user, $invite);
+
+            return $user;
+        });
         Auth::login($user);
         $request->session()->regenerate();
 
-        return $this->join($user, $invitation);
+        return to_route('home');
     }
 
-    private function join(User $user, OrganizationInvitation $invitation): RedirectResponse
+    /** Recheck the invitation inside the transaction that consumes it. */
+    private function activeInvitation(OrganizationInvitation $invitation): OrganizationInvitation
+    {
+        $invite = OrganizationInvitation::query()->lockForUpdate()->findOrFail($invitation->id);
+        abort_if($invite->expires_at->isPast(), 410);
+
+        return $invite;
+    }
+
+    private function join(User $user, OrganizationInvitation $invitation): void
     {
         $organization = $invitation->organization;
-        DB::transaction(fn () => $invitation->accept($user));
+        $invitation->accept($user);
 
-        if ($user->markEmailAsVerified()) {
+        if (! $user->hasVerifiedEmail() && $user->markEmailAsVerified()) {
             event(new Verified($user));
         }
 
         Inertia::flash('toast', ['title' => "You joined {$organization->name}", 'description' => 'Switch between it and Personal in the header.']);
-
-        return to_route('home');
     }
 }

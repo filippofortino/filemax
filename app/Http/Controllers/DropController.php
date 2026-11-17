@@ -58,6 +58,7 @@ final class DropController
         /** @var array{title: string, instructions?: ?string, accept_days: int, keep_days: int, max_file_size?: ?int, max_submission_size?: ?int, file_types?: ?list<string>, extensions?: ?list<string>} $data */
         $data = $request->validated();
         $drop = ($request->user() ?? abort(403))->drops()->create([
+            'organization_id' => $request->string('organization_id')->toString(),
             'title' => $data['title'],
             'instructions' => $data['instructions'] ?? null,
             'closes_at' => now()->addDays((int) $data['accept_days']),

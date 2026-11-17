@@ -41,12 +41,13 @@ final class TransferPolicy
             return $this->submit($user, $transfer);
         }
 
-        return $user instanceof User && $this->update($user, $transfer);
+        return $user instanceof User && $this->view($user, $transfer);
     }
 
     public function update(User $user, Transfer $transfer): bool
     {
-        return $this->view($user, $transfer);
+        return $this->view($user, $transfer)
+            && $user->organizations()->newPivotStatementForId($transfer->organization_id)->sharedLock()->exists();
     }
 
     public function delete(User $user, Transfer $transfer): bool

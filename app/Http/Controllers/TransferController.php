@@ -47,6 +47,7 @@ final class TransferController
         $transfer = DB::transaction(function () use ($request, $data, $storage, $passwordHash): Transfer {
             $transfer = Transfer::query()->create([
                 'user_id' => ($request->user() ?? abort(403))->id,
+                'organization_id' => $request->string('organization_id')->toString(),
                 'title' => $data['title'] ?? null,
                 'message' => $data['message'] ?? null,
                 'visibility' => $data['visibility'],
@@ -117,6 +118,7 @@ final class TransferController
         return Inertia::render('transfers/show', [
             'transfer' => new TransferResource($transfer->load(['files', 'organization']))->resolve($request),
             'membersCount' => $transfer->organization->users()->count(),
+            'canUpdate' => Gate::allows('update', $transfer),
         ]);
     }
 
@@ -125,6 +127,7 @@ final class TransferController
     {
         DB::transaction(function () use ($transfer): void {
             $transfer = Transfer::query()->lockForUpdate()->findOrFail($transfer->id);
+            Gate::authorize('update', $transfer);
             abort_unless($transfer->visibility === 'members' && $transfer->revoked_at === null, 422);
             $transfer->update(['visibility' => 'public']);
         });

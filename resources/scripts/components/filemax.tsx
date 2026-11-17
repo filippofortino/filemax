@@ -483,6 +483,8 @@ function OrganizationSwitcher() {
                     <Link
                         key={organization.id}
                         href={switchOrganization(organization.id)}
+                        preserveState={false}
+                        disabled={organization.current}
                         as="button"
                         aria-current={organization.current ? 'true' : undefined}
                         className={cn(

@@ -14,6 +14,12 @@ return new class extends Migration
 
     public function up(): void
     {
+        throw_if(
+            ! app()->isDownForMaintenance() && (app()->isProduction() || DB::table('users')->exists() || DB::table('teams')->exists()),
+            RuntimeException::class,
+            'Put all instances in maintenance mode and drain old HTTP and queue workers before migrating organizations. See README.md.',
+        );
+
         Schema::create('organizations', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->string('name');
@@ -59,7 +65,11 @@ return new class extends Migration
 
         $this->moveExistingData();
 
-        DB::table('transfers')->where('visibility', 'teams')->update(['visibility' => 'members']);
+        // An issued team URL must never grant its holder access through the broader organization audience.
+        foreach (DB::table('transfers')->where('visibility', 'teams')->select('id')->lazyById() as $transfer) {
+            DB::table('transfers')->where('id', $transfer->id)->update(['token' => Str::random(64), 'visibility' => 'members']);
+        }
+
         Schema::dropIfExists('team_transfer');
         Schema::dropIfExists('team_user');
         Schema::dropIfExists('teams');
@@ -67,11 +77,10 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Dropping a foreign key rebuilds the table on SQLite, and inside the migration's transaction that cascades deletes into every table pointing at it.
         throw_if(
-            DB::getDriverName() === 'sqlite' && DB::table('users')->exists(),
+            DB::table('organizations')->exists() || DB::table('users')->exists(),
             RuntimeException::class,
-            'Rolling back organizations on SQLite would delete existing transfers. Restore a backup instead.',
+            'Rolling back a populated organization database cannot restore the original team access lists. Restore a backup instead.',
         );
 
         Schema::create('teams', function (Blueprint $table): void {
@@ -91,8 +100,6 @@ return new class extends Migration
             $table->primary(['team_id', 'transfer_id']);
             $table->index('transfer_id');
         });
-        DB::table('transfers')->where('visibility', 'members')->update(['visibility' => 'teams']);
-
         foreach (self::OWNED as $name) {
             Schema::table($name, function (Blueprint $table): void {
                 $table->dropForeign(['organization_id']);
@@ -134,7 +141,7 @@ return new class extends Migration
     {
         $users = DB::table('users')->get(['id', 'is_admin']);
 
-        if ($users->isEmpty()) {
+        if ($users->isEmpty() && DB::table('teams')->doesntExist()) {
             return;
         }
 
@@ -147,7 +154,11 @@ return new class extends Migration
             'updated_at' => $now,
         ]);
 
-        foreach (config()->array('filemax.migration.allowed_email_domains') as $domain) {
+        $domains = collect(explode(',', config()->string('filemax.migration.allowed_email_domains')))
+            ->map(fn (string $domain): string => mb_strtolower(mb_trim($domain)))
+            ->filter()->unique();
+
+        foreach ($domains as $domain) {
             DB::table('organization_domains')->insert(['id' => (string) Str::uuid7(), 'organization_id' => $organizationId, 'domain' => $domain, 'created_at' => $now, 'updated_at' => $now]);
         }
 

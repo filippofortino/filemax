@@ -25,7 +25,7 @@ beforeEach(function (): void {
 /** @return array<string, mixed> */
 function passwordTransferPayload(array $overrides = []): array
 {
-    return array_replace(['visibility' => 'public', 'expires_in_days' => 7, 'team_ids' => [], 'files' => [['name' => 'private.txt', 'size' => 4]]], $overrides);
+    return array_replace(['organization_id' => auth()->user()->currentOrganization()->id, 'visibility' => 'public', 'expires_in_days' => 7, 'team_ids' => [], 'files' => [['name' => 'private.txt', 'size' => 4]]], $overrides);
 }
 
 it('defaults protection off and stores only a hidden hash when enabled', function (): void {

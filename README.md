@@ -50,6 +50,16 @@ Update `APP_NAME`, `APP_URL`, and any database settings in `.env` before you
 start building your application. If you are not using SQLite, configure your
 database connection before running migrations.
 
+## Upgrading from teams to organizations
+
+Schedule a maintenance window for this release. Previously issued team-only links will stop working. Senders can copy the replacement link from their transfer and share it with members of the migrated organization. Public links keep their existing URLs.
+
+1. Enable maintenance mode with `php artisan down` on every instance, including the instance that runs migrations. A shared cache maintenance driver can apply this across instances.
+2. Drain in-flight HTTP requests and jobs, then stop the old web, queue and scheduler processes. Keep traffic disabled and ensure supervisors cannot restart old workers.
+3. Back up the database once writes have stopped. Run `php artisan migrate --force` from the new release. To revert after migration, restore the backup before starting the old release.
+4. If the migrated organization has no admin, find its UUID with `SELECT id, name, personal FROM organizations`. Run `php artisan filemax:organization-admin <uuid> <email>` with the verified email of an existing member.
+5. Start the new release and its workers, then run `php artisan up` on every instance.
+
 ## Development
 
 Run the full local development stack:

@@ -4,7 +4,7 @@ import {
     Tick02Icon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CopyLink, ErrorMessage, RadioPill, Shell } from '@/components/filemax';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { dateTime } from '@/lib/format';
 import { request } from '@/lib/http';
 import { encryptSecret, formatKey } from '@/lib/secret';
+import type { SharedProps } from '@/lib/types';
 import { create, index, store } from '@/routes/secrets';
 
 const expiries = [
@@ -23,6 +24,9 @@ const expiries = [
 type Ready = { url: string; key: string; expiresAt: string; maxViews: number };
 
 export default function CreateSecret() {
+    const organization = usePage<SharedProps>().props.auth.organizations.find(
+        (organization) => organization.current,
+    );
     const [secret, setSecret] = useState('');
     const [label, setLabel] = useState('');
     const [maxViews, setMaxViews] = useState<1 | 5>(1);
@@ -52,6 +56,7 @@ export default function CreateSecret() {
                 expires_at: string;
                 max_views: number;
             }>(store.url(), 'POST', {
+                organization_id: organization?.id,
                 label: label.trim() || null,
                 payload,
                 verifier,

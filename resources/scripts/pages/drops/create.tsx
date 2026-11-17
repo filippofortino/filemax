@@ -8,7 +8,7 @@ import {
     Video01Icon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
     useEffect,
     useRef,
@@ -28,7 +28,7 @@ import {
 } from '@/lib/drop';
 import { bytes, dateTime } from '@/lib/format';
 import { request } from '@/lib/http';
-import type { Drop, DropFileType, DropRules } from '@/lib/types';
+import type { Drop, DropFileType, DropRules, SharedProps } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { create, index, store } from '@/routes/drops';
 import { index as received } from '@/routes/received';
@@ -52,6 +52,9 @@ function toBytes(value: string, unit: Unit): number | null {
 }
 
 export default function CreateDrop() {
+    const organization = usePage<SharedProps>().props.auth.organizations.find(
+        (organization) => organization.current,
+    );
     const [title, setTitle] = useState('');
     const [instructions, setInstructions] = useState('');
     const [acceptDays, setAcceptDays] =
@@ -152,6 +155,7 @@ export default function CreateDrop() {
         setError('');
         try {
             const result = await request<{ drop: Drop }>(store.url(), 'POST', {
+                organization_id: organization?.id,
                 title: title.trim(),
                 instructions: instructions.trim() || null,
                 accept_days: acceptDays,

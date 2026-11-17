@@ -16,7 +16,7 @@ final class TransferUploadController
 {
     public function store(Transfer $transfer, TransferStorage $storage): JsonResponse
     {
-        Gate::authorize('update', $transfer);
+        Gate::authorize('view', $transfer);
 
         return $storage->withTransferLock($transfer, function (Transfer $transfer) use ($storage): JsonResponse {
             abort_if($transfer->revoked_at !== null || $transfer->purged_at !== null, 410, 'This transfer was cancelled.');
@@ -26,8 +26,8 @@ final class TransferUploadController
                     throw ValidationException::withMessages(['files' => 'Complete at least one file and retry any failed files before creating your link.']);
                 }
 
-                if ($transfer->visibility === 'members' && ! $transfer->organization->hasMember($transfer->user)) {
-                    throw ValidationException::withMessages(['visibility' => "You’re no longer a member of {$transfer->organization->name}, so this members-only link can’t be created."]);
+                if (Gate::denies('update', $transfer)) {
+                    throw ValidationException::withMessages(['visibility' => "You’re no longer a member of {$transfer->organization->name}, so this link can’t be created."]);
                 }
 
                 foreach ($transfer->files as $file) {

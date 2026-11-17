@@ -10,6 +10,7 @@ use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 
 it('registers an eligible account and asks the user to verify their email', function (): void {
     Notification::fake();
@@ -201,6 +202,8 @@ it('switches organization from the header and keeps Personal to public links', f
         ->assertSee('Who can download')
         ->assertSee('Members only')
         ->assertSee('Signed-in members of Mediamax.')
+        ->click('Members only')
+        ->fill('#transfer-title', 'For Mediamax')
         ->click('button[aria-label="Organization: Mediamax. Switch organization"]')
         ->assertSee('Send and see links as')
         ->assertSee('Only you')
@@ -212,6 +215,8 @@ it('switches organization from the header and keeps Personal to public links', f
         ->assertSeeIn('button[aria-label="Organization: Personal. Switch organization"]', 'Personal')
         ->assertSee('Anyone with the link can download. It shows your name, with no organization.')
         ->assertDontSee('Members only')
+        ->assertValue('#transfer-title', '')
+        ->assertVisible('[aria-labelledby="protect-label"]')
         ->assertNoJavascriptErrors();
     expect($user->refresh()->currentOrganization()->personal)->toBeTrue();
 
@@ -258,7 +263,7 @@ it('lets an invited person create an account and join, and a signed-in invitee j
     $organization = Organization::factory()->create(['name' => 'Mediamax Communication']);
     $invitation = OrganizationInvitation::factory()->for($organization)->create(['email' => 'anna@studioconti.it', 'invited_by' => $inviter->id]);
 
-    $page = visit(route('invitations.show', $invitation))->resize(1280, 940)
+    $page = visit(URL::signedRoute('invitations.show', $invitation, absolute: false))->resize(1280, 940)
         ->assertSee('Join Mediamax Communication')
         ->assertSee('Giulia Rossi invited you. Create your account to join.')
         ->assertValue('#email', 'anna@studioconti.it')
@@ -278,7 +283,7 @@ it('lets an invited person create an account and join, and a signed-in invitee j
     $marta = User::factory()->create(['name' => 'Marta Bianchi', 'email' => 'marta@studiobassi.it']);
     $second = OrganizationInvitation::factory()->for($organization)->create(['email' => $marta->email, 'invited_by' => $inviter->id]);
     $this->flushSession()->actingAs($marta);
-    visit(route('invitations.show', $second))->resize(1280, 940)
+    visit(URL::signedRoute('invitations.show', $second, absolute: false))->resize(1280, 940)
         ->assertSee('Join Mediamax Communication?')
         ->assertSee('Giulia Rossi invited you as a member. You’re signed in as marta@studiobassi.it.')
         ->screenshot(fullPage: false, filename: 'organization-accept-invite-signed-in')
@@ -287,7 +292,7 @@ it('lets an invited person create an account and join, and a signed-in invitee j
         ->assertNoJavascriptErrors();
     expect($organization->hasMember($marta))->toBeTrue();
 
-    visit(route('invitations.show', $second))
+    visit(URL::signedRoute('invitations.show', $second, absolute: false))
         ->assertSee('This invite no longer works')
         ->assertNoJavascriptErrors();
 });

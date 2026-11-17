@@ -16,6 +16,7 @@ beforeEach(function (): void {
 function newDropInput(array $overrides = []): array
 {
     return [
+        'organization_id' => auth()->user()->currentOrganization()->id,
         'title' => 'Foto e video — Fiera Rimini',
         'instructions' => 'Foto in JPG alla massima risoluzione.',
         'accept_days' => 7,

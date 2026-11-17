@@ -34,9 +34,11 @@ import { destroy, extend, index, update } from '@/routes/transfers';
 export default function Show({
     transfer,
     membersCount,
+    canUpdate,
 }: {
     transfer: Transfer;
     membersCount: number;
+    canUpdate: boolean;
 }) {
     const [allFiles, setAllFiles] = useState(false);
     const [sharingOpen, setSharingOpen] = useState(false);
@@ -114,7 +116,7 @@ export default function Show({
                 >
                     {({ errors, processing }) => (
                         <>
-                            {transfer.can_extend && (
+                            {canUpdate && transfer.can_extend && (
                                 <div className="flex flex-col gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-5">
                                     <input
                                         type="hidden"
@@ -177,7 +179,7 @@ export default function Show({
                                     <h2 className="font-sans text-sm font-semibold tracking-normal">
                                         Shared with
                                     </h2>
-                                    {!transfer.revoked_at && (
+                                    {canUpdate && !transfer.revoked_at && (
                                         <Dialog
                                             open={sharingOpen}
                                             onOpenChange={setSharingOpen}

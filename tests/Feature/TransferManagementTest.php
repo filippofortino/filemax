@@ -210,6 +210,17 @@ it('never grants ownership via membership or admin status', function (): void {
     $this->deleteJson(route('transfers.destroy', $transfer))->assertForbidden();
 });
 
+it('keeps a former sender from widening or extending access to an organization transfer', function (): void {
+    $transfer = Transfer::factory()->membersOnly()->expired()->create();
+    $transfer->organization->users()->detach($transfer->user);
+
+    $this->actingAs($transfer->user)->get(route('transfers.show', $transfer))
+        ->assertInertia(fn (Assert $page): Assert => $page->where('canUpdate', false));
+    $this->patchJson(route('transfers.update', $transfer), ['visibility' => 'public'])->assertForbidden();
+    $this->postJson(route('transfers.extend', $transfer), ['expected_expires_at' => $transfer->expires_at->toIso8601String()])->assertForbidden();
+    expect($transfer->refresh()->visibility)->toBe('members')->and($transfer->isAvailable())->toBeFalse();
+});
+
 it('makes a members-only transfer public once without changing files token or expiry', function (): void {
     $transfer = Transfer::factory()->membersOnly()->expired()->create();
     $token = $transfer->token;

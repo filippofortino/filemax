@@ -26,6 +26,10 @@ final class DropSubmissionController
         /** @var array{sender_name: string, message?: ?string, files: list<array{name: string, size: int, type?: ?string}>} $data */
         $data = $request->validated();
         $transfer = DB::transaction(function () use ($drop, $data, $storage): Transfer {
+            // Member removal locks the owner before closing their Drops and cancelling unfinished submissions.
+            $drop->user()->sharedLock()->firstOrFail(['id']);
+            $drop = Drop::query()->sharedLock()->findOrFail($drop->id);
+            abort_unless($drop->isOpen(), 410, 'This Drop is closed.');
             $transfer = $drop->submissions()->create([
                 'user_id' => $drop->user_id,
                 'organization_id' => $drop->organization_id,

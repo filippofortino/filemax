@@ -6,9 +6,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateOrganizationMemberRequest;
 use App\Models\Organization;
+use App\Models\Transfer;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 
@@ -28,8 +30,17 @@ final class OrganizationMemberController
     {
         $organization = $this->organization($request, $user);
         Gate::authorize('update', $organization);
-        $organization->users()->detach($user->id);
-        User::query()->whereKey($user->id)->where('current_organization_id', $organization->id)->update(['current_organization_id' => null]);
+        DB::transaction(function () use ($organization, $user): void {
+            $user = User::query()->lockForUpdate()->findOrFail($user->id);
+            $organization->users()->detach($user->id);
+            if ($user->current_organization_id === $organization->id) {
+                $user->forceFill(['current_organization_id' => null])->save();
+            }
+
+            $user->drops()->whereBelongsTo($organization)->whereNull('closed_at')->where('closes_at', '>', now())->update(['closed_at' => now()]);
+            Transfer::query()->whereBelongsTo($user)->whereBelongsTo($organization)->whereNotNull('drop_id')
+                ->where('status', 'uploading')->whereNull('revoked_at')->update(['revoked_at' => now()]);
+        });
 
         Inertia::flash('toast', ['title' => 'Member removed', 'description' => "{$user->name} can no longer send as {$organization->name} or open its members-only links."]);
 

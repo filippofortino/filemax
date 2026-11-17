@@ -703,7 +703,9 @@ JS);
 it('guards navigation while the upload draft is being created', function (): void {
     Storage::fake('local');
     config(['filemax.disk' => 'local']);
-    $this->actingAs(User::factory()->create());
+    $user = User::factory()->create();
+    $organization = joinOrganization($user);
+    $this->actingAs($user);
     $page = visit('/')->assertSee('Browse files');
     $page->script(<<<'JS'
 () => {
@@ -722,11 +724,16 @@ it('guards navigation while the upload draft is being created', function (): voi
 JS);
     $page->press('Create transfer')->assertSee('Uploading…')->click('My transfers')->assertSee('Uploading…')->assertSee('draft.txt');
     expect($page->script('() => window.leavePrompts'))->toBe(1);
+    $page->click('button[aria-label^="Organization:"]')
+        ->click('[data-slot="popover-content"] button:has-text("Personal")')
+        ->assertSee('Uploading…')->assertSee('draft.txt');
+    expect($page->script('() => window.leavePrompts'))->toBe(2);
+    expect($user->refresh()->currentOrganization()->is($organization))->toBeTrue();
     expect(Transfer::query()->count())->toBe(0);
 
     $page->script('() => window.resumeDraft()');
     $page->assertSee('Your link is ready')->click('Send another')->assertSee('Drop files here')->assertNoJavascriptErrors();
-    expect($page->script('() => window.leavePrompts'))->toBe(1);
+    expect($page->script('() => window.leavePrompts'))->toBe(2);
     expect(Transfer::query()->sole()->status)->toBe('ready');
 });
 
@@ -750,10 +757,10 @@ it('can finish a members-only upload after regaining membership lost on the way'
     window.confirm = () => { window.leavePrompts++; return false; };
 }
 JS);
-    $page->press('Create transfer')->assertSee('Uploading…');
+    $page->press('Create transfer')->assertSee('Uploading…')->assertScript('window.uploadPutCount', 1);
     $organization->users()->detach($user);
-    $page->script('() => new Promise(resolve => { const timer = setInterval(() => { if (window.resumeUpload) { clearInterval(timer); window.resumeUpload(); resolve(true); } }, 20); })');
-    $page->assertSee('You’re no longer a member of Mediamax, so this members-only link can’t be created.');
+    $page->script('() => window.resumeUpload()');
+    $page->assertSee('You’re no longer a member of Mediamax, so this link can’t be created.');
 
     expect(Transfer::query()->sole()->status)->toBe('uploading');
     $organization->users()->attach($user);

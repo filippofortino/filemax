@@ -33,7 +33,7 @@ type Entry = UploadEntry & { remote?: TransferFile };
 export default function Create() {
     // Personal has nobody to restrict a link to, so it only sends public links.
     const organization = usePage<SharedProps>().props.auth.organizations.find(
-        (organization) => organization.current && !organization.personal,
+        (organization) => organization.current,
     );
     const [entries, setEntries] = useState<Entry[]>([]);
     const currentEntries = useRef<Entry[]>([]);
@@ -195,6 +195,7 @@ export default function Create() {
                     store.url(),
                     'POST',
                     {
+                        organization_id: organization?.id,
                         title,
                         message,
                         visibility,
@@ -784,7 +785,7 @@ export default function Create() {
                                 <legend className="mb-2.5 text-sm font-semibold">
                                     Who can download
                                 </legend>
-                                {organization ? (
+                                {organization && !organization.personal ? (
                                     <div className="grid grid-cols-2 gap-3">
                                         {(
                                             [

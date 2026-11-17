@@ -12,10 +12,11 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { passwordHint } from '@/lib/format';
 import type { SharedProps } from '@/lib/types';
 import { home, login } from '@/routes';
-import { accept, register, show } from '@/routes/invitations';
 
 type Invitation = {
-    id: string;
+    return_path: string;
+    accept_url: string;
+    register_url: string;
     email: string;
     role: 'admin' | 'member';
     organization: { name: string; logo_url: string | null };
@@ -49,7 +50,7 @@ export default function AcceptInvitation({
         <Link
             href={switchAccount()}
             method="post"
-            data={{ return_to: show.url(invitation.id) }}
+            data={{ return_to: invitation.return_path }}
             as="button"
             className="font-semibold text-primary"
         >
@@ -106,7 +107,8 @@ export default function AcceptInvitation({
                 </div>
                 {invitation.state === 'register' && (
                     <Form
-                        action={register(invitation.id)}
+                        action={invitation.register_url}
+                        method="post"
                         className="flex flex-col gap-5"
                         resetOnSuccess={['password', 'password_confirmation']}
                     >
@@ -240,7 +242,8 @@ export default function AcceptInvitation({
                         </ul>
                         <div className="flex flex-col gap-2.5">
                             <Link
-                                href={accept(invitation.id)}
+                                href={invitation.accept_url}
+                                method="post"
                                 as="button"
                                 className={buttonVariants({
                                     size: 'lg',
@@ -265,7 +268,7 @@ export default function AcceptInvitation({
                     <Link
                         href={switchAccount()}
                         method="post"
-                        data={{ return_to: show.url(invitation.id) }}
+                        data={{ return_to: invitation.return_path }}
                         as="button"
                         className={buttonVariants({
                             size: 'lg',

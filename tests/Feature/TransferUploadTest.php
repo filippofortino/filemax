@@ -26,7 +26,7 @@ beforeEach(function (): void {
 
 function transferUploadPayload(array $overrides = []): array
 {
-    return array_replace(['visibility' => 'public', 'team_ids' => [], 'expires_in_days' => 7, 'files' => [['name' => 'hello.txt', 'size' => 5]]], $overrides);
+    return array_replace(['organization_id' => auth()->user()->currentOrganization()->id, 'visibility' => 'public', 'team_ids' => [], 'expires_in_days' => 7, 'files' => [['name' => 'hello.txt', 'size' => 5]]], $overrides);
 }
 
 function putTransferPart(string $transferId, string $fileId, string $content, int $part = 1): TestResponse
@@ -91,9 +91,9 @@ it('allows removing failed files but never publishes an empty transfer', functio
     expect(Transfer::query()->findOrFail($id)->status)->toBe('uploading');
 });
 
-it('revalidates membership when publishing without losing completed bytes', function (): void {
+it('revalidates membership when publishing without losing completed bytes', function (string $visibility): void {
     $organization = joinOrganization(auth()->user());
-    $response = $this->postJson(route('transfers.store'), transferUploadPayload(['visibility' => 'members']))->assertCreated();
+    $response = $this->postJson(route('transfers.store'), transferUploadPayload(['visibility' => $visibility]))->assertCreated();
     $id = $response->json('transfer.id');
     $file = TransferFile::query()->findOrFail($response->json('transfer.files.0.id'));
     putTransferPart($id, $file->id, 'hello')->assertOk();
@@ -103,7 +103,7 @@ it('revalidates membership when publishing without losing completed bytes', func
     Storage::disk('local')->assertExists($file->path);
     $organization->users()->attach(auth()->user());
     $this->postJson(route('transfers.uploads.finalize', $id))->assertOk()->assertJsonPath('transfer.organization', $organization->name);
-});
+})->with(['members', 'public']);
 
 it('blocks upload changes and publication after cancellation', function (): void {
     Queue::fake();

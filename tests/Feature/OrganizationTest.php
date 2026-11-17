@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -135,6 +136,35 @@ test('organization settings open only for admins of a real organization', functi
     $this->get(route($route))->assertRedirect(route('verification.notice'));
 })->with(['organization.show', 'organization.members', 'organization.domains']);
 
+test('stale forms cannot write to the organization selected in another tab', function (): void {
+    $admin = User::factory()->create();
+    $original = joinOrganization($admin, 'admin');
+    $other = joinOrganization($admin, 'admin');
+    $member = User::factory()->create();
+    joinOrganization($member, 'member', $original);
+    joinOrganization($member, 'member', $other);
+    $originalForm = ['organization_id' => $original->id];
+
+    $this->actingAs($admin);
+    foreach (['transfers.store', 'secrets.store', 'drops.store'] as $route) {
+        $this->postJson(route($route), $originalForm)->assertConflict();
+        $this->postJson(route($route))->assertConflict();
+    }
+
+    $this->post(route('organization.update'), $originalForm + ['name' => 'Stale name'])
+        ->assertRedirect(route('home'))->assertInertiaFlash('toast.title', 'Organization changed');
+    $this->post(route('organization.domains.store'), $originalForm + ['domain' => 'example.com'])->assertRedirect(route('home'));
+    $this->post(route('organization.invitations.store'), $originalForm + ['emails' => ['hello@example.com'], 'role' => 'member'])->assertRedirect(route('home'));
+    $this->patch(route('organization.members.update', $member), $originalForm + ['role' => 'admin'])->assertRedirect(route('home'));
+    $this->delete(route('organization.members.destroy', $member), $originalForm)->assertRedirect(route('home'));
+
+    expect($other->refresh()->name)->not->toBe('Stale name')
+        ->and($other->domains()->exists())->toBeFalse()
+        ->and($other->invitations()->exists())->toBeFalse()
+        ->and($other->hasMember($member))->toBeTrue()
+        ->and($other->hasAdmin($member))->toBeFalse();
+});
+
 test('members cannot change anything in organization settings', function (): void {
     $admin = User::factory()->create();
     $organization = joinOrganization($admin, 'admin');
@@ -144,13 +174,13 @@ test('members cannot change anything in organization settings', function (): voi
     $domain = $organization->domains()->create(['domain' => 'example.com']);
 
     $this->actingAs($member);
-    $this->post(route('organization.update'), ['name' => 'Hijacked'])->assertForbidden();
-    $this->patch(route('organization.members.update', $admin), ['role' => 'member'])->assertForbidden();
-    $this->delete(route('organization.members.destroy', $admin))->assertForbidden();
-    $this->post(route('organization.invitations.store'), ['emails' => ['friend@example.com'], 'role' => 'admin'])->assertForbidden();
+    $this->post(route('organization.update'), ['organization_id' => $organization->id, 'name' => 'Hijacked'])->assertForbidden();
+    $this->patch(route('organization.members.update', $admin), ['organization_id' => $organization->id, 'role' => 'member'])->assertForbidden();
+    $this->delete(route('organization.members.destroy', $admin), ['organization_id' => $organization->id])->assertForbidden();
+    $this->post(route('organization.invitations.store'), ['organization_id' => $organization->id, 'emails' => ['friend@example.com'], 'role' => 'admin'])->assertForbidden();
     $this->post(route('organization.invitations.resend', $invitation))->assertForbidden();
     $this->delete(route('organization.invitations.destroy', $invitation))->assertForbidden();
-    $this->post(route('organization.domains.store'), ['domain' => 'evil.com'])->assertForbidden();
+    $this->post(route('organization.domains.store'), ['organization_id' => $organization->id, 'domain' => 'evil.com'])->assertForbidden();
     $this->delete(route('organization.domains.destroy', $domain))->assertForbidden();
 
     expect($organization->refresh()->name)->not->toBe('Hijacked')
@@ -165,17 +195,17 @@ test('admins rename the organization and replace or remove its logo', function (
     $admin = User::factory()->create();
     $organization = joinOrganization($admin, 'admin');
 
-    $this->actingAs($admin)->post(route('organization.update'), ['name' => ''])->assertSessionHasErrors('name');
-    $this->post(route('organization.update'), ['name' => 'Studio Conti', 'logo' => UploadedFile::fake()->createWithContent('logo.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>')])
+    $this->actingAs($admin)->post(route('organization.update'), ['organization_id' => $organization->id, 'name' => ''])->assertSessionHasErrors('name');
+    $this->post(route('organization.update'), ['organization_id' => $organization->id, 'name' => 'Studio Conti', 'logo' => UploadedFile::fake()->createWithContent('logo.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>')])
         ->assertSessionHasErrors('logo');
-    $this->post(route('organization.update'), ['name' => 'Studio Conti', 'logo' => UploadedFile::fake()->image('logo.png', 400, 300)])
+    $this->post(route('organization.update'), ['organization_id' => $organization->id, 'name' => 'Studio Conti', 'logo' => UploadedFile::fake()->image('logo.png', 400, 300)])
         ->assertSessionHasNoErrors()->assertInertiaFlash('toast.title', 'Organization updated');
 
     $path = $organization->refresh()->logo_path;
     expect($organization->name)->toBe('Studio Conti')->and($path)->toStartWith('logos/');
     Storage::assertExists($path);
 
-    $this->post(route('organization.update'), ['name' => 'Studio Conti', 'remove_logo' => true])->assertSessionHasNoErrors();
+    $this->post(route('organization.update'), ['organization_id' => $organization->id, 'name' => 'Studio Conti', 'remove_logo' => true])->assertSessionHasNoErrors();
     expect($organization->refresh()->logo_path)->toBeNull();
     Storage::assertMissing($path);
 });
@@ -190,17 +220,17 @@ test('admins change roles and remove members, but never themselves or outsiders'
     $this->actingAs($admin)->get(route('organization.members'))->assertInertia(fn (Assert $page): Assert => $page
         ->has('members', 2)->where('members', fn ($members): bool => collect($members)->pluck('role', 'id')->all() === [$admin->id => 'admin', $member->id => 'member'] || collect($members)->pluck('role', 'id')->all() === [$member->id => 'member', $admin->id => 'admin']));
 
-    $this->patch(route('organization.members.update', $member), ['role' => 'owner'])->assertSessionHasErrors('role');
-    $this->patch(route('organization.members.update', $member), ['role' => 'admin'])->assertSessionHasNoErrors();
+    $this->patch(route('organization.members.update', $member), ['organization_id' => $organization->id, 'role' => 'owner'])->assertSessionHasErrors('role');
+    $this->patch(route('organization.members.update', $member), ['organization_id' => $organization->id, 'role' => 'admin'])->assertSessionHasNoErrors();
     expect($organization->hasAdmin($member))->toBeTrue();
 
-    $this->patch(route('organization.members.update', $admin), ['role' => 'member'])->assertForbidden();
-    $this->delete(route('organization.members.destroy', $admin))->assertForbidden();
-    $this->patch(route('organization.members.update', $outsider), ['role' => 'admin'])->assertNotFound();
-    $this->delete(route('organization.members.destroy', $outsider))->assertNotFound();
+    $this->patch(route('organization.members.update', $admin), ['organization_id' => $organization->id, 'role' => 'member'])->assertForbidden();
+    $this->delete(route('organization.members.destroy', $admin), ['organization_id' => $organization->id])->assertForbidden();
+    $this->patch(route('organization.members.update', $outsider), ['organization_id' => $organization->id, 'role' => 'admin'])->assertNotFound();
+    $this->delete(route('organization.members.destroy', $outsider), ['organization_id' => $organization->id])->assertNotFound();
     expect($organization->hasAdmin($admin))->toBeTrue()->and($organization->hasMember($outsider))->toBeFalse();
 
-    $this->delete(route('organization.members.destroy', $member))->assertInertiaFlash('toast.title', 'Member removed');
+    $this->delete(route('organization.members.destroy', $member), ['organization_id' => $organization->id])->assertInertiaFlash('toast.title', 'Member removed');
     expect($organization->hasMember($member))->toBeFalse()
         ->and($member->refresh()->current_organization_id)->toBeNull()
         ->and($member->currentOrganization()->personal)->toBeTrue();
@@ -213,12 +243,12 @@ test('admins invite people by email, skipping members, and can resend or cancel'
     $member = User::factory()->create();
     joinOrganization($member, 'member', $organization);
 
-    $this->actingAs($admin)->post(route('organization.invitations.store'), ['emails' => ['not-an-email'], 'role' => 'member'])->assertSessionHasErrors('emails.0');
-    $this->post(route('organization.invitations.store'), ['emails' => [], 'role' => 'member'])->assertSessionHasErrors('emails');
-    $this->post(route('organization.invitations.store'), ['emails' => ['anna@studioconti.it'], 'role' => 'owner'])->assertSessionHasErrors('role');
+    $this->actingAs($admin)->post(route('organization.invitations.store'), ['organization_id' => $organization->id, 'emails' => ['not-an-email'], 'role' => 'member'])->assertSessionHasErrors('emails.0');
+    $this->post(route('organization.invitations.store'), ['organization_id' => $organization->id, 'emails' => [], 'role' => 'member'])->assertSessionHasErrors('emails');
+    $this->post(route('organization.invitations.store'), ['organization_id' => $organization->id, 'emails' => ['anna@studioconti.it'], 'role' => 'owner'])->assertSessionHasErrors('role');
     Notification::assertNothingSent();
 
-    $this->post(route('organization.invitations.store'), ['emails' => [' Anna@StudioConti.it ', 'anna@studioconti.it', $member->email], 'role' => 'admin'])
+    $this->post(route('organization.invitations.store'), ['organization_id' => $organization->id, 'emails' => [' Anna@StudioConti.it ', 'anna@studioconti.it', $member->email], 'role' => 'admin'])
         ->assertSessionHasNoErrors()->assertInertiaFlash('toast.title', 'Invite sent');
 
     $invitation = $organization->invitations()->sole();
@@ -232,7 +262,7 @@ test('admins invite people by email, skipping members, and can resend or cancel'
 
         return $notifiable->routes['mail'] === 'anna@studioconti.it'
             && $mail->subject === "Giulia Rossi invited you to {$organization->name}"
-            && $mail->actionUrl === route('invitations.show', $invitation);
+            && $mail->actionUrl === url(URL::signedRoute('invitations.show', $invitation, absolute: false));
     });
 
     $this->get(route('organization.members'))->assertInertia(fn (Assert $page): Assert => $page
@@ -256,13 +286,13 @@ test('an invited person without an account registers through the invite even whi
     $invitation = OrganizationInvitation::factory()->create(['email' => 'anna@studioconti.it', 'role' => 'admin', 'invited_by' => User::factory()->create(['name' => 'Giulia Rossi'])->id]);
     $organization = $invitation->organization;
 
-    $this->get(route('invitations.show', $invitation))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
+    $this->get(URL::signedRoute('invitations.show', $invitation, absolute: false))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
         ->component('invitations/show', false)
         ->where('invitation.state', 'register')->where('invitation.email', 'anna@studioconti.it')
         ->where('invitation.organization.name', $organization->name)->where('invitation.inviter', 'Giulia Rossi'));
 
-    $this->post(route('invitations.register', $invitation), ['name' => 'Anna', 'password' => 'short', 'password_confirmation' => 'short'])->assertSessionHasErrors('password');
-    $this->post(route('invitations.register', $invitation), [
+    $this->post(URL::signedRoute('invitations.register', $invitation, absolute: false), ['name' => 'Anna', 'password' => 'short', 'password_confirmation' => 'short'])->assertSessionHasErrors('password');
+    $this->post(URL::signedRoute('invitations.register', $invitation, absolute: false), [
         'name' => 'Anna Conti', 'email' => 'someone-else@example.com', 'is_admin' => true,
         'password' => 'a-secure-password', 'password_confirmation' => 'a-secure-password',
     ])->assertRedirect(route('home'))->assertInertiaFlash('toast.title', "You joined {$organization->name}");
@@ -281,19 +311,23 @@ test('a signed-in invitee joins with one click and other accounts cannot use the
     $invitee = User::factory()->unverified()->create(['email' => 'anna@studioconti.it']);
     $invitation = OrganizationInvitation::factory()->create(['email' => 'anna@studioconti.it']);
     $organization = $invitation->organization;
-    $url = route('invitations.show', $invitation);
+    $url = url(URL::signedRoute('invitations.show', $invitation, absolute: false));
 
     $this->get($url)->assertRedirect(route('login'))->assertSessionHas('url.intended', $url);
-    $this->post(route('invitations.register', $invitation), ['name' => 'Impostor', 'password' => 'a-secure-password', 'password_confirmation' => 'a-secure-password'])->assertForbidden();
-    $this->post(route('invitations.accept', $invitation))->assertRedirect(route('login'));
+    $this->post(URL::signedRoute('invitations.register', $invitation, absolute: false), ['name' => 'Impostor', 'password' => 'a-secure-password', 'password_confirmation' => 'a-secure-password'])->assertForbidden();
+    $this->post(URL::signedRoute('invitations.accept', $invitation, absolute: false))->assertRedirect(route('login'));
 
     $other = User::factory()->create();
     $this->actingAs($other)->get($url)->assertInertia(fn (Assert $page): Assert => $page->where('invitation.state', 'wrong_account'));
-    $this->post(route('invitations.accept', $invitation))->assertForbidden();
+    $this->post(URL::signedRoute('invitations.accept', $invitation, absolute: false))->assertForbidden();
     expect($organization->hasMember($other))->toBeFalse();
 
+    $returnPath = URL::signedRoute('invitations.show', $invitation, absolute: false);
+    $this->post(route('account.switch'), ['return_to' => $returnPath])
+        ->assertRedirect(route('login'))->assertSessionHas('url.intended', $returnPath);
+
     $this->flushSession()->actingAs($invitee)->get($url)->assertInertia(fn (Assert $page): Assert => $page->where('invitation.state', 'join'));
-    $this->post(route('invitations.accept', $invitation))->assertRedirect(route('home'));
+    $this->post(URL::signedRoute('invitations.accept', $invitation, absolute: false))->assertRedirect(route('home'));
     expect($organization->hasMember($invitee))->toBeTrue()
         ->and($organization->hasAdmin($invitee))->toBeFalse()
         ->and($invitee->refresh()->hasVerifiedEmail())->toBeTrue()
@@ -301,15 +335,43 @@ test('a signed-in invitee joins with one click and other accounts cannot use the
     $this->get($url)->assertNotFound();
 });
 
+test('accepting a new invitation leaves a verified user off their former organization', function (): void {
+    $user = User::factory()->create(['email' => 'former@example.com']);
+    $former = joinOrganization($user);
+    $former->domains()->create(['domain' => 'example.com']);
+    $former->users()->detach($user);
+    $verifiedAt = $user->email_verified_at;
+    $this->travel(1)->day();
+    $invitation = OrganizationInvitation::factory()->create(['email' => $user->email]);
+
+    $this->actingAs($user)->post(URL::signedRoute('invitations.accept', $invitation, absolute: false))->assertRedirect(route('home'));
+
+    expect($invitation->organization->hasMember($user))->toBeTrue()
+        ->and($former->hasMember($user))->toBeFalse()
+        ->and($user->refresh()->email_verified_at)->toEqual($verifiedAt);
+});
+
+test('an invitation identifier alone cannot verify an email or create an account', function (): void {
+    $invitation = OrganizationInvitation::factory()->create();
+    $this->get(route('invitations.show', $invitation))->assertForbidden();
+    $this->post(route('invitations.register', $invitation))->assertForbidden();
+    $user = User::factory()->unverified()->create(['email' => $invitation->email]);
+    $this->actingAs($user)->post(route('invitations.accept', $invitation))->assertForbidden();
+
+    expect($user->refresh()->hasVerifiedEmail())->toBeFalse()
+        ->and($invitation->organization->hasMember($user))->toBeFalse()
+        ->and(User::query()->count())->toBe(1);
+});
+
 test('an expired invite does nothing', function (): void {
     $invitation = OrganizationInvitation::factory()->expired()->create(['email' => 'anna@studioconti.it']);
 
-    $this->get(route('invitations.show', $invitation))->assertGone()->assertInertia(fn (Assert $page): Assert => $page->where('invitation', null));
-    $this->post(route('invitations.register', $invitation), ['name' => 'Anna', 'password' => 'a-secure-password', 'password_confirmation' => 'a-secure-password'])->assertGone();
+    $this->get(URL::signedRoute('invitations.show', $invitation, absolute: false))->assertGone()->assertInertia(fn (Assert $page): Assert => $page->where('invitation', null));
+    $this->post(URL::signedRoute('invitations.register', $invitation, absolute: false), ['name' => 'Anna', 'password' => 'a-secure-password', 'password_confirmation' => 'a-secure-password'])->assertGone();
     expect(User::query()->count())->toBe(0);
 
     $invitee = User::factory()->create(['email' => 'anna@studioconti.it']);
-    $this->actingAs($invitee)->post(route('invitations.accept', $invitation))->assertGone();
+    $this->actingAs($invitee)->post(URL::signedRoute('invitations.accept', $invitation, absolute: false))->assertGone();
     expect($invitation->organization->hasMember($invitee))->toBeFalse();
 });
 
@@ -317,10 +379,10 @@ test('admins add and remove allowed domains', function (): void {
     $admin = User::factory()->create(['email' => 'giulia@studioconti.it']);
     $organization = joinOrganization($admin, 'admin');
 
-    $this->actingAs($admin)->post(route('organization.domains.store'), ['domain' => 'https://studioconti.it'])->assertSessionHasErrors('domain');
-    $this->post(route('organization.domains.store'), ['domain' => 'no-dot'])->assertSessionHasErrors('domain');
-    $this->post(route('organization.domains.store'), ['domain' => ' @StudioConti.IT '])->assertSessionHasNoErrors();
-    $this->post(route('organization.domains.store'), ['domain' => 'studioconti.it'])->assertSessionHasErrors('domain');
+    $this->actingAs($admin)->post(route('organization.domains.store'), ['organization_id' => $organization->id, 'domain' => 'https://studioconti.it'])->assertSessionHasErrors('domain');
+    $this->post(route('organization.domains.store'), ['organization_id' => $organization->id, 'domain' => 'no-dot'])->assertSessionHasErrors('domain');
+    $this->post(route('organization.domains.store'), ['organization_id' => $organization->id, 'domain' => ' @StudioConti.IT '])->assertSessionHasNoErrors();
+    $this->post(route('organization.domains.store'), ['organization_id' => $organization->id, 'domain' => 'studioconti.it'])->assertSessionHasErrors('domain');
 
     $domain = $organization->domains()->sole();
     expect($domain->domain)->toBe('studioconti.it');
@@ -347,6 +409,27 @@ test('the organization command creates an organization with a verified first adm
     expect($organization->personal)->toBeFalse()->and($organization->hasAdmin($user))->toBeTrue();
 });
 
+test('a verified member can recover admin access to an existing shared organization', function (): void {
+    $user = User::factory()->create();
+    $organization = joinOrganization($user);
+    $other = Organization::factory()->create();
+    $unverified = User::factory()->unverified()->create();
+    joinOrganization($unverified, organization: $organization);
+    $personal = $unverified->organizations()->where('personal', true)->sole();
+
+    $this->artisan('filemax:organization-admin', ['organization' => $other->id, 'email' => $user->email])->assertFailed();
+    $this->artisan('filemax:organization-admin', ['organization' => $personal->id, 'email' => $user->email])->assertFailed();
+    $this->artisan('filemax:organization-admin', ['organization' => $organization->id, 'email' => $unverified->email])->assertFailed();
+    $this->artisan('filemax:organization-admin', ['organization' => $organization->id, 'email' => Str::upper($user->email)])->assertSuccessful();
+    $this->artisan('filemax:organization-admin', ['organization' => $organization->id, 'email' => $user->email])->assertSuccessful();
+
+    expect($organization->hasAdmin($user))->toBeTrue()
+        ->and($user->refresh()->is_admin)->toBeFalse()
+        ->and($organization->hasAdmin($unverified))->toBeFalse()
+        ->and($other->hasMember($user))->toBeFalse()
+        ->and($personal->hasMember($user))->toBeFalse();
+});
+
 test('admin bootstrap requires an existing verified user and supports revocation', function (): void {
     $user = User::factory()->create(['email' => 'alice@mediamaxcommunication.it']);
     $unverified = User::factory()->unverified()->create();
@@ -370,16 +453,25 @@ test('the migration moves everything that existed into a first organization and 
     $team = $row(['name' => 'Creative']);
     DB::table('teams')->insert($team);
     DB::table('team_user')->insert(['team_id' => $team['id'], 'user_id' => $member['id']]);
-    $restricted = $row(['user_id' => $member['id'], 'token' => Str::random(64), 'visibility' => 'teams', 'status' => 'ready', 'expires_in_days' => 7]);
-    $public = $row(['user_id' => $admin['id'], 'token' => Str::random(64), 'visibility' => 'public', 'status' => 'ready', 'expires_in_days' => 7]);
+    $restricted = $row(['user_id' => $member['id'], 'token' => Str::random(64), 'visibility' => 'teams', 'status' => 'ready', 'expires_in_days' => 7, 'expires_at' => $now->copy()->addWeek()]);
+    $public = $row(['user_id' => $admin['id'], 'token' => Str::random(64), 'visibility' => 'public', 'status' => 'ready', 'expires_in_days' => 7, 'expires_at' => $now->copy()->addWeek()]);
     DB::table('transfers')->insert([$restricted, $public]);
     DB::table('team_transfer')->insert(['team_id' => $team['id'], 'transfer_id' => $restricted['id']]);
     DB::table('transfer_files')->insert($row(['transfer_id' => $restricted['id'], 'original_name' => 'brief.pdf', 'path' => 'transfers/brief', 'size' => 5, 'position' => 0, 'part_size' => 5]));
     DB::table('secrets')->insert($row(['user_id' => $admin['id'], 'token' => Str::random(32), 'payload' => 'x', 'verifier_hash' => 'x', 'max_views' => 1, 'expires_at' => $now]));
     DB::table('drops')->insert($row(['user_id' => $admin['id'], 'token' => Str::random(16), 'title' => 'Brief', 'closes_at' => $now, 'keep_days' => 7]));
-    config(['filemax.migration' => ['organization_name' => 'Mediamax Communication', 'allowed_email_domains' => ['mediamaxcommunication.it']]]);
+    config([
+        'filemax.migration.organization_name' => 'Mediamax Communication',
+        'filemax.migration.allowed_email_domains' => ' MediaMaxCommunication.IT ,mediamaxcommunication.it,',
+        'app.maintenance.driver' => 'array',
+    ]);
 
+    expect(fn () => $this->artisan('migrate')->run())->toThrow(RuntimeException::class, 'maintenance mode');
+    expect(Schema::hasTable('organizations'))->toBeFalse()->and(Schema::hasTable('teams'))->toBeTrue();
+
+    app()->maintenanceMode()->activate([]);
     $this->artisan('migrate')->assertSuccessful();
+    app()->maintenanceMode()->deactivate();
 
     $organization = Organization::query()->where('personal', false)->sole();
     $admin = User::query()->findOrFail($admin['id']);
@@ -399,5 +491,18 @@ test('the migration moves everything that existed into a first organization and 
         ->and(TransferFile::query()->sole()->transfer_id)->toBe($restricted['id'])
         ->and(Schema::hasTable('teams'))->toBeFalse();
 
-    expect(fn () => $this->artisan('migrate:rollback', ['--step' => 1])->run())->toThrow(RuntimeException::class);
+    $this->get(route('shared.show', $restricted['token']))->assertNotFound();
+    $this->get(route('shared.show', Transfer::query()->findOrFail($restricted['id'])->token))->assertRedirect(route('login'));
+    $this->get(route('shared.show', $public['token']))->assertOk();
+
+    expect(fn () => $this->artisan('migrate:rollback', ['--step' => 1])->run())->toThrow(RuntimeException::class, 'Restore a backup');
+    expect(Schema::hasTable('teams'))->toBeFalse()->and($organization->domains()->count())->toBe(1);
+});
+
+test('organization rollback also protects workspaces with no remaining users', function (): void {
+    $organization = Organization::factory()->create();
+
+    expect(fn () => $this->artisan('migrate:rollback', ['--step' => 1])->run())->toThrow(RuntimeException::class, 'Restore a backup');
+    $this->assertModelExists($organization);
+    expect(Schema::hasTable('teams'))->toBeFalse();
 });
