@@ -754,6 +754,7 @@ JS);
     $organization->users()->detach($user);
     $page->script('() => new Promise(resolve => { const timer = setInterval(() => { if (window.resumeUpload) { clearInterval(timer); window.resumeUpload(); resolve(true); } }, 20); })');
     $page->assertSee('You’re no longer a member of Mediamax, so this members-only link can’t be created.');
+
     expect(Transfer::query()->sole()->status)->toBe('uploading');
     $organization->users()->attach($user);
     $page->press('Retry and create link')->assertSee('Your link is ready')->assertSee('Shared with members of Mediamax')->assertNoJavascriptErrors();

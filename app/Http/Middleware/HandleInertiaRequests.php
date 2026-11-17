@@ -53,6 +53,7 @@ final class HandleInertiaRequests extends Middleware
                     if (! $user instanceof User) {
                         return [];
                     }
+
                     $current = $user->currentOrganization()->id;
 
                     return $user->organizations()->select(['organizations.*', 'organization_user.role as role'])->withCount('users')->orderByDesc('personal')->orderBy('name')->get()

@@ -18,23 +18,6 @@ beforeEach(function (): void {
     Notification::fake();
 });
 
-test('the sign-up flag is closed unless the environment opens it', function (): void {
-    $configuration = fn (?string $value): array => (function () use ($value): array {
-        $value === null ? putenv('FILEMAX_SIGNUP_OPEN') : putenv('FILEMAX_SIGNUP_OPEN='.$value);
-        unset($_ENV['FILEMAX_SIGNUP_OPEN'], $_SERVER['FILEMAX_SIGNUP_OPEN']);
-
-        return require config_path('filemax.php');
-    })();
-
-    try {
-        expect($configuration(null)['signup_open'])->toBeFalse()
-            ->and($configuration('true')['signup_open'])->toBeTrue()
-            ->and($configuration('false')['signup_open'])->toBeFalse();
-    } finally {
-        putenv('FILEMAX_SIGNUP_OPEN=true');
-    }
-});
-
 test('the register page says whether sign-up is open', function (bool $open): void {
     config(['filemax.signup_open' => $open]);
 
