@@ -1,4 +1,12 @@
-export type Team = { id: string; name: string; users_count: number };
+export type Organization = {
+    id: string;
+    name: string;
+    personal: boolean;
+    logo_url: string | null;
+    role: 'admin' | 'member';
+    members_count: number;
+    current: boolean;
+};
 export type User = {
     id: string;
     name: string;
@@ -8,7 +16,7 @@ export type User = {
     email_verified_at: string | null;
 };
 export type SharedProps = {
-    auth: { user: User | null };
+    auth: { user: User | null; organizations: Organization[] };
     passwordRequirements: {
         min: number;
         mixedCase: boolean;
@@ -44,11 +52,12 @@ export type Transfer = {
     token: string;
     title: string;
     message: string | null;
-    visibility: 'public' | 'teams';
+    visibility: 'public' | 'members';
+    /** The organization it was sent from, or null when sent from Personal. */
+    organization: string | null;
     password_protected: boolean;
     status: string;
     files: TransferFile[];
-    teams: Team[];
     total_size: number;
     files_count: number;
     download_count: number;

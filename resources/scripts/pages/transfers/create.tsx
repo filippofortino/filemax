@@ -8,7 +8,7 @@ import {
     ViewOffIcon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import {
     CopyLink,
@@ -17,22 +17,24 @@ import {
     FileRow,
     PasswordBadge,
     Shell,
-    TeamBadges,
-    TeamPicker,
 } from '@/components/filemax';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { bytes, dateTime } from '@/lib/format';
 import { request } from '@/lib/http';
-import type { Team, Transfer, TransferFile } from '@/lib/types';
+import type { SharedProps, Transfer, TransferFile } from '@/lib/types';
 import { uploadEntries, type UploadEntry } from '@/lib/upload';
 import { cn } from '@/lib/utils';
 import { home } from '@/routes';
-import { destroy, show, store, update } from '@/routes/transfers';
+import { destroy, show, store } from '@/routes/transfers';
 import { complete, finalize, remove, sign } from '@/routes/transfers/uploads';
 
 type Entry = UploadEntry & { remote?: TransferFile };
-export default function Create({ teams }: { teams: Team[] }) {
+export default function Create() {
+    // Personal has nobody to restrict a link to, so it only sends public links.
+    const organization = usePage<SharedProps>().props.auth.organizations.find(
+        (organization) => organization.current && !organization.personal,
+    );
     const [entries, setEntries] = useState<Entry[]>([]);
     const currentEntries = useRef<Entry[]>([]);
     const draft = useRef<Transfer | null>(null);
@@ -46,14 +48,14 @@ export default function Create({ teams }: { teams: Team[] }) {
     const fileList = useRef<HTMLDivElement>(null);
     const refocusRow = useRef<number | null>(null);
     const browseFiles = useRef<HTMLButtonElement>(null);
-    const teamsTrigger = useRef<HTMLButtonElement>(null);
     const [title, setTitle] = useState('');
     const [message, setMessage] = useState('');
-    const [visibility, setVisibility] = useState<'public' | 'teams'>('public');
+    const [visibility, setVisibility] = useState<'public' | 'members'>(
+        'public',
+    );
     const [passwordProtected, setPasswordProtected] = useState(false);
     const [password, setPassword] = useState('');
     const [passwordVisible, setPasswordVisible] = useState(false);
-    const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
     const [expiry, setExpiry] = useState(7);
     const [busy, setBusy] = useState(false);
     const [removing, setRemoving] = useState(false);
@@ -171,14 +173,9 @@ export default function Create({ teams }: { teams: Team[] }) {
     function send(started: number) {
         if (operating.current) return;
         const filesMissing = !currentEntries.current.length;
-        const teamsMissing = visibility === 'teams' && !selectedTeams.length;
-        setValidationFailed(filesMissing || teamsMissing);
+        setValidationFailed(filesMissing);
         if (filesMissing) {
             browseFiles.current?.focus();
-            return;
-        }
-        if (teamsMissing) {
-            teamsTrigger.current?.focus();
             return;
         }
         operating.current = true;
@@ -206,7 +203,6 @@ export default function Create({ teams }: { teams: Team[] }) {
                         ...(visibility === 'public' && passwordProtected
                             ? { password }
                             : {}),
-                        team_ids: selectedTeams,
                         expires_in_days: expiry,
                         files: currentEntries.current.map((entry) => ({
                             name: entry.file.name,
@@ -280,14 +276,6 @@ export default function Create({ teams }: { teams: Team[] }) {
                 );
                 return;
             }
-            if (visibility === 'teams')
-                await request(
-                    update.url(transferId),
-                    'PATCH',
-                    { team_ids: selectedTeams },
-                    controller.signal,
-                );
-            if (controller.signal.aborted) return;
             const result = await request<{ transfer: Transfer }>(
                 finalize.url(transferId),
                 'POST',
@@ -296,10 +284,7 @@ export default function Create({ teams }: { teams: Team[] }) {
             );
             if (!controller.signal.aborted) setReady(result.transfer);
         } catch (cause) {
-            if (!controller.signal.aborted) {
-                setError((cause as Error).message);
-                if (visibility === 'teams') router.reload({ only: ['teams'] });
-            }
+            if (!controller.signal.aborted) setError((cause as Error).message);
         } finally {
             if (!cancelling.current) {
                 operating.current = false;
@@ -346,17 +331,6 @@ export default function Create({ teams }: { teams: Team[] }) {
     const availableUntil = new Date();
     availableUntil.setDate(availableUntil.getDate() + expiry);
     const hasDraft = entries.some((entry) => entry.remote !== undefined);
-    const teamsHint = !selectedTeams.length && (
-        <p
-            id="teams-hint"
-            className={cn(
-                'text-sm text-muted-foreground',
-                validationFailed && 'text-destructive',
-            )}
-        >
-            Select at least one team.
-        </p>
-    );
     if (ready)
         return (
             <Shell>
@@ -389,15 +363,14 @@ export default function Create({ teams }: { teams: Team[] }) {
                             </p>
                         </div>
                         <CopyLink url={ready.url} />
-                        {ready.visibility === 'teams' ? (
+                        {ready.visibility === 'members' ? (
                             <div className="flex flex-col gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-slate-700">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <strong>Shared with</strong>
-                                    <TeamBadges teams={ready.teams} />
-                                </div>
+                                <strong>
+                                    Shared with members of {ready.organization}
+                                </strong>
                                 <p className="text-sm">
-                                    Only signed-in, verified members of one of
-                                    these teams can download.
+                                    Members sign in to download. The link alone
+                                    is not enough.
                                 </p>
                             </div>
                         ) : (
@@ -724,31 +697,15 @@ export default function Create({ teams }: { teams: Team[] }) {
                                     <span className="text-sm font-semibold">
                                         Who can download
                                     </span>
-                                    {visibility === 'teams' ? (
-                                        !busy ? (
-                                            <>
-                                                <TeamPicker
-                                                    teams={teams}
-                                                    selected={selectedTeams}
-                                                    onChange={setSelectedTeams}
-                                                    triggerRef={teamsTrigger}
-                                                    describedBy={
-                                                        selectedTeams.length
-                                                            ? undefined
-                                                            : 'teams-hint'
-                                                    }
-                                                />
-                                                {teamsHint}
-                                            </>
-                                        ) : (
-                                            <TeamBadges
-                                                teams={teams.filter((team) =>
-                                                    selectedTeams.includes(
-                                                        team.id,
-                                                    ),
-                                                )}
+                                    {visibility === 'members' ? (
+                                        <span className="flex w-fit items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-slate-700">
+                                            <HugeiconsIcon
+                                                icon={UserGroupIcon}
+                                                size={18}
+                                                aria-hidden="true"
                                             />
-                                        )
+                                            Members of {organization?.name}
+                                        </span>
                                     ) : (
                                         <span className="flex w-fit items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-slate-700">
                                             <HugeiconsIcon
@@ -827,96 +784,111 @@ export default function Create({ teams }: { teams: Team[] }) {
                                 <legend className="mb-2.5 text-sm font-semibold">
                                     Who can download
                                 </legend>
-                                <div className="grid grid-cols-2 gap-3">
-                                    {(
-                                        [
-                                            {
-                                                value: 'public',
-                                                icon: Globe02Icon,
-                                                label: 'Public link',
-                                                text: passwordProtected
-                                                    ? 'Anyone with the link and the password.'
-                                                    : 'Anyone with the link. No account needed.',
-                                            },
-                                            {
-                                                value: 'teams',
-                                                icon: UserGroupIcon,
-                                                label: 'Specific teams',
-                                                text: 'Signed-in members of the teams you pick.',
-                                            },
-                                        ] as const
-                                    ).map((option) => (
-                                        <label
-                                            className="flex cursor-pointer flex-col gap-2 rounded-lg border border-input p-4 has-checked:border-primary has-checked:bg-primary/5 has-checked:ring-1 has-checked:ring-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary has-disabled:cursor-not-allowed has-disabled:bg-muted has-disabled:text-muted-foreground"
-                                            key={option.value}
-                                        >
-                                            <span className="flex items-center justify-between has-checked:text-primary">
-                                                <HugeiconsIcon
-                                                    icon={option.icon}
-                                                    size={22}
-                                                    aria-hidden="true"
-                                                />
-                                                <input
-                                                    type="radio"
-                                                    name="visibility"
-                                                    value={option.value}
-                                                    checked={
-                                                        visibility ===
-                                                        option.value
-                                                    }
-                                                    disabled={
-                                                        busy ||
-                                                        hasDraft ||
-                                                        (option.value ===
-                                                            'teams' &&
-                                                            teams.length === 0)
-                                                    }
-                                                    onChange={() => {
-                                                        setVisibility(
-                                                            option.value,
-                                                        );
-                                                        if (
-                                                            option.value ===
-                                                            'public'
-                                                        )
-                                                            setSelectedTeams(
-                                                                [],
-                                                            );
-                                                        else {
-                                                            setPasswordProtected(
-                                                                false,
-                                                            );
-                                                            setPassword('');
-                                                            setPasswordVisible(
-                                                                false,
-                                                            );
+                                {organization ? (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {(
+                                            [
+                                                {
+                                                    value: 'public',
+                                                    icon: Globe02Icon,
+                                                    label: 'Public link',
+                                                    text: passwordProtected
+                                                        ? 'Anyone with the link and the password.'
+                                                        : 'Anyone with the link. No account needed.',
+                                                },
+                                                {
+                                                    value: 'members',
+                                                    icon: UserGroupIcon,
+                                                    label: 'Members only',
+                                                    text: `Signed-in members of ${organization.name}.`,
+                                                },
+                                            ] as const
+                                        ).map((option) => (
+                                            <label
+                                                className="flex cursor-pointer flex-col gap-2 rounded-lg border border-input p-4 has-checked:border-primary has-checked:bg-primary/5 has-checked:ring-1 has-checked:ring-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary has-disabled:cursor-not-allowed has-disabled:bg-muted has-disabled:text-muted-foreground"
+                                                key={option.value}
+                                            >
+                                                <span className="flex items-center justify-between has-checked:text-primary">
+                                                    <HugeiconsIcon
+                                                        icon={option.icon}
+                                                        size={22}
+                                                        aria-hidden="true"
+                                                    />
+                                                    <input
+                                                        type="radio"
+                                                        name="visibility"
+                                                        value={option.value}
+                                                        checked={
+                                                            visibility ===
+                                                            option.value
                                                         }
-                                                    }}
-                                                />
+                                                        disabled={
+                                                            busy || hasDraft
+                                                        }
+                                                        onChange={() => {
+                                                            setVisibility(
+                                                                option.value,
+                                                            );
+                                                            if (
+                                                                option.value ===
+                                                                'members'
+                                                            ) {
+                                                                setPasswordProtected(
+                                                                    false,
+                                                                );
+                                                                setPassword('');
+                                                                setPasswordVisible(
+                                                                    false,
+                                                                );
+                                                            }
+                                                        }}
+                                                    />
+                                                </span>
+                                                <span>
+                                                    <strong
+                                                        className={cn(
+                                                            'text-base',
+                                                            visibility ===
+                                                                option.value &&
+                                                                'text-primary',
+                                                        )}
+                                                    >
+                                                        {option.label}
+                                                    </strong>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        {option.text}
+                                                    </p>
+                                                </span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="flex items-start gap-3 rounded-lg bg-muted px-4 py-3">
+                                        <HugeiconsIcon
+                                            icon={Globe02Icon}
+                                            size={20}
+                                            className="mt-0.5 shrink-0 text-muted-foreground"
+                                            aria-hidden="true"
+                                        />
+                                        <div className="flex flex-col gap-0.5">
+                                            <strong className="text-sm">
+                                                Public link
+                                            </strong>
+                                            <span className="text-sm text-muted-foreground">
+                                                Anyone with the link can
+                                                download. It shows your name,
+                                                with no organization.
                                             </span>
-                                            <span>
-                                                <strong
-                                                    className={cn(
-                                                        'text-base',
-                                                        visibility ===
-                                                            option.value &&
-                                                            'text-primary',
-                                                    )}
-                                                >
-                                                    {option.label}
-                                                </strong>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {option.text}
-                                                </p>
-                                            </span>
-                                        </label>
-                                    ))}
-                                </div>
-                                <p className="text-sm text-muted-foreground">
-                                    {teams.length
-                                        ? `You belong to ${teams.length} ${teams.length === 1 ? 'team' : 'teams'}: ${teams.map((team) => team.name).join(', ')}.`
-                                        : 'No team memberships yet. You can share public links, or ask an admin to add you to a team.'}
-                                </p>
+                                        </div>
+                                    </div>
+                                )}
+                                {visibility === 'members' && (
+                                    <p className="text-sm text-muted-foreground">
+                                        Only signed-in members of{' '}
+                                        {organization?.name} can open the link.
+                                        Anyone else is turned away.
+                                    </p>
+                                )}
                                 {visibility === 'public' && (
                                     <div className="flex flex-col gap-4 rounded-lg border border-input p-4">
                                         <div className="flex items-start justify-between gap-6">
@@ -1028,23 +1000,6 @@ export default function Create({ teams }: { teams: Team[] }) {
                                             </div>
                                         )}
                                     </div>
-                                )}
-                                {visibility === 'teams' && (
-                                    <>
-                                        <TeamPicker
-                                            teams={teams}
-                                            selected={selectedTeams}
-                                            onChange={setSelectedTeams}
-                                            disabled={busy}
-                                            triggerRef={teamsTrigger}
-                                            describedBy={
-                                                selectedTeams.length
-                                                    ? undefined
-                                                    : 'teams-hint'
-                                            }
-                                        />
-                                        {teamsHint}
-                                    </>
                                 )}
                             </fieldset>
                             <fieldset>

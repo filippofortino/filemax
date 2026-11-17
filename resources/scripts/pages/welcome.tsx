@@ -35,7 +35,7 @@ const steps = [
             },
             {
                 icon: UserGroupIcon,
-                text: 'Share publicly, or only with your teams',
+                text: 'Share publicly, or only with your organization',
             },
             {
                 icon: Clock01Icon,
@@ -185,7 +185,7 @@ const steps = [
     {
         title: 'Choose who can download',
         description:
-            'Send a public link anyone can open, or keep a transfer inside your teams.',
+            'Send a public link anyone can open, or keep a transfer inside your organization.',
         points: [
             {
                 icon: Globe02Icon,
@@ -200,17 +200,18 @@ const steps = [
                 icon: UserGroupIcon,
                 text: (
                     <>
-                        <strong>Specific teams:</strong> members sign in to
-                        download. Anyone else is turned away.
+                        <strong>Members only:</strong> members of your
+                        organization sign in to download. Anyone else is turned
+                        away.
                     </>
                 ),
             },
             {
                 icon: ArrowRight01Icon,
-                text: 'Change the teams later from the transfer page. The link stays the same.',
+                text: 'Switch organization in the header. Links sent from Personal carry only your name.',
             },
         ],
-        label: 'Who can download: Specific teams is selected, sharing with Mediamax and Lenergy.',
+        label: 'Who can download: Members only is selected, sharing with members of Mediamax.',
         figure: (
             <div className="flex flex-col gap-5 rounded-xl border bg-background p-6">
                 <div className="flex flex-col gap-2.5">
@@ -247,10 +248,10 @@ const steps = [
                             </span>
                             <span className="flex flex-col">
                                 <strong className="text-base text-primary">
-                                    Specific teams
+                                    Members only
                                 </strong>
                                 <span className="text-sm text-muted-foreground">
-                                    Signed-in members of the teams you pick.
+                                    Signed-in members of Mediamax.
                                 </span>
                             </span>
                         </span>
@@ -260,15 +261,9 @@ const steps = [
                     <span className="text-sm font-semibold">Shared with</span>
                     <div className="flex flex-wrap gap-2">
                         <span className="inline-flex flex-wrap items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-2 text-sm">
-                            <strong>Mediamax</strong>
+                            <strong>Members of Mediamax</strong>
                             <span className="text-xs text-muted-foreground">
-                                8 members
-                            </span>
-                        </span>
-                        <span className="inline-flex flex-wrap items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-2 text-sm">
-                            <strong>Lenergy</strong>
-                            <span className="text-xs text-muted-foreground">
-                                5 members
+                                12 members
                             </span>
                         </span>
                     </div>

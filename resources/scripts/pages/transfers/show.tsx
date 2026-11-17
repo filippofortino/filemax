@@ -15,7 +15,6 @@ import {
     FileRow,
     PasswordBadge,
     Shell,
-    TeamPicker,
 } from '@/components/filemax';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,22 +28,20 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
 import { bytes, date, dateTime, relativeDay } from '@/lib/format';
-import type { Team, Transfer } from '@/lib/types';
+import type { Transfer } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { destroy, extend, index, update } from '@/routes/transfers';
 export default function Show({
     transfer,
-    teams,
+    membersCount,
 }: {
     transfer: Transfer;
-    teams: Team[];
+    membersCount: number;
 }) {
     const [allFiles, setAllFiles] = useState(false);
     const [sharingOpen, setSharingOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
-    const sharing = useForm({
-        team_ids: transfer.teams.map((team) => team.id),
-    });
+    const sharing = useForm({ visibility: 'public' });
     const refresh = () => router.reload({ only: ['transfer'] });
     return (
         <Shell active="transfers">
@@ -76,15 +73,15 @@ export default function Show({
                         >
                             <HugeiconsIcon
                                 icon={
-                                    transfer.visibility === 'teams'
+                                    transfer.visibility === 'members'
                                         ? UserGroupIcon
                                         : Globe02Icon
                                 }
                                 size={13}
                                 aria-hidden="true"
                             />
-                            {transfer.visibility === 'teams'
-                                ? `${transfer.teams.length} ${transfer.teams.length === 1 ? 'team' : 'teams'}`
+                            {transfer.visibility === 'members'
+                                ? 'Members only'
                                 : 'Public link'}
                         </span>
                         {transfer.password_protected && <PasswordBadge />}
@@ -174,58 +171,65 @@ export default function Show({
                                 )}
                             </div>
                         )}
-                        {transfer.visibility === 'teams' && (
+                        {transfer.visibility === 'members' && (
                             <section className="flex flex-col gap-2">
                                 <div className="flex items-center justify-between gap-3">
                                     <h2 className="font-sans text-sm font-semibold tracking-normal">
                                         Shared with
                                     </h2>
-                                    {transfer.visibility === 'teams' &&
-                                        !transfer.revoked_at && (
-                                            <Dialog
-                                                open={sharingOpen}
-                                                onOpenChange={(open) => {
-                                                    setSharingOpen(open);
-                                                    if (open) {
-                                                        sharing.setData(
-                                                            'team_ids',
-                                                            transfer.teams.map(
-                                                                (team) =>
-                                                                    team.id,
-                                                            ),
-                                                        );
-                                                        sharing.clearErrors();
-                                                    }
-                                                }}
+                                    {!transfer.revoked_at && (
+                                        <Dialog
+                                            open={sharingOpen}
+                                            onOpenChange={setSharingOpen}
+                                        >
+                                            <DialogTrigger
+                                                render={
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                    />
+                                                }
                                             >
-                                                <DialogTrigger
-                                                    render={
-                                                        <Button
-                                                            variant="link"
-                                                            size="sm"
-                                                        />
-                                                    }
-                                                    className="h-auto min-h-0 p-0 text-sm"
-                                                >
-                                                    Change teams
-                                                </DialogTrigger>
-                                                <DialogContent>
-                                                    <DialogHeader>
-                                                        <DialogTitle>
-                                                            Change teams
-                                                        </DialogTitle>
-                                                        <DialogDescription>
-                                                            Members of any
-                                                            selected team can
-                                                            download. The link
-                                                            and expiry stay the
-                                                            same.
-                                                        </DialogDescription>
-                                                    </DialogHeader>
-                                                    <form
-                                                        className="flex flex-col gap-5"
-                                                        onSubmit={(event) => {
-                                                            event.preventDefault();
+                                                Make public
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>
+                                                        Make this transfer
+                                                        public?
+                                                    </DialogTitle>
+                                                    <DialogDescription>
+                                                        Anyone with the link
+                                                        will be able to
+                                                        download, without
+                                                        signing in. The link and
+                                                        expiry stay the same.
+                                                        You can’t make it
+                                                        members-only again.
+                                                    </DialogDescription>
+                                                </DialogHeader>
+                                                <ErrorMessage>
+                                                    {Object.values(
+                                                        sharing.errors,
+                                                    ).join(' ')}
+                                                </ErrorMessage>
+                                                <DialogFooter>
+                                                    <Button
+                                                        variant="outline"
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setSharingOpen(
+                                                                false,
+                                                            )
+                                                        }
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                    <Button
+                                                        disabled={
+                                                            sharing.processing
+                                                        }
+                                                        onClick={() =>
                                                             sharing.patch(
                                                                 update.url(
                                                                     transfer.id,
@@ -238,91 +242,29 @@ export default function Show({
                                                                                 false,
                                                                             ),
                                                                 },
-                                                            );
-                                                        }}
+                                                            )
+                                                        }
                                                     >
-                                                        <TeamPicker
-                                                            teams={teams}
-                                                            selected={
-                                                                sharing.data
-                                                                    .team_ids
-                                                            }
-                                                            onChange={(ids) =>
-                                                                sharing.setData(
-                                                                    'team_ids',
-                                                                    ids,
-                                                                )
-                                                            }
-                                                        />
-                                                        <ErrorMessage>
-                                                            {Object.values(
-                                                                sharing.errors,
-                                                            ).join(' ')}
-                                                        </ErrorMessage>
-                                                        {teams.length === 0 && (
-                                                            <p className="text-muted-foreground">
-                                                                You have no
-                                                                current team
-                                                                memberships. Ask
-                                                                an admin to add
-                                                                you to a team.
-                                                            </p>
-                                                        )}
-                                                        <DialogFooter>
-                                                            <Button
-                                                                variant="outline"
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    setSharingOpen(
-                                                                        false,
-                                                                    )
-                                                                }
-                                                            >
-                                                                Cancel
-                                                            </Button>
-                                                            <Button
-                                                                disabled={
-                                                                    sharing.processing ||
-                                                                    !sharing
-                                                                        .data
-                                                                        .team_ids
-                                                                        .length
-                                                                }
-                                                                type="submit"
-                                                            >
-                                                                Save changes
-                                                            </Button>
-                                                        </DialogFooter>
-                                                    </form>
-                                                </DialogContent>
-                                            </Dialog>
-                                        )}
+                                                        Make public
+                                                    </Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                    )}
                                 </div>
-                                {transfer.teams.length ? (
-                                    <div className="flex flex-wrap gap-2">
-                                        {transfer.teams.map((team) => (
-                                            <span
-                                                key={team.id}
-                                                className="inline-flex flex-wrap items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-2 text-sm"
-                                            >
-                                                <strong className="wrap-anywhere">
-                                                    {team.name}
-                                                </strong>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {team.users_count}{' '}
-                                                    {team.users_count === 1
-                                                        ? 'member'
-                                                        : 'members'}
-                                                </span>
-                                            </span>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <ErrorMessage>
-                                        No teams remain. Change teams to restore
-                                        recipient access.
-                                    </ErrorMessage>
-                                )}
+                                <div className="flex flex-wrap gap-2">
+                                    <span className="inline-flex flex-wrap items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-2 text-sm">
+                                        <strong className="wrap-anywhere">
+                                            Members of {transfer.organization}
+                                        </strong>
+                                        <span className="text-xs text-muted-foreground">
+                                            {membersCount}{' '}
+                                            {membersCount === 1
+                                                ? 'member'
+                                                : 'members'}
+                                        </span>
+                                    </span>
+                                </div>
                                 <p className="text-sm text-muted-foreground">
                                     Members sign in to download. The link alone
                                     is not enough.

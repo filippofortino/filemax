@@ -2,9 +2,9 @@ import { LockKeyIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Head, Link, usePage } from '@inertiajs/react';
 import switchAccount from '@/actions/App/Http/Controllers/SwitchAccountController';
-import { Shell, TeamBadges } from '@/components/filemax';
+import { Shell } from '@/components/filemax';
 import { buttonVariants } from '@/components/ui/button';
-import type { SharedProps, Team } from '@/lib/types';
+import type { SharedProps } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { home } from '@/routes';
 import { show } from '@/routes/shared';
@@ -14,7 +14,7 @@ type DeniedProps = {
     sender: { name: string; email: string } | null;
     token: string;
     url: string;
-    own_teams: Team[];
+    organization: string | null;
     requires_verification: boolean;
 };
 
@@ -22,7 +22,7 @@ export default function AccessDenied({
     sender,
     token,
     url,
-    own_teams,
+    organization,
     requires_verification,
 }: DeniedProps) {
     const { auth } = usePage<SharedProps>().props;
@@ -50,26 +50,17 @@ export default function AccessDenied({
                     <h1>You don&apos;t have access to these files</h1>
                     <p className="max-w-md text-base text-muted-foreground">
                         {sender
-                            ? `${sender.name} shared this transfer with selected teams.`
-                            : 'This transfer is shared with selected teams.'}{' '}
-                        You&apos;re signed in as{' '}
+                            ? `${sender.name} shared this transfer with members of `
+                            : 'This transfer is shared with members of '}
+                        <strong className="font-semibold text-foreground">
+                            {organization}
+                        </strong>{' '}
+                        only. You&apos;re signed in as{' '}
                         <span className="break-all">{auth.user?.email}</span>,{' '}
                         {requires_verification
-                            ? 'which needs to be verified before opening team transfers.'
-                            : 'which doesn’t currently have access.'}
+                            ? 'which needs to be verified before opening members-only transfers.'
+                            : 'which isn’t a member.'}
                     </p>
-                    <div className="flex flex-wrap items-center justify-center gap-2 rounded-lg bg-muted px-3.5 py-2.5">
-                        <span className="text-sm text-muted-foreground">
-                            Your teams:
-                        </span>
-                        {own_teams.length ? (
-                            <TeamBadges teams={own_teams} />
-                        ) : (
-                            <span className="text-sm text-muted-foreground">
-                                No teams assigned
-                            </span>
-                        )}
-                    </div>
                     <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
                         {requires_verification ? (
                             <Link

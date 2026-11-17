@@ -1,8 +1,8 @@
 import {
     Add01Icon,
+    ArrowDown01Icon,
     ArrowLeft01Icon,
     ArrowRight01Icon,
-    Cancel01Icon,
     Copy01Icon,
     File01Icon,
     FileZipIcon,
@@ -11,6 +11,8 @@ import {
     Logout01Icon,
     Settings01Icon,
     Tick02Icon,
+    UserGroupIcon,
+    UserIcon,
     Video01Icon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
@@ -21,7 +23,6 @@ import {
     useState,
     type ComponentProps,
     type ReactNode,
-    type Ref,
 } from 'react';
 import { Avatar } from '@/components/avatar';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -32,14 +33,15 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { bytes } from '@/lib/format';
-import type { SharedProps, Team } from '@/lib/types';
+import type { SharedProps } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { home, logout } from '@/routes';
 import { settings } from '@/routes/account';
 import { create as newDrop, index as drops } from '@/routes/drops';
+import { members as organizationSettings } from '@/routes/organization';
+import { switchMethod as switchOrganization } from '@/routes/organizations';
 import { index as received } from '@/routes/received';
 import { create as newSecret, index as secrets } from '@/routes/secrets';
-import { index as teams } from '@/routes/teams';
 import { index as transfers } from '@/routes/transfers';
 
 export function Brand({ large = false }: { large?: boolean }) {
@@ -83,7 +85,8 @@ export function Shell({
     active = 'new',
     recipient = false,
     recipientAccount = false,
-    footer = 'Sent with Filemax, the file-sharing tool of Mediamax Communication.',
+    footer = 'Sent with Filemax.',
+    organization = null,
 }: {
     children: ReactNode;
     active?:
@@ -93,11 +96,13 @@ export function Shell({
         | 'new-secret'
         | 'drops'
         | 'new-drop'
-        | 'teams'
+        | 'organization'
         | 'account';
     recipient?: boolean;
     recipientAccount?: boolean;
     footer?: string;
+    /** On recipient pages, the organization the link was sent from. Personal links pass none. */
+    organization?: string | null;
 }) {
     const user = usePage<SharedProps>().props.auth.user;
     // The header's primary action creates what the current section lists, and hides on its own form.
@@ -144,6 +149,9 @@ export function Shell({
                 )}
             >
                 <Brand />
+                {!recipient && user?.email_verified_at && (
+                    <OrganizationSwitcher />
+                )}
                 {!recipient && (
                     <nav
                         ref={nav}
@@ -192,17 +200,6 @@ export function Shell({
                         >
                             Drops
                         </Link>
-                        {user?.is_admin && (
-                            <Link
-                                className={navLinkClass(active === 'teams')}
-                                href={teams()}
-                                aria-current={
-                                    active === 'teams' ? 'page' : undefined
-                                }
-                            >
-                                Teams
-                            </Link>
-                        )}
                     </nav>
                 )}
                 <div className="flex items-center gap-2 md:gap-4">
@@ -225,73 +222,73 @@ export function Shell({
                             </span>
                         </Link>
                     )}
-                    {recipient && !recipientAccount ? (
-                        <span className="text-xs text-muted-foreground md:text-sm">
-                            Mediamax Communication
-                        </span>
-                    ) : (
-                        user && (
-                            <Popover>
-                                <PopoverTrigger
-                                    className="flex items-center gap-2.5 text-muted-foreground"
-                                    aria-label={`${user.name}, account menu`}
-                                >
-                                    <span
-                                        className={cn(
-                                            'hidden md:inline',
-                                            action && 'md:hidden',
-                                        )}
-                                    >
-                                        {user.name.split(' ')[0]}
-                                    </span>
-                                    <Avatar
-                                        name={user.name}
-                                        url={user.avatar_url}
-                                    />
-                                </PopoverTrigger>
-                                <PopoverContent
-                                    align="end"
-                                    className="w-54 gap-3 p-5"
-                                >
-                                    <PopoverHeader>
-                                        <strong>{user.name}</strong>
-                                        <span
-                                            className="truncate text-muted-foreground"
-                                            title={user.email}
-                                        >
-                                            {user.email}
-                                        </span>
-                                    </PopoverHeader>
-                                    {user.email_verified_at && (
-                                        <Link
-                                            href={settings()}
-                                            className="flex items-center gap-2"
-                                        >
-                                            <HugeiconsIcon
-                                                icon={Settings01Icon}
-                                                size={18}
-                                                aria-hidden="true"
-                                            />
-                                            Settings
-                                        </Link>
-                                    )}
-                                    <Link
-                                        href={logout()}
-                                        method="post"
-                                        as="button"
-                                        className="flex items-center gap-2 border-t pt-3"
-                                    >
-                                        <HugeiconsIcon
-                                            icon={Logout01Icon}
-                                            size={18}
-                                            aria-hidden="true"
-                                        />
-                                        Sign out
-                                    </Link>
-                                </PopoverContent>
-                            </Popover>
-                        )
-                    )}
+                    {recipient && !recipientAccount
+                        ? organization && (
+                              <span className="text-xs text-muted-foreground md:text-sm">
+                                  {organization}
+                              </span>
+                          )
+                        : user && (
+                              <Popover>
+                                  <PopoverTrigger
+                                      className="flex items-center gap-2.5 text-muted-foreground"
+                                      aria-label={`${user.name}, account menu`}
+                                  >
+                                      <span
+                                          className={cn(
+                                              'hidden md:inline',
+                                              action && 'md:hidden',
+                                          )}
+                                      >
+                                          {user.name.split(' ')[0]}
+                                      </span>
+                                      <Avatar
+                                          name={user.name}
+                                          url={user.avatar_url}
+                                      />
+                                  </PopoverTrigger>
+                                  <PopoverContent
+                                      align="end"
+                                      className="w-54 gap-3 p-5"
+                                  >
+                                      <PopoverHeader>
+                                          <strong>{user.name}</strong>
+                                          <span
+                                              className="truncate text-muted-foreground"
+                                              title={user.email}
+                                          >
+                                              {user.email}
+                                          </span>
+                                      </PopoverHeader>
+                                      {user.email_verified_at && (
+                                          <Link
+                                              href={settings()}
+                                              className="flex items-center gap-2"
+                                          >
+                                              <HugeiconsIcon
+                                                  icon={Settings01Icon}
+                                                  size={18}
+                                                  aria-hidden="true"
+                                              />
+                                              Settings
+                                          </Link>
+                                      )}
+                                      <Link
+                                          href={logout()}
+                                          method="post"
+                                          as="button"
+                                          className="flex items-center gap-2 border-t pt-3"
+                                      >
+                                          <HugeiconsIcon
+                                              icon={Logout01Icon}
+                                              size={18}
+                                              aria-hidden="true"
+                                          />
+                                          Sign out
+                                      </Link>
+                                  </PopoverContent>
+                              </Popover>
+                          )}
                 </div>
             </header>
             {children}
@@ -415,166 +412,135 @@ export function PasswordBadge({ compact = false }: { compact?: boolean }) {
         </span>
     );
 }
-export function TeamBadges({
-    teams,
-    limit = Infinity,
-    variant = 'default',
+/** An organization's logo, or its first letter. Personal shows a person, since it is nobody but you. */
+export function OrganizationMark({
+    name,
+    logoUrl = null,
+    personal = false,
+    className,
 }: {
-    teams: Team[];
-    limit?: number;
-    variant?: 'default' | 'muted';
+    name: string;
+    logoUrl?: string | null;
+    personal?: boolean;
+    className?: string;
 }) {
-    const badgeClassName = cn(
-        'inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold wrap-anywhere text-primary',
-        variant === 'muted' && 'border-border bg-muted text-slate-700',
-    );
     return (
-        <span className="inline-flex max-w-full flex-wrap items-center gap-1.5">
-            {teams.slice(0, limit).map((team) => (
-                <span className={badgeClassName} key={team.id}>
-                    {team.name}
-                </span>
-            ))}
-            {teams.length > limit && (
-                <span
-                    className={badgeClassName}
-                    title={teams
-                        .slice(limit)
-                        .map((team) => team.name)
-                        .join(', ')}
-                >
-                    +{teams.length - limit}
-                </span>
+        <span
+            aria-hidden="true"
+            className={cn(
+                'inline-flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-900 text-sm font-bold text-white',
+                personal && 'rounded-full bg-muted text-foreground',
+                className,
+            )}
+        >
+            {personal ? (
+                <HugeiconsIcon icon={UserIcon} className="size-[56%]" />
+            ) : logoUrl ? (
+                <img src={logoUrl} alt="" className="size-full object-cover" />
+            ) : (
+                name.trim().charAt(0).toUpperCase()
             )}
         </span>
     );
 }
-export function TeamPicker({
-    teams,
-    selected,
-    onChange,
-    disabled = false,
-    triggerRef,
-    describedBy,
-}: {
-    teams: Team[];
-    selected: string[];
-    onChange: (ids: string[]) => void;
-    disabled?: boolean;
-    triggerRef?: Ref<HTMLButtonElement>;
-    describedBy?: string;
-}) {
-    const [query, setQuery] = useState('');
-    const availableSelection = selected.filter((id) =>
-        teams.some((team) => team.id === id),
-    );
-    const toggle = (id: string) =>
-        onChange(
-            availableSelection.includes(id)
-                ? availableSelection.filter((value) => value !== id)
-                : [...availableSelection, id],
-        );
+function OrganizationSwitcher() {
+    const { organizations } = usePage<SharedProps>().props.auth;
+    const current = organizations.find((organization) => organization.current);
+
+    if (!current) return null;
+
     return (
-        <div className="flex min-w-0 flex-col gap-2.5">
-            <Popover>
-                <PopoverTrigger
-                    render={<Button variant="outline" />}
-                    type="button"
-                    className="w-full flex-wrap justify-between gap-y-1 py-2 whitespace-normal"
-                    ref={triggerRef}
-                    aria-describedby={describedBy}
-                    disabled={disabled}
-                >
-                    Choose teams
-                    <span>
-                        {availableSelection.length
-                            ? `${availableSelection.length} selected`
-                            : 'Select at least one'}
-                    </span>
-                </PopoverTrigger>
-                <PopoverContent
-                    className="w-(--anchor-width) max-w-(--available-width) min-w-64 p-2"
-                    align="start"
-                >
-                    <label className="sr-only" htmlFor="team-search">
-                        Search teams
-                    </label>
-                    <input
-                        id="team-search"
-                        placeholder="Search teams…"
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                    />
-                    <fieldset className="mt-2 max-h-56 overflow-auto">
-                        <legend className="sr-only">Teams with access</legend>
-                        {teams
-                            .filter((team) =>
-                                team.name
-                                    .toLocaleLowerCase()
-                                    .includes(query.toLocaleLowerCase()),
-                            )
-                            .map((team) => (
-                                <label
-                                    className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2.5 hover:bg-muted"
-                                    key={team.id}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        aria-label={team.name}
-                                        checked={availableSelection.includes(
-                                            team.id,
-                                        )}
-                                        onChange={() => toggle(team.id)}
-                                    />
-                                    <span className="min-w-0 flex-1 wrap-anywhere">
-                                        {team.name}
-                                    </span>
-                                    <small className="text-muted-foreground">
-                                        {team.users_count}{' '}
-                                        {team.users_count === 1
-                                            ? 'member'
-                                            : 'members'}
-                                    </small>
-                                </label>
-                            ))}
-                    </fieldset>
-                    {!teams.some((team) =>
-                        team.name
-                            .toLocaleLowerCase()
-                            .includes(query.toLocaleLowerCase()),
-                    ) && (
-                        <p className="p-3 text-muted-foreground">
-                            No teams found.
-                        </p>
-                    )}
-                </PopoverContent>
-            </Popover>
-            <div className="inline-flex flex-wrap items-center gap-1.5">
-                {teams
-                    .filter((team) => availableSelection.includes(team.id))
-                    .map((team) => (
-                        <span
-                            className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold wrap-anywhere text-primary"
-                            key={team.id}
-                        >
-                            {team.name}
-                            <button
-                                type="button"
-                                onClick={() => toggle(team.id)}
-                                aria-label={`Remove ${team.name}`}
-                                disabled={disabled}
-                                className="inline-flex shrink-0 p-1"
-                            >
-                                <HugeiconsIcon
-                                    icon={Cancel01Icon}
-                                    size={14}
-                                    aria-hidden="true"
-                                />
-                            </button>
+        <Popover>
+            <PopoverTrigger
+                aria-label={`Organization: ${current.name}. Switch organization`}
+                className="mr-auto inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-input bg-background px-2.5 text-sm font-semibold text-foreground hover:bg-muted"
+            >
+                <OrganizationMark
+                    name={current.name}
+                    logoUrl={current.logo_url}
+                    personal={current.personal}
+                    className="size-5 rounded-[5px] text-[11px]"
+                />
+                <span className="hidden max-w-40 truncate md:inline">
+                    {current.name}
+                </span>
+                <HugeiconsIcon
+                    icon={ArrowDown01Icon}
+                    size={14}
+                    className="text-muted-foreground"
+                    aria-hidden="true"
+                />
+            </PopoverTrigger>
+            <PopoverContent
+                align="start"
+                sideOffset={8}
+                className="w-[min(18.75rem,calc(100vw-1.5rem))] gap-1 p-2"
+            >
+                <span className="px-2 pt-1.5 pb-1 text-xs text-muted-foreground">
+                    Send and see links as
+                </span>
+                {organizations.map((organization) => (
+                    <Link
+                        key={organization.id}
+                        href={switchOrganization(organization.id)}
+                        as="button"
+                        aria-current={organization.current ? 'true' : undefined}
+                        className={cn(
+                            'flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-muted',
+                            organization.current && 'bg-primary/5',
+                        )}
+                    >
+                        <OrganizationMark
+                            name={organization.name}
+                            logoUrl={organization.logo_url}
+                            personal={organization.personal}
+                        />
+                        <span className="flex min-w-0 flex-1 flex-col">
+                            <strong className="truncate text-sm">
+                                {organization.name}
+                            </strong>
+                            <span className="text-xs text-muted-foreground">
+                                {organization.personal
+                                    ? 'Only you'
+                                    : `${organization.role === 'admin' ? 'Admin' : 'Member'} · ${organization.members_count} ${organization.members_count === 1 ? 'member' : 'members'}`}
+                            </span>
                         </span>
-                    ))}
-            </div>
-        </div>
+                        {organization.current && (
+                            <HugeiconsIcon
+                                icon={Tick02Icon}
+                                size={18}
+                                className="text-primary"
+                                aria-hidden="true"
+                            />
+                        )}
+                    </Link>
+                ))}
+                {!current.personal && current.role === 'admin' && (
+                    <Link
+                        href={organizationSettings()}
+                        className="mt-1 flex items-center gap-2.5 border-t px-2 pt-3 pb-2 text-foreground hover:text-foreground"
+                    >
+                        <HugeiconsIcon
+                            icon={Settings01Icon}
+                            size={18}
+                            aria-hidden="true"
+                        />
+                        <span className="truncate">
+                            {current.name} settings
+                        </span>
+                    </Link>
+                )}
+            </PopoverContent>
+        </Popover>
+    );
+}
+/** Marks a transfer only signed-in members of its organization can download. */
+export function MembersBadge() {
+    return (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+            <HugeiconsIcon icon={UserGroupIcon} size={13} aria-hidden="true" />
+            Members only
+        </span>
     );
 }
 export function CopyLink({
