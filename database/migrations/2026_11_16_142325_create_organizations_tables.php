@@ -65,10 +65,7 @@ return new class extends Migration
 
         $this->moveExistingData();
 
-        // An issued team URL must never grant its holder access through the broader organization audience.
-        foreach (DB::table('transfers')->where('visibility', 'teams')->select('id')->lazyById() as $transfer) {
-            DB::table('transfers')->where('id', $transfer->id)->update(['token' => Str::random(64), 'visibility' => 'members']);
-        }
+        DB::table('transfers')->where('visibility', 'teams')->update(['visibility' => 'members']);
 
         Schema::dropIfExists('team_transfer');
         Schema::dropIfExists('team_user');

@@ -447,16 +447,20 @@ test('the migration moves everything that existed into a first organization and 
 
     $now = now();
     $row = fn (array $attributes): array => ['id' => (string) Str::uuid7(), 'created_at' => $now, 'updated_at' => $now, ...$attributes];
-    $admin = $row(['name' => 'Admin', 'email' => 'admin@mediamaxcommunication.it', 'password' => 'x', 'is_admin' => true]);
-    $member = $row(['name' => 'Member', 'email' => 'member@mediamaxcommunication.it', 'password' => 'x', 'is_admin' => false]);
+    $admin = $row(['name' => 'Admin', 'email' => 'admin@mediamaxcommunication.it', 'email_verified_at' => $now, 'password' => 'x', 'is_admin' => true]);
+    $member = $row(['name' => 'Member', 'email' => 'member@mediamaxcommunication.it', 'email_verified_at' => $now, 'password' => 'x', 'is_admin' => false]);
     DB::table('users')->insert([$admin, $member]);
     $team = $row(['name' => 'Creative']);
     DB::table('teams')->insert($team);
     DB::table('team_user')->insert(['team_id' => $team['id'], 'user_id' => $member['id']]);
     $restricted = $row(['user_id' => $member['id'], 'token' => Str::random(64), 'visibility' => 'teams', 'status' => 'ready', 'expires_in_days' => 7, 'expires_at' => $now->copy()->addWeek()]);
+    $expired = [...$restricted, 'id' => (string) Str::uuid7(), 'token' => Str::random(64), 'expires_at' => $now->copy()->subDay()];
     $public = $row(['user_id' => $admin['id'], 'token' => Str::random(64), 'visibility' => 'public', 'status' => 'ready', 'expires_in_days' => 7, 'expires_at' => $now->copy()->addWeek()]);
-    DB::table('transfers')->insert([$restricted, $public]);
-    DB::table('team_transfer')->insert(['team_id' => $team['id'], 'transfer_id' => $restricted['id']]);
+    DB::table('transfers')->insert([$restricted, $expired, $public]);
+    DB::table('team_transfer')->insert([
+        ['team_id' => $team['id'], 'transfer_id' => $restricted['id']],
+        ['team_id' => $team['id'], 'transfer_id' => $expired['id']],
+    ]);
     DB::table('transfer_files')->insert($row(['transfer_id' => $restricted['id'], 'original_name' => 'brief.pdf', 'path' => 'transfers/brief', 'size' => 5, 'position' => 0, 'part_size' => 5]));
     DB::table('secrets')->insert($row(['user_id' => $admin['id'], 'token' => Str::random(32), 'payload' => 'x', 'verifier_hash' => 'x', 'max_views' => 1, 'expires_at' => $now]));
     DB::table('drops')->insert($row(['user_id' => $admin['id'], 'token' => Str::random(16), 'title' => 'Brief', 'closes_at' => $now, 'keep_days' => 7]));
@@ -491,9 +495,12 @@ test('the migration moves everything that existed into a first organization and 
         ->and(TransferFile::query()->sole()->transfer_id)->toBe($restricted['id'])
         ->and(Schema::hasTable('teams'))->toBeFalse();
 
-    $this->get(route('shared.show', $restricted['token']))->assertNotFound();
-    $this->get(route('shared.show', Transfer::query()->findOrFail($restricted['id'])->token))->assertRedirect(route('login'));
+    $restrictedUrl = route('shared.show', $restricted['token']);
+    $this->get($restrictedUrl)->assertRedirect(route('login'));
     $this->get(route('shared.show', $public['token']))->assertOk();
+    $this->actingAs($admin)->get($restrictedUrl)->assertOk();
+    $this->get(route('shared.show', $expired['token']))->assertGone();
+    $this->flushSession()->actingAs(User::factory()->create())->get($restrictedUrl)->assertForbidden();
 
     expect(fn () => $this->artisan('migrate:rollback', ['--step' => 1])->run())->toThrow(RuntimeException::class, 'Restore a backup');
     expect(Schema::hasTable('teams'))->toBeFalse()->and($organization->domains()->count())->toBe(1);
