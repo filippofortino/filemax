@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Models\Team;
+use App\Models\Organization;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
@@ -21,7 +21,7 @@ describe('concurrent upload chunks', function (): void {
 
     it('offers password protection only for public links and clears it when disabled or switching audience', function (): void {
         $user = User::factory()->create();
-        $user->teams()->attach(Team::factory()->create());
+        joinOrganization($user);
         $this->actingAs($user);
 
         $page = visit('/')->resize(1280, 1140)
@@ -45,7 +45,7 @@ describe('concurrent upload chunks', function (): void {
             ->click('[aria-labelledby="protect-label"]')
             ->assertValue('#transfer-password', '')
             ->fill('#transfer-password', 'private-delivery')
-            ->click('Specific teams')
+            ->click('Members only')
             ->assertMissing('[aria-labelledby="protect-label"]')
             ->assertMissing('#transfer-password')
             ->click('Public link')
@@ -95,13 +95,11 @@ describe('concurrent upload chunks', function (): void {
 
     it('replaces the last failed draft file after cleanup without losing transfer details', function (bool $cleanupFails): void {
         $user = User::factory()->create();
-        $team = Team::factory()->create(['name' => 'Recovery team']);
-        $user->teams()->attach($team);
+        $organization = joinOrganization($user);
         $this->actingAs($user);
         $page = visit('/')->assertSee('Browse files');
         $page->fill('#transfer-title', 'Replacement transfer')->fill('#transfer-message', 'Keep this message')
-            ->click('Specific teams')->click('button:has-text("Choose teams")')->check('[aria-label="Recovery team"]')
-            ->keys('#team-search', 'Escape')->click('30 days');
+            ->click('Members only')->click('30 days');
         $page->script(controlledTransferUploads());
         $page->script('() => window.dropUploadFiles([4])');
         $page->press('Create transfer')->assertScript('window.uploads.length', 1);
@@ -140,9 +138,9 @@ describe('concurrent upload chunks', function (): void {
             ->and($replacement->status)->toBe('ready')
             ->and($replacement->title)->toBe('Replacement transfer')
             ->and($replacement->message)->toBe('Keep this message')
-            ->and($replacement->visibility)->toBe('teams')
+            ->and($replacement->visibility)->toBe('members')
             ->and($replacement->expires_in_days)->toBe(30)
-            ->and($replacement->teams()->sole()->id)->toBe($team->id)
+            ->and($replacement->organization_id)->toBe($organization->id)
             ->and($replacement->files()->sole()->original_name)->toBe('replacement0.txt');
     })->with(['successful cleanup' => false, 'cleanup retry' => true]);
 
@@ -560,15 +558,14 @@ it('recovers a failed multi-file upload while preserving finished files and shar
     Storage::fake('local');
     config(['filemax.disk' => 'local']);
     $user = User::factory()->create(['name' => 'Filippo Fortino']);
-    $team = Team::factory()->create(['name' => 'Mediamax']);
-    $user->teams()->attach($team);
+    $organization = joinOrganization($user, 'member', Organization::factory()->create(['name' => 'Mediamax']));
     $this->actingAs($user);
     $page = visit('/')->withTimezone('Europe/Rome')->resize(1280, 940)->assertSee('Drop files here');
     expect($page->script('() => document.body.innerText'))->toMatch('/Available until \d{1,2} \w+ \d{4}, \d{2}:\d{2}\./');
     $page->script('() => document.fonts.ready');
     $page->screenshot(filename: 'upload-empty');
     $page->fill('#transfer-title', 'Spot autunno — materiali finali')->fill('#transfer-message', 'Ciao Marco, qui i materiali approvati.');
-    $page->click('Specific teams')->click('button:has-text("Choose teams")')->check('[aria-label="Mediamax"]')->keys('#team-search', 'Escape');
+    $page->click('Members only')->assertSee('Only signed-in members of Mediamax can open the link. Anyone else is turned away.');
     $page->script(<<<'JS'
 () => {
     const data = new DataTransfer();
@@ -614,7 +611,7 @@ JS);
     $page->screenshot(filename: 'upload-ready');
     expect($page->script('() => window.uploadPutCount'))->toBe(4);
     $transfer = Transfer::query()->sole();
-    expect($transfer->status)->toBe('ready')->and($transfer->teams()->sole()->id)->toBe($team->id);
+    expect($transfer->status)->toBe('ready')->and($transfer->visibility)->toBe('members')->and($transfer->organization_id)->toBe($organization->id);
     expect($transfer->files()->count())->toBe(3);
     expect(Storage::disk('local')->size($transfer->files()->where('position', 1)->sole()->path))->toBe(1024);
     $page->click('View transfer')->assertSee('Downloads')->assertSee('Not opened yet')->assertSee('No download clicks yet.');
@@ -733,14 +730,12 @@ JS);
     expect(Transfer::query()->sole()->status)->toBe('ready');
 });
 
-it('can repair sharing after losing membership during an upload', function (): void {
+it('can finish a members-only upload after regaining membership lost on the way', function (): void {
     Storage::fake('local');
     $user = User::factory()->create();
-    $oldTeam = Team::factory()->create(['name' => 'Old team']);
-    $newTeam = Team::factory()->create(['name' => 'New team']);
-    $user->teams()->attach([$oldTeam->id, $newTeam->id]);
+    $organization = joinOrganization($user, 'member', Organization::factory()->create(['name' => 'Mediamax']));
     $this->actingAs($user);
-    $page = visit('/')->click('Specific teams')->click('button:has-text("Choose teams")')->check('[aria-label="Old team"]')->keys('#team-search', 'Escape');
+    $page = visit('/')->click('Members only');
     $page->script(<<<'JS'
 () => {
     const data = new DataTransfer(); data.items.add(new File(['hello'], 'repair.txt'));
@@ -756,11 +751,13 @@ it('can repair sharing after losing membership during an upload', function (): v
 }
 JS);
     $page->press('Create transfer')->assertSee('Uploading…');
-    $user->teams()->detach($oldTeam);
+    $organization->users()->detach($user);
     $page->script('() => new Promise(resolve => { const timer = setInterval(() => { if (window.resumeUpload) { clearInterval(timer); window.resumeUpload(); resolve(true); } }, 20); })');
-    $page->assertSee('Ready to finish')->assertSee('Select at least one');
-    $page->click('button:has-text("Choose teams")')->check('[aria-label="New team"]')->keys('#team-search', 'Escape')->press('Retry and create link')->assertSee('Your link is ready')->assertNoJavascriptErrors();
-    expect(Transfer::query()->sole()->teams()->sole()->id)->toBe($newTeam->id);
+    $page->assertSee('You’re no longer a member of Mediamax, so this members-only link can’t be created.');
+    expect(Transfer::query()->sole()->status)->toBe('uploading');
+    $organization->users()->attach($user);
+    $page->press('Retry and create link')->assertSee('Your link is ready')->assertSee('Shared with members of Mediamax')->assertNoJavascriptErrors();
+    expect(Transfer::query()->sole()->only(['status', 'visibility']))->toBe(['status' => 'ready', 'visibility' => 'members']);
     expect($page->script('() => window.uploadPutCount'))->toBe(1);
     expect($page->script('() => window.leavePrompts'))->toBe(0);
 });
@@ -854,15 +851,12 @@ it('pluralizes file and member counts from upload to transfer detail', function 
     Storage::fake('local');
     config(['filemax.disk' => 'local']);
     $user = User::factory()->create();
-    $mediamax = Team::factory()->create(['name' => 'Mediamax']);
-    $lenergy = Team::factory()->create(['name' => 'Lenergy']);
-    $user->teams()->attach([$mediamax->id, $lenergy->id]);
-    $lenergy->users()->attach(User::factory()->create());
+    $organization = joinOrganization($user, 'member', Organization::factory()->create(['name' => 'Mediamax']));
     $this->actingAs($user);
     $page = visit('/')->assertSee('Drop files here');
-    $page->click('Specific teams')->click('button:has-text("Choose teams")')
-        ->assertSee('2 members')->assertSee('1 member')->assertDontSee('1 members')
-        ->check('[aria-label="Mediamax"]')->check('[aria-label="Lenergy"]')->keys('#team-search', 'Escape');
+    $page->click('button[aria-label^="Organization:"]')->assertSee('Member · 1 member')->assertDontSee('1 members')->keys(':focus', 'Escape');
+    $organization->users()->attach(User::factory()->create());
+    $page->click('Members only');
     $page->script(<<<'JS'
 () => {
     const data = new DataTransfer(); data.items.add(new File(['hello'], 'brief.txt'));
@@ -870,16 +864,12 @@ it('pluralizes file and member counts from upload to transfer detail', function 
 }
 JS);
     $page->assertSee('1 file · 5 B')->press('Create transfer')->assertSee('1 file · 5 B · expires');
-    $page->click('View transfer')->assertSee('2 members')->assertSee('1 member')->assertDontSee('1 members')->assertNoJavascriptErrors();
+    $page->click('View transfer')->assertSee('Members of Mediamax')->assertSee('2 members')->assertNoJavascriptErrors();
 });
 
 it('keeps every upload form placeholder at 4.5:1 contrast and lighter than typed text', function (): void {
-    $user = User::factory()->create();
-    $user->teams()->attach(Team::factory()->create(['name' => 'Mediamax']));
-    $this->actingAs($user);
+    $this->actingAs(User::factory()->create());
     $page = visit('/')->assertSee('Drop files here');
-    $page->click('Specific teams')->click('button:has-text("Choose teams")');
-    $page->page()->locator('#team-search')->waitFor();
 
     $contrast = $page->script(<<<'JS'
 () => {
@@ -910,7 +900,7 @@ it('keeps every upload form placeholder at 4.5:1 contrast and lighter than typed
 }
 JS);
 
-    expect($contrast)->toHaveKeys(['transfer-title', 'transfer-message', 'team-search']);
+    expect($contrast)->toHaveKeys(['transfer-title', 'transfer-message']);
     foreach ($contrast as $field => $ratios) {
         expect($ratios['placeholder'])
             ->toBeGreaterThanOrEqual(4.5, "#{$field} placeholder contrast")
@@ -960,70 +950,18 @@ it('keeps Create transfer in the tab order and sends focus to Browse files when 
         ->and(Transfer::query()->count())->toBe(0);
 });
 
-it('sends focus to the team picker when no team is selected, before and after an interrupted upload', function (): void {
-    Storage::fake('local');
-    config(['filemax.disk' => 'local']);
-    $user = User::factory()->create();
-    $user->teams()->attach(Team::factory()->create(['name' => 'Mediamax']));
-    $this->actingAs($user);
-    $description = 'document.getElementById(document.activeElement.getAttribute("aria-describedby"))?.innerText';
-
-    $page = visit('/')->click('Specific teams');
-    $page->script(<<<'JS'
-() => {
-    const data = new DataTransfer(); data.items.add(new File(['hello'], 'teams.txt'));
-    document.querySelector('main').dispatchEvent(new DragEvent('drop', {bubbles: true, dataTransfer: data}));
-    const send = XMLHttpRequest.prototype.send;
-    let interrupted = false;
-    XMLHttpRequest.prototype.send = function(body) {
-        if (body instanceof Blob && !interrupted) {
-            interrupted = true;
-            this.dispatchEvent(new ProgressEvent('error'));
-            return;
-        }
-        return send.call(this, body);
-    };
-}
-JS);
-    $page->assertSee('teams.txt')->press('Create transfer')
-        ->assertScript('document.activeElement.innerText.startsWith("Choose teams")')
-        ->assertScript($description, 'Select at least one team.');
-    expect(Transfer::query()->count())->toBe(0);
-
-    $page->keys(':focus', 'Enter')->check('[aria-label="Mediamax"]')->keys('#team-search', 'Escape')
-        ->press('Create transfer')->assertSee('Retry and create link');
-    $transferId = Transfer::query()->sole()->id;
-
-    $page->click('[aria-label="Remove Mediamax"]')->press('Retry and create link')
-        ->assertScript('document.activeElement.innerText.startsWith("Choose teams")')
-        ->assertScript($description, 'Select at least one team.')
-        ->assertSee('teams.txt')
-        ->assertNoJavascriptErrors();
-    expect(Transfer::query()->sole()->id)->toBe($transferId);
-
-    $page->keys(':focus', 'Enter')->check('[aria-label="Mediamax"]')->keys('#team-search', 'Escape')
-        ->press('Retry and create link')->assertVisible('h1:has-text("Your link is ready")')
-        ->assertNoJavascriptErrors();
-    expect(Transfer::query()->sole()->id)->toBe($transferId);
-});
-
-it('names the account menu and team picker after their visible text', function (): void {
+it('names the account menu and organization switcher after their visible text', function (): void {
     $user = User::factory()->create(['name' => 'Filippo Fortino']);
-    $user->teams()->attach(Team::factory()->create(['name' => 'Mediamax']));
+    joinOrganization($user, 'member', Organization::factory()->create(['name' => 'Mediamax']));
     $this->actingAs($user);
 
     visit('/')->resize(1280, 940)
-        ->assertSeeIn('header [data-slot="popover-trigger"]', 'Filippo')
+        ->assertSeeIn('header [data-slot="popover-trigger"]:has-text("Filippo")', 'Filippo')
         ->assertVisible('internal:role=button[name="Filippo Fortino, account menu"s]')
-        ->click('Specific teams')
-        ->assertVisible('internal:role=button[name="Choose teams Select at least one"s]')
+        ->assertVisible('internal:role=button[name="Organization: Mediamax. Switch organization"s]')
         ->resize(390, 844)
         ->assertVisible('internal:role=button[name="Filippo Fortino, account menu"s]')
-        ->assertVisible('internal:role=button[name="Choose teams Select at least one"s]')
-        ->click('button:has-text("Choose teams")')
-        ->check('[aria-label="Mediamax"]')
-        ->keys('#team-search', 'Escape')
-        ->assertVisible('internal:role=button[name="Choose teams 1 selected"s]')
+        ->assertVisible('internal:role=button[name="Organization: Mediamax. Switch organization"s]')
         ->assertNoJavascriptErrors();
 });
 
