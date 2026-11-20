@@ -27,7 +27,8 @@ final class SecretController
         $search = $filters['search'] ?? '';
         $now = now();
 
-        $historyQuery = Secret::query()->whereBelongsTo($request->user() ?? abort(403));
+        $user = $request->user() ?? abort(403);
+        $historyQuery = Secret::query()->whereBelongsTo($user)->whereBelongsTo($user->currentOrganization());
         $totals = [
             'total' => (clone $historyQuery)->count(),
             'active' => $this->applyStatus(clone $historyQuery, 'active', $now)->count(),
@@ -66,6 +67,7 @@ final class SecretController
         /** @var array{label?: ?string, payload: string, verifier: string, max_views: int, expires_in_hours: int} $data */
         $data = $request->validated();
         $secret = ($request->user() ?? abort(403))->secrets()->create([
+            'organization_id' => $request->string('organization_id')->toString(),
             'label' => $data['label'] ?? null,
             'payload' => $data['payload'],
             'verifier_hash' => hash('sha256', $data['verifier']),

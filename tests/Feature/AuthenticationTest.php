@@ -2,8 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Http\Middleware\EnsureEligibleEmail;
-use App\Models\Team;
+use App\Models\Organization;
 use App\Models\Transfer;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -17,13 +16,13 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 beforeEach(function (): void {
-    Route::middleware(['web', 'auth', EnsureEligibleEmail::class, 'verified'])
+    Route::middleware(['web', 'auth', 'verified'])
         ->get('/staff-auth-test', fn (): string => 'staff');
 });
 
-test('staff can register with normalized email but cannot assign privileges', function (): void {
+test('people can register with normalized email but cannot assign privileges', function (): void {
     Notification::fake();
-    $team = Team::factory()->create();
+    $organization = Organization::factory()->create();
 
     $this->post(route('register.store'), [
         'name' => 'Alice',
@@ -31,20 +30,24 @@ test('staff can register with normalized email but cannot assign privileges', fu
         'password' => 'a-secure-password',
         'password_confirmation' => 'a-secure-password',
         'is_admin' => true,
-        'team_ids' => [$team->id],
+        'current_organization_id' => $organization->id,
     ])->assertRedirect(route('verification.notice'));
 
     $user = User::query()->sole();
     expect($user->email)->toBe('alice@mediamaxcommunication.it')
         ->and($user->is_admin)->toBeFalse()
         ->and($user->hasVerifiedEmail())->toBeFalse()
-        ->and($user->teams()->count())->toBe(0);
+        ->and($user->organizations()->sole()->personal)->toBeTrue()
+        ->and($user->currentOrganization()->personal)->toBeTrue();
     $this->assertAuthenticatedAs($user);
     Notification::assertSentTo($user, VerifyEmail::class);
     $this->get('/staff-auth-test')->assertRedirect(route('verification.notice'));
 });
 
-test('registration requires the exact company domain', function (string $email): void {
+test('closed registration requires the exact domain of an organization', function (string $email): void {
+    config(['filemax.signup_open' => false]);
+    Organization::factory()->create()->domains()->create(['domain' => 'mediamaxcommunication.it']);
+
     $this->post(route('register.store'), [
         'name' => 'Alice', 'email' => $email,
         'password' => 'a-secure-password', 'password_confirmation' => 'a-secure-password',
@@ -89,10 +92,10 @@ test('wrong credentials do not sign in and login attempts are throttled', functi
     $this->assertGuest();
 });
 
-test('sender access requires authentication and current domain eligibility', function (): void {
+test('sender access requires authentication and a verified email', function (): void {
     $this->get('/staff-auth-test')->assertRedirect(route('login'));
-    $user = User::factory()->create(['email' => 'former@example.com']);
-    $this->actingAs($user)->get('/staff-auth-test')->assertForbidden();
+    $this->actingAs(User::factory()->unverified()->create())->get('/staff-auth-test')->assertRedirect(route('verification.notice'));
+    $this->flushSession()->actingAs(User::factory()->create(['email' => 'anyone@example.com']))->get('/staff-auth-test')->assertOk();
 });
 
 test('signed verification verifies ownership and resumes an intended transfer', function (): void {
@@ -259,12 +262,12 @@ test('password recovery gives the same response for existing missing and throttl
     Notification::assertSentToTimes($user, ResetPassword::class, 1);
 });
 
-test('password endpoints reject malformed and ineligible email addresses', function (string $route, mixed $email): void {
+test('password endpoints reject malformed email addresses', function (string $route, mixed $email): void {
     $this->post(route($route), ['email' => $email, 'password' => 'password', 'token' => 'token'])
         ->assertSessionHasErrors('email');
     $this->assertGuest();
 })->with(['login.store', 'password.email', 'password.update'])->with([
-    'outside@example.com', 'person@sub.mediamaxcommunication.it', [['alice@mediamaxcommunication.it']],
+    'not-an-email', 'person@@mediamaxcommunication.it', [['alice@mediamaxcommunication.it']],
 ]);
 
 test('registration and recovery endpoints retain request throttling', function (string $route): void {

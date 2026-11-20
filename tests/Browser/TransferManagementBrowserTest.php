@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Models\Team;
+use App\Models\Organization;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
@@ -46,8 +46,7 @@ it('uses links for available pages and disabled buttons at the pagination bounda
 
 it('combines title search with audience and status counts across pages and clears every filter', function (): void {
     $owner = User::factory()->create();
-    $team = Team::factory()->create(['name' => 'Creative']);
-    $owner->teams()->attach($team);
+    joinOrganization($owner);
     Transfer::factory()->count(9)->for($owner)->create(['title' => 'Campaign public version']);
     Transfer::factory()->for($owner)->create(['title' => 'Campaign public urgent', 'expires_at' => now()->addHours(6)]);
     Transfer::factory()->for($owner)->expired()->create(['title' => 'Campaign public expired']);
@@ -55,11 +54,10 @@ it('combines title search with audience and status counts across pages and clear
     Transfer::factory()->for($owner)->create(['title' => 'Unrelated presentation']);
     $target = Transfer::factory()->for($owner)->create([
         'title' => 'Campaign team target',
-        'visibility' => 'teams',
+        'visibility' => 'members',
         'expires_at' => now()->addHours(12),
         'created_at' => now()->subDay(),
     ]);
-    $target->teams()->attach($team);
     $this->actingAs($owner);
 
     $page = visit('/transfers')
@@ -115,17 +113,15 @@ it('combines title search with audience and status counts across pages and clear
 
 it('supports keyboard status selection and restores filters through browser history on a narrow screen', function (): void {
     $owner = User::factory()->create();
-    $team = Team::factory()->create(['name' => 'Creative production and account management']);
-    $owner->teams()->attach($team);
+    joinOrganization($owner, 'member', Organization::factory()->create(['name' => 'Creative production and account management']));
     Transfer::factory()->for($owner)->create(['title' => 'Campaign public active']);
     Transfer::factory()->for($owner)->expired()->create(['title' => 'Campaign public expired']);
     Transfer::factory()->for($owner)->create(['title' => 'Budget public urgent', 'expires_at' => now()->addHours(2)]);
     $target = Transfer::factory()->for($owner)->create([
         'title' => 'Campaign team urgent',
-        'visibility' => 'teams',
+        'visibility' => 'members',
         'expires_at' => now()->addHours(6),
     ]);
-    $target->teams()->attach($team);
     $this->actingAs($owner);
 
     $page = visit('/transfers?search=Campaign&status=active')->resize(390, 844)
@@ -170,18 +166,13 @@ JS)
 
 it('keeps mobile filters on one line and paginates with scrollable keyboard accessible audience chips', function (): void {
     $owner = User::factory()->create();
-    $teams = Team::factory()->count(4)->sequence(
-        ['name' => 'Brand strategy'],
-        ['name' => 'Creative production'],
-        ['name' => 'Mediamax'],
-        ['name' => 'Studio Zeta'],
-    )->create();
+    joinOrganization($owner);
     Transfer::factory()->count(10)->for($owner)->has(TransferFile::factory(), 'files')->create([
         'title' => 'Campaign mobile delivery',
-        'visibility' => 'teams',
+        'visibility' => 'members',
         'expires_at' => now()->addHours(6),
         'download_count' => 3,
-    ])->each(fn (Transfer $transfer) => $transfer->teams()->attach($teams->modelKeys()));
+    ]);
     $this->actingAs($owner);
 
     $page = visit('/transfers?search=Campaign&status=soon');
@@ -206,7 +197,7 @@ it('keeps mobile filters on one line and paginates with scrollable keyboard acce
                 && [...content.getClientRects()].filter((rect) => rect.width > 0).every((rect) =>
                     rect.left >= bounds.left && rect.right <= bounds.right);
         })
-        && audience.scrollWidth > audience.clientWidth
+        && chips.map((chip) => chip.innerText.trim()).join('|') === 'Everyone|Public|Members only'
         && chips.every((chip) => chip.getBoundingClientRect().height >= 44
             && Math.abs(chip.getBoundingClientRect().top - chips[0].getBoundingClientRect().top) < 1);
 }
@@ -217,10 +208,7 @@ JS)
     $page->assertDisabled('nav[aria-label="Pagination"] button:has-text("Previous")')
         ->keys('nav[aria-label="Filter transfers"] a:has-text("Everyone")', 'Tab')
         ->keys(':focus', 'Tab')
-        ->keys(':focus', 'Tab')
-        ->keys(':focus', 'Tab')
-        ->keys(':focus', 'Tab')
-        ->assertVisible('nav[aria-label="Filter transfers"] a:has-text("Studio Zeta"):focus-visible')
+        ->assertVisible('nav[aria-label="Filter transfers"] a:has-text("Members only"):focus-visible')
         ->assertScript(<<<'JS'
 () => {
     const audience = document.querySelector('nav[aria-label="Filter transfers"]');
@@ -228,19 +216,19 @@ JS)
     const bounds = chip.getBoundingClientRect();
     const viewport = audience.getBoundingClientRect();
     const style = getComputedStyle(chip);
-    return audience.scrollLeft > 0 && bounds.left >= viewport.left && bounds.right <= viewport.right
+    return bounds.left >= viewport.left && bounds.right <= viewport.right
         && style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) >= 2
         && document.documentElement.scrollWidth <= window.innerWidth;
 }
 JS)
         ->keys(':focus', 'Enter')
-        ->assertQueryStringHas('filter', $teams->last()->id)
+        ->assertQueryStringHas('filter', 'members')
         ->assertQueryStringHas('search', 'Campaign')
         ->assertQueryStringHas('status', 'soon')
         ->click('nav[aria-label="Pagination"] a:has-text("Next")')
         ->assertSee('Page 2 of 2')
         ->assertQueryStringHas('page', '2')
-        ->assertQueryStringHas('filter', $teams->last()->id)
+        ->assertQueryStringHas('filter', 'members')
         ->assertQueryStringHas('search', 'Campaign')
         ->assertQueryStringHas('status', 'soon')
         ->assertDisabled('nav[aria-label="Pagination"] button:has-text("Next")')
@@ -266,10 +254,8 @@ JS)
 
 it('cancels an in-flight audience request immediately when a new search is typed', function (): void {
     $owner = User::factory()->create();
-    $team = Team::factory()->create();
-    $owner->teams()->attach($team);
-    $target = Transfer::factory()->for($owner)->create(['title' => 'Needle team transfer', 'visibility' => 'teams']);
-    $target->teams()->attach($team);
+    joinOrganization($owner);
+    Transfer::factory()->for($owner)->create(['title' => 'Needle team transfer', 'visibility' => 'members']);
     Transfer::factory()->for($owner)->create(['title' => 'Unrelated public transfer']);
     $this->actingAs($owner);
 
@@ -555,20 +541,17 @@ it('keeps stale extension errors visible when the refreshed transfer is no longe
     expect($transfer->refresh()->expires_at->toDateTimeString())->toBe('2026-10-04 12:00:00');
 });
 
-it('saves team changes only on confirmation and keeps delete dialog keyboard focus inside', function (): void {
+it('makes a transfer public only on confirmation and keeps delete dialog keyboard focus inside', function (): void {
     $owner = User::factory()->create(['name' => 'Filippo Fortino']);
-    $mediamax = Team::factory()->create(['name' => 'Mediamax']);
-    $lenergy = Team::factory()->create(['name' => 'Lenergy']);
-    $owner->teams()->attach([$mediamax->id, $lenergy->id]);
+    joinOrganization($owner, 'member', Organization::factory()->create(['name' => 'Mediamax']));
     $transfer = Transfer::factory()->for($owner)->create([
         'title' => 'Master spot + visual approvato',
-        'visibility' => 'teams',
+        'visibility' => 'members',
         'message' => 'Ultima versione prima della consegna — fatemi sapere entro venerdì.',
         'download_count' => 9,
         'first_opened_at' => now()->subHours(4),
         'last_downloaded_at' => now()->subHour(),
     ]);
-    $transfer->teams()->attach([$mediamax->id, $lenergy->id]);
     TransferFile::factory()->for($transfer)->create(['original_name' => 'Lenergy_Spot30s_v3.mp4', 'size' => 1200000000, 'download_count' => 6]);
     TransferFile::factory()->for($transfer)->create(['original_name' => 'Keyvisual_Autunno_2026.psd', 'size' => 480000000, 'download_count' => 3, 'position' => 1]);
     $public = Transfer::factory()->for($owner)->create(['title' => 'Shooting Villa Borbone — selezione']);
@@ -591,11 +574,11 @@ it('saves team changes only on confirmation and keeps delete dialog keyboard foc
     $page->resize(1280, 940);
 
     $page->click('nav[aria-label="Filter transfers"] a:has-text("Public")')->assertSee('Shooting Villa Borbone — selezione')->assertDontSee('Master spot + visual approvato');
-    $page->click('nav[aria-label="Filter transfers"] a:has-text("Mediamax")')->assertSee('Master spot + visual approvato')->assertDontSee('Shooting Villa Borbone — selezione');
+    $page->click('nav[aria-label="Filter transfers"] a:has-text("Members only")')->assertSee('Master spot + visual approvato')->assertDontSee('Shooting Villa Borbone — selezione');
     $page->click('nav[aria-label="Filter transfers"] a:has-text("Everyone")')->assertSee('Shooting Villa Borbone — selezione');
 
-    $page->click('a:has-text("Master spot + visual approvato")')->assertSee('First opened')->assertSee('Change teams');
-    $page->screenshot(fullPage: false, filename: 'detail-teams');
+    $page->click('a:has-text("Master spot + visual approvato")')->assertSee('First opened')->assertSee('Members of Mediamax')->assertSee('1 member')->assertSee('Make public');
+    $page->screenshot(fullPage: false, filename: 'detail-members');
     $page->resize(768, 940)->assertSee('Download all');
     expect($page->script('() => document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
     $page->screenshot(fullPage: false, filename: 'detail-tablet-narrow');
@@ -607,40 +590,20 @@ it('saves team changes only on confirmation and keeps delete dialog keyboard foc
     $page->screenshot(fullPage: false, filename: 'detail-phone');
     $page->resize(1280, 940);
 
-    $page->press('Change teams')->assertSee('Save changes');
-    $page->screenshot(fullPage: false, filename: 'dialog-change-teams');
-    $page->resize(390, 844)->press('button:has-text("Choose teams")')
-        ->assertVisible('#team-search')
-        ->assertScript(<<<'JS'
-() => {
-    const trigger = [...document.querySelectorAll('button')].find((button) => button.textContent.startsWith('Choose teams')).getBoundingClientRect();
-    const popup = document.querySelector('[data-slot="popover-content"]').getBoundingClientRect();
-    return popup.left >= 0 && popup.right <= window.innerWidth
-        && Math.abs(popup.width - Math.max(256, trigger.width)) < 1;
-}
-JS)
-        ->uncheck('[aria-label="Lenergy"]')
-        ->keys(':focus', 'Escape')
-        ->assertMissing('#team-search')
-        ->assertVisible('button:has-text("Choose teams"):focus')
-        ->assertSee('Save changes')
-        ->press('Cancel')
-        ->assertDontSee('Save changes')
-        ->assertVisible('button:has-text("Change teams"):focus')
-        ->resize(1280, 940);
-    expect($transfer->teams()->pluck('teams.id')->all())->toEqualCanonicalizing([$mediamax->id, $lenergy->id]);
+    $page->press('Make public')->assertSee('Make this transfer public?');
+    $page->screenshot(fullPage: false, filename: 'dialog-make-public');
+    $page->press('Cancel')
+        ->assertDontSee('Make this transfer public?')
+        ->assertVisible('button:has-text("Make public"):focus');
+    expect($transfer->refresh()->visibility)->toBe('members');
 
-    $page->press('Change teams')
-        ->wait(0.3)
-        ->press('button:has-text("Choose teams")')
-        ->assertChecked('[aria-label="Lenergy"]')
-        ->uncheck('[aria-label="Lenergy"]')
-        ->keys(':focus', 'Escape')
-        ->assertMissing('#team-search')
-        ->press('Save changes')
-        ->assertDontSee('Save changes')
-        ->assertSeeIn('[data-slot="toast"]', 'Sharing updated');
-    expect($transfer->teams()->pluck('teams.id')->all())->toBe([$mediamax->id]);
+    $page->press('Make public')
+        ->press('[role="dialog"] button:has-text("Make public")')
+        ->assertDontSee('Make this transfer public?')
+        ->assertSeeIn('[data-slot="toast"]', 'Transfer is now public')
+        ->assertDontSee('Members of Mediamax')
+        ->assertSee('Public link');
+    expect($transfer->refresh()->visibility)->toBe('public');
 
     $page->press('button:has-text("Delete transfer")')->assertSee('Delete this transfer?');
     $page->assertVisible('[role="dialog"]:has-text("Delete this transfer?"):focus-within');

@@ -21,17 +21,19 @@ final class SharedTransferController
             ])->toResponse($request)->setStatusCode(410);
         }
 
-        if ($transfer->visibility === 'teams' && ! $request->user()) {
+        if ($transfer->visibility === 'members' && ! $request->user()) {
             return redirect()->guest(route('login'));
         }
 
         $sender = $transfer->user->settings->show_name_on_transfers ? $transfer->user : null;
+        $organization = $transfer->organization->publicName();
 
         if (! Gate::forUser($request->user())->allows('download', $transfer)) {
             if ($transfer->visibility === 'public' && $transfer->password_hash !== null) {
                 $response = Inertia::render('shared/password', [
                     'token' => $transfer->token,
                     'sender' => $sender?->only(['name', 'email']),
+                    'organization' => $organization,
                 ])->toResponse($request);
                 $response->headers->set('Cache-Control', 'private, no-store');
 
@@ -44,7 +46,7 @@ final class SharedTransferController
                 'sender' => $sender?->only(['name', 'email']),
                 'token' => $transfer->token,
                 'url' => route('shared.show', $transfer->token),
-                'own_teams' => $request->user()?->teams()->get(['teams.id', 'teams.name'])->map->only(['id', 'name']) ?? [],
+                'organization' => $organization,
                 'requires_verification' => ! $request->user()?->hasVerifiedEmail(),
             ])->toResponse($request)->setStatusCode(403);
         }
@@ -60,6 +62,7 @@ final class SharedTransferController
                 'title' => $transfer->displayTitle(),
                 'message' => $transfer->message,
                 'sender' => $sender ? [...$sender->only(['name', 'email']), 'avatar_url' => $sender->avatarUrl()] : null,
+                'organization' => $organization,
                 'files' => $transfer->files->map(fn (TransferFile $file): array => [
                     'id' => $file->id,
                     'name' => $file->original_name,

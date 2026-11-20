@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToOrganization;
 use Carbon\CarbonInterface;
 use Database\Factories\SecretFactory;
 use Illuminate\Database\Eloquent\Attributes\Guarded;
@@ -38,6 +39,8 @@ use Illuminate\Support\Str;
 #[Hidden(['token', 'payload', 'verifier_hash'])]
 final class Secret extends Model
 {
+    use BelongsToOrganization;
+
     /** @use HasFactory<SecretFactory> */
     use HasFactory;
 

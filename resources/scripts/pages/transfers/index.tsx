@@ -15,13 +15,13 @@ import {
     Pagination,
     PasswordBadge,
     Shell,
-    TeamBadges,
+    MembersBadge,
     TransferTabs,
 } from '@/components/filemax';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { bytes, date, dateTime } from '@/lib/format';
-import type { Team, Transfer } from '@/lib/types';
+import type { SharedProps, Transfer } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { home } from '@/routes';
 import { index, show } from '@/routes/transfers';
@@ -94,7 +94,6 @@ type Props = {
             links: { url: string | null; label: string; active: boolean }[];
         };
     };
-    teams: Team[];
     filter: string;
     search: string;
     status: Status;
@@ -107,7 +106,6 @@ type Props = {
 };
 export default function Index({
     transfers,
-    teams,
     filter,
     search,
     status,
@@ -187,11 +185,17 @@ export default function Index({
             cancelVisit.current = undefined;
         },
     };
-    const audiences = [
-        { id: 'all', name: 'Everyone' },
-        { id: 'public', name: 'Public' },
-        ...teams,
-    ];
+    // Personal only ever sends public links, so it has no audience to filter by.
+    const personal = usePage<SharedProps>().props.auth.organizations.some(
+        (organization) => organization.current && organization.personal,
+    );
+    const audiences = personal
+        ? []
+        : [
+              { id: 'all', name: 'Everyone' },
+              { id: 'public', name: 'Public' },
+              { id: 'members', name: 'Members only' },
+          ];
 
     return (
         <Shell active="transfers">
@@ -457,16 +461,8 @@ export default function Index({
                                                     />
                                                     Public
                                                 </span>
-                                            ) : transfer.teams.length ? (
-                                                <TeamBadges
-                                                    teams={transfer.teams}
-                                                    limit={2}
-                                                    variant="muted"
-                                                />
                                             ) : (
-                                                <span className="text-destructive">
-                                                    Sharing needs repair
-                                                </span>
+                                                <MembersBadge />
                                             )}
                                             {transfer.password_protected && (
                                                 <PasswordBadge compact />

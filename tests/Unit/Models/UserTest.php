@@ -23,5 +23,6 @@ test('to array', function (): void {
             'updated_at',
             'is_admin',
             'onboarded_at',
+            'current_organization_id',
         ]);
 });

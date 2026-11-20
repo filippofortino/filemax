@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToOrganization;
 use App\Notifications\TransferDownloaded;
 use Carbon\CarbonInterface;
 use Database\Factories\TransferFactory;
@@ -15,7 +16,6 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
@@ -48,13 +48,14 @@ use Illuminate\Support\Str;
  * @property CarbonInterface $updated_at
  * @property-read User $user
  * @property-read Collection<int, TransferFile> $files
- * @property-read Collection<int, Team> $teams
  * @property-read ?Drop $drop
  */
 #[Guarded(['id'])]
 #[Hidden(['token', 'archive_path', 'password_hash'])]
 final class Transfer extends Model
 {
+    use BelongsToOrganization;
+
     /** @use HasFactory<TransferFactory> */
     use HasFactory;
 
@@ -70,13 +71,13 @@ final class Transfer extends Model
     }
 
     /**
-     * Submissions that arrived through one of the owner's Drops.
+     * Submissions that arrived through one of the owner's Drops in the organization they are working in.
      *
      * @return Builder<self>
      */
     public static function receivedBy(User $owner): Builder
     {
-        return self::query()->whereBelongsTo($owner)->whereNotNull('drop_id')->where('status', 'ready');
+        return self::query()->whereBelongsTo($owner)->whereBelongsTo($owner->currentOrganization())->whereNotNull('drop_id')->where('status', 'ready');
     }
 
     /** Received submissions the owner hasn't opened yet and can still download. */
@@ -101,12 +102,6 @@ final class Transfer extends Model
     public function files(): HasMany
     {
         return $this->hasMany(TransferFile::class)->orderBy('position');
-    }
-
-    /** @return BelongsToMany<Team, $this> */
-    public function teams(): BelongsToMany
-    {
-        return $this->belongsToMany(Team::class);
     }
 
     public function isAvailable(): bool

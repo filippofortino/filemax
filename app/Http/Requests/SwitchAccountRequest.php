@@ -11,6 +11,6 @@ final class SwitchAccountRequest extends FormRequest
     /** @return array<string, list<string>> */
     public function rules(): array
     {
-        return ['return_to' => ['required', 'string', 'regex:~\A/t/[A-Za-z0-9_-]+\z~']];
+        return ['return_to' => ['required', 'string', 'regex:~\A(?:/t/[A-Za-z0-9_-]+|/invites/[0-9a-f-]+\?signature=[0-9a-f]{64})\z~']];
     }
 }

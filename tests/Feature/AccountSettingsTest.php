@@ -55,7 +55,7 @@ test('security settings ask to confirm identity first and return there for three
     $this->get(route('account.settings.security'))->assertRedirect(route('password.confirm'));
 });
 
-test('settings sections require an eligible verified account', function (string $route, bool $verified): void {
+test('settings sections require a verified account', function (string $route, bool $verified): void {
     $this->get(route($route))->assertRedirect(route('login'));
 
     $user = User::factory()->create([
@@ -64,20 +64,20 @@ test('settings sections require an eligible verified account', function (string 
     ]);
 
     $this->actingAs($user)->getJson(route($route))->assertForbidden();
-})->with(['account.settings', 'account.settings.notifications', 'account.settings.security'])->with([true, false]);
+})->with(['account.settings', 'account.settings.notifications', 'account.settings.security'])->with([false]);
 
 test('guests cannot update their profile, password or settings', function (string $route): void {
     $this->put(route($route))->assertRedirect(route('login'));
 })->with(['user-profile-information.update', 'user-password.update', 'account.settings.update']);
 
-test('profile, password and settings updates require an eligible verified account', function (string $route, bool $verified): void {
+test('profile, password and settings updates require a verified account', function (string $route, bool $verified): void {
     $user = User::factory()->create([
         'email' => $verified ? 'person@example.com' : 'person@mediamaxcommunication.it',
         'email_verified_at' => $verified ? now() : null,
     ]);
 
     $this->actingAs($user)->putJson(route($route))->assertForbidden();
-})->with(['user-profile-information.update', 'user-password.update', 'account.settings.update'])->with([true, false]);
+})->with(['user-profile-information.update', 'user-password.update', 'account.settings.update'])->with([false]);
 
 test('profile updates only the current users name and preserves immutable attributes', function (): void {
     $user = User::factory()->create(['avatar_path' => 'avatars/original.webp']);

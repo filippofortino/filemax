@@ -24,6 +24,7 @@ type SharedTransfer = {
     message: string | null;
     password_protected: boolean;
     sender: { name: string; email: string; avatar_url: string | null } | null;
+    organization: string | null;
     files: { id: string; name: string; size: number; mime_type: string }[];
     total_size: number;
     expires_at: string;
@@ -37,7 +38,7 @@ export default function SharedTransferPage({
     const [allFiles, setAllFiles] = useState(false);
     const displayUrl = transfer.url.replace(/^https?:\/\//, '');
     return (
-        <Shell recipient>
+        <Shell recipient organization={transfer.organization}>
             <Head title={transfer.title}>
                 <meta name="robots" content="noindex, nofollow" />
             </Head>
@@ -55,13 +56,17 @@ export default function SharedTransferPage({
                                     <strong className="text-foreground">
                                         {transfer.sender.name}
                                     </strong>
-                                    <span className="hidden md:inline">
-                                        {' '}
-                                        ·{' '}
-                                    </span>
-                                    <span className="block md:inline">
-                                        Mediamax Communication
-                                    </span>
+                                    {transfer.organization && (
+                                        <>
+                                            <span className="hidden md:inline">
+                                                {' '}
+                                                ·{' '}
+                                            </span>
+                                            <span className="block md:inline">
+                                                {transfer.organization}
+                                            </span>
+                                        </>
+                                    )}
                                 </span>
                             </div>
                         )}

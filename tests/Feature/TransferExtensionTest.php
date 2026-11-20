@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Jobs\PurgeTransfer;
-use App\Models\Team;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
@@ -69,19 +68,16 @@ it('rejects deleted purged and incomplete transfers', function (array $attribute
     'no expiry' => [['expires_at' => null]],
 ]);
 
-it('requires the verified eligible owner rather than team membership or admin status', function (string $actor): void {
-    $transfer = Transfer::factory()->create(['visibility' => 'teams']);
-    $team = Team::factory()->create();
-    $transfer->teams()->attach($team);
+it('requires the verified owner rather than organization membership or admin status', function (string $actor): void {
+    $transfer = Transfer::factory()->membersOnly()->create();
     $user = match ($actor) {
         'admin' => User::factory()->admin()->create(),
         'member' => User::factory()->create(),
         'unverified' => tap($transfer->user, fn (User $user): bool => $user->update(['email_verified_at' => null])),
-        'ineligible' => tap($transfer->user, fn (User $user): bool => $user->update(['email' => 'external@example.com'])),
         default => null,
     };
     if ($user) {
-        $user->teams()->attach($team);
+        $transfer->organization->users()->syncWithoutDetaching([$user->id => ['role' => 'admin']]);
         $this->actingAs($user);
     }
 
@@ -91,7 +87,7 @@ it('requires the verified eligible owner rather than team membership or admin st
     $response->assertStatus($actor === 'guest' ? 401 : 403);
 
     expect($transfer->refresh()->expires_at->equalTo(now()->addDays(7)))->toBeTrue();
-})->with(['guest', 'admin', 'member', 'unverified', 'ineligible']);
+})->with(['guest', 'admin', 'member', 'unverified']);
 
 it('validates the expected expiry before making changes', function (mixed $expectedExpiry): void {
     $transfer = Transfer::factory()->create();
@@ -116,12 +112,10 @@ it('rejects duplicate submissions but allows intentional extensions with the lat
 });
 
 it('preserves the link sharing files archive and statistics and leaves the toast to the page', function (): void {
-    $transfer = Transfer::factory()->expired()->create([
-        'visibility' => 'teams', 'download_count' => 5, 'first_opened_at' => now()->subDays(2),
+    $transfer = Transfer::factory()->membersOnly()->expired()->create([
+        'download_count' => 5, 'first_opened_at' => now()->subDays(2),
         'last_downloaded_at' => now()->subDays(2), 'archive_path' => 'archives/ready.zip', 'archive_status' => 'ready',
     ]);
-    $team = Team::factory()->create();
-    $transfer->teams()->attach($team);
     $file = TransferFile::factory()->for($transfer)->create(['download_count' => 2]);
     $attributes = $transfer->getAttributes();
     $fileAttributes = $file->refresh()->getAttributes();
@@ -134,7 +128,7 @@ it('preserves the link sharing files archive and statistics and leaves the toast
 
     expect($transfer->refresh()->only(array_keys($attributes)))->toEqual($attributes)
         ->and($file->refresh()->getAttributes())->toEqual($fileAttributes)
-        ->and($transfer->teams()->pluck('teams.id')->all())->toBe([$team->id]);
+        ->and($transfer->visibility)->toBe('members');
 
     $this->get(route('transfers.show', $transfer))->assertOk();
     $this->post('/transfers/'.$transfer->id.'/extend', $payload)
@@ -156,13 +150,11 @@ it('returns a retryable error without extending when the byte lock times out', f
 });
 
 it('restores the original public and restricted download links with their existing permissions', function (bool $restricted): void {
-    $transfer = Transfer::factory()->expired()->create(['visibility' => $restricted ? 'teams' : 'public']);
+    $transfer = Transfer::factory()->membersOnly()->expired()->create($restricted ? [] : ['visibility' => 'public']);
     $file = TransferFile::factory()->for($transfer)->create();
     Storage::disk('local')->put($file->path, 'retained file');
     $recipient = User::factory()->create();
-    $team = Team::factory()->create();
-    $transfer->teams()->attach($team);
-    $recipient->teams()->attach($team);
+    $transfer->organization->users()->attach($recipient);
     $pageUrl = route('shared.show', $transfer->token);
     $downloadUrl = route('shared.files.download', [$transfer->token, $file]);
     $this->get($pageUrl)->assertGone();
@@ -183,7 +175,7 @@ it('restores the original public and restricted download links with their existi
     $response = $this->postJson($downloadUrl)->assertOk();
     $this->get($response->json('url'))->assertOk()->assertStreamedContent('retained file');
     if ($restricted) {
-        $recipient->teams()->detach();
+        $transfer->organization->users()->detach($recipient);
         $this->postJson($downloadUrl)->assertForbidden();
     }
 })->with([false, true]);

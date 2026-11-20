@@ -10,6 +10,7 @@ use App\Services\TransferStorage;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 final class ExtendTransferController
@@ -18,6 +19,7 @@ final class ExtendTransferController
     {
         try {
             $transfer = $storage->withTransferLock($transfer, function (Transfer $transfer) use ($request): Transfer {
+                Gate::authorize('update', $transfer);
                 /** @var string $expectedExpiry */
                 $expectedExpiry = $request->validated('expected_expires_at');
 

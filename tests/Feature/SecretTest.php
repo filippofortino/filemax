@@ -17,6 +17,7 @@ beforeEach(function (): void {
 function newSecretInput(array $overrides = []): array
 {
     return [
+        'organization_id' => auth()->user()->currentOrganization()->id,
         'label' => 'Token Google Ads (dev)',
         'payload' => base64_encode(random_bytes(80)),
         'verifier' => str_repeat('V', 43),
@@ -35,7 +36,6 @@ it('opens the new secret page only for verified colleagues', function (): void {
     $this->get(route('secrets.index'))->assertRedirect(route('login'));
     $this->get(route('secrets.create'))->assertRedirect(route('login'));
     $this->actingAs(User::factory()->unverified()->create())->get(route('secrets.create'))->assertRedirect(route('verification.notice'));
-    $this->flushSession()->actingAs(User::factory()->create(['email' => 'external@example.com']))->get(route('secrets.create'))->assertForbidden();
     $this->flushSession()->actingAs(User::factory()->create())->get(route('secrets.create'))->assertOk()
         ->assertInertia(fn (Assert $page): Assert => $page->component('secrets/create', false));
 });
@@ -67,9 +67,10 @@ it('lists only the owner’s secrets, newest first, with label search and status
 
 it('stores the ciphertext with only a hash of the key verifier', function (): void {
     $owner = User::factory()->create();
+    $this->actingAs($owner);
     $input = newSecretInput(['max_views' => 5, 'expires_in_hours' => 168]);
 
-    $response = $this->actingAs($owner)->postJson(route('secrets.store'), $input)->assertCreated();
+    $response = $this->postJson(route('secrets.store'), $input)->assertCreated();
 
     $secret = Secret::query()->sole();
     $response->assertExactJson([

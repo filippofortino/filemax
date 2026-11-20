@@ -13,7 +13,7 @@ final class TransferPolicy
 {
     public function create(User $user): bool
     {
-        return $user->isEligible() && $user->hasVerifiedEmail();
+        return $user->hasVerifiedEmail();
     }
 
     public function view(User $user, Transfer $transfer): bool
@@ -41,12 +41,13 @@ final class TransferPolicy
             return $this->submit($user, $transfer);
         }
 
-        return $user instanceof User && $this->update($user, $transfer);
+        return $user instanceof User && $this->view($user, $transfer);
     }
 
     public function update(User $user, Transfer $transfer): bool
     {
-        return $this->view($user, $transfer);
+        return $this->view($user, $transfer)
+            && $user->organizations()->newPivotStatementForId($transfer->organization_id)->sharedLock()->exists();
     }
 
     public function delete(User $user, Transfer $transfer): bool
@@ -70,7 +71,6 @@ final class TransferPolicy
             return false;
         }
 
-        return $transfer->user_id === $user->id || $transfer->teams()
-            ->whereHas('users', fn ($query) => $query->whereKey($user->id))->exists();
+        return $transfer->user_id === $user->id || ($transfer->visibility === 'members' && $transfer->organization->hasMember($user));
     }
 }

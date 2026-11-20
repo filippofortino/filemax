@@ -9,14 +9,16 @@ import { unlock } from '@/routes/shared';
 export default function Password({
     token,
     sender,
+    organization,
 }: {
     token: string;
     sender: { name: string; email: string } | null;
+    organization: string | null;
 }) {
     const [passwordVisible, setPasswordVisible] = useState(false);
 
     return (
-        <Shell recipient>
+        <Shell recipient organization={organization}>
             <Head title="Password required">
                 <meta name="robots" content="noindex, nofollow" />
             </Head>

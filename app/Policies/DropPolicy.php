@@ -11,7 +11,7 @@ final class DropPolicy
 {
     public function create(User $user): bool
     {
-        return $user->isEligible() && $user->hasVerifiedEmail();
+        return $user->hasVerifiedEmail();
     }
 
     public function update(User $user, Drop $drop): bool

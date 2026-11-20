@@ -14,7 +14,7 @@ export default function Login() {
     return (
         <AuthLayout
             title="Sign in"
-            description="To send files, and to open transfers shared with your teams."
+            description="To send files, and to open transfers shared with your organization."
             footer={
                 <>
                     New to Filemax?{' '}

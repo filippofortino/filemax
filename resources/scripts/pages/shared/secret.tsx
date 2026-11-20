@@ -20,6 +20,7 @@ import { open as openSecret } from '@/routes/shared/secrets';
 type SharedSecret = {
     token: string;
     sender: { name: string; avatar_url: string | null } | null;
+    organization: string | null;
     max_views: number;
     views_left: number;
     expires_at: string;
@@ -168,8 +169,14 @@ export default function SharedSecretPage({
                 <strong className="text-foreground">
                     {secret.sender.name}
                 </strong>
-                <span className="hidden md:inline"> · </span>
-                <span className="block md:inline">Mediamax Communication</span>
+                {secret.organization && (
+                    <>
+                        <span className="hidden md:inline"> · </span>
+                        <span className="block md:inline">
+                            {secret.organization}
+                        </span>
+                    </>
+                )}
             </span>
         </div>
     );
@@ -196,7 +203,7 @@ export default function SharedSecretPage({
     );
 
     return (
-        <Shell recipient>
+        <Shell recipient organization={secret?.organization}>
             <Head title={first ? `${first} sent you a secret` : 'Secret'}>
                 <meta name="robots" content="noindex, nofollow" />
             </Head>

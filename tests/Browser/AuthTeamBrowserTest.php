@@ -2,15 +2,17 @@
 
 declare(strict_types=1);
 
-use App\Models\Team;
+use App\Models\Organization;
+use App\Models\OrganizationInvitation;
 use App\Models\User;
+use App\Notifications\OrganizationInvite;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 
 it('registers an eligible account and asks the user to verify their email', function (): void {
-    config(['filemax.allowed_email_domains' => []]);
     Notification::fake();
 
     $page = visit('/register')->resize(1280, 940)
@@ -40,7 +42,6 @@ it('registers an eligible account and asks the user to verify their email', func
 });
 
 it('requests and resets a password by clicking the form buttons', function (): void {
-    config(['filemax.allowed_email_domains' => ['example.com']]);
     $user = User::factory()->create(['email' => 'alice@example.com']);
     Notification::fake();
 
@@ -121,41 +122,179 @@ it('shortens a long email in the account menu and keeps the full one on hover', 
     $page->assertNoJavascriptErrors();
 });
 
-it('lets an admin add and remove a registered member in the teams interface', function (): void {
-    $admin = User::factory()->admin()->create();
+it('lets an admin manage members, invites, domains and the name in organization settings', function (): void {
+    Notification::fake();
+    $admin = User::factory()->create(['name' => 'Giulia Rossi']);
+    $organization = joinOrganization($admin, 'admin', Organization::factory()->create(['name' => 'Creative Studio']));
     $member = User::factory()->create(['name' => 'Beatrice Test']);
-    $team = Team::factory()->create(['name' => 'Creative Studio']);
+    $organization->users()->attach($member);
     $this->actingAs($admin);
 
-    $page = visit('/teams')->resize(1280, 940)
+    $page = visit('/organization/members')->resize(1280, 1180)
         ->assertSee('Creative Studio')
-        ->select('user_id', $member->id)
-        ->press('Add member')
-        ->assertSee('1 member')
-        ->assertSeeIn('[data-slot="toast"]', 'Member added');
+        ->assertSee('2 members. They can open members-only links and send as Creative Studio.')
+        ->assertSee('Admin · you')
+        ->assertSee('No pending invites.')
+        ->select('[aria-label="Role of Beatrice Test"]', 'admin')
+        ->assertSee('Role updated');
+    expect($organization->hasAdmin($member))->toBeTrue();
+
+    $page->press('Invite people')
+        ->assertSee('Invite people to Creative Studio')
+        ->assertButtonDisabled('Send invite')
+        ->fill('#invite-emails', "anna@studioconti.it,\nluca@gmail.com")
+        ->screenshot(fullPage: false, filename: 'organization-invite-dialog')
+        ->press('Send 2 invites')
+        ->assertSee('2 invites sent')
+        ->assertSee('anna@studioconti.it')
+        ->assertSee('Member · invited by you · expires');
+    Notification::assertSentOnDemandTimes(OrganizationInvite::class, 2);
 
     $page->script('() => document.fonts.ready');
-    $page->screenshot(fullPage: false, filename: 'teams-admin');
+    $page->screenshot(fullPage: false, filename: 'organization-members');
 
-    $page
+    $page->press('[aria-label="Cancel invite to luca@gmail.com"]')
+        ->assertSee('Invite cancelled')
+        ->assertDontSee('luca@gmail.com has')
         ->press('[aria-label="Remove Beatrice Test from Creative Studio"]')
-        ->assertSee('This team has no members yet.')
-        ->assertSeeIn('[data-slot="toast"]', 'Member removed')
+        ->assertSee('Remove Beatrice Test from Creative Studio?')
+        ->press('Remove member')
+        ->assertSee('Member removed')
+        ->assertSee('1 member. They can open')
+        ->assertNoJavascriptErrors();
+    expect($organization->hasMember($member))->toBeFalse()->and($organization->invitations()->count())->toBe(1);
+
+    $page->click('nav[aria-label="Organization settings"] a:has-text("Allowed domains")')
+        ->assertSee('Anyone who signs up and verifies an email on one of these domains joins Creative Studio as a member, with no invite.')
+        ->fill('domain', 'not a domain')
+        ->press('Add domain')
+        ->assertSee('Enter a domain like example.com, without @ or https://.')
+        ->fill('domain', 'StudioConti.it')
+        ->press('Add domain')
+        ->assertSee('Domain added')
+        ->assertSee('No member uses this domain yet')
+        ->screenshot(fullPage: false, filename: 'organization-domains')
+        ->press('[aria-label="Remove studioconti.it"]')
+        ->assertSee('Domain removed')
+        ->assertNoJavascriptErrors();
+    expect($organization->domains()->count())->toBe(0);
+
+    $page->click('nav[aria-label="Organization settings"] a:has-text("General")')
+        ->assertSee('What recipients see')
+        ->assertSee('Giulia Rossi · Creative Studio')
+        ->fill('#org-name', 'Creative Studio Updated')
+        ->assertSee('Giulia Rossi · Creative Studio Updated')
+        ->screenshot(fullPage: false, filename: 'organization-general')
+        ->press('Save changes')
+        ->assertSee('Organization updated')
+        ->assertSeeIn('button[aria-label^="Organization:"]', 'Creative Studio Updated')
+        ->assertNoJavascriptErrors();
+    expect($organization->refresh()->name)->toBe('Creative Studio Updated');
+});
+
+it('switches organization from the header and keeps Personal to public links', function (): void {
+    $user = User::factory()->create(['name' => 'Filippo Fortino']);
+    $organization = joinOrganization($user, 'member', Organization::factory()->create(['name' => 'Mediamax']));
+    $this->actingAs($user);
+
+    $page = visit('/')->resize(1280, 940)
+        ->assertSeeIn('button[aria-label="Organization: Mediamax. Switch organization"]', 'Mediamax')
+        ->assertSee('Who can download')
+        ->assertSee('Members only')
+        ->assertSee('Signed-in members of Mediamax.')
+        ->click('Members only')
+        ->fill('#transfer-title', 'For Mediamax')
+        ->click('button[aria-label="Organization: Mediamax. Switch organization"]')
+        ->assertSee('Send and see links as')
+        ->assertSee('Only you')
+        ->assertSee('Member · 1 member')
+        ->assertDontSee('Mediamax settings');
+    $page->script('() => document.fonts.ready');
+    $page->screenshot(fullPage: false, filename: 'organization-switcher')
+        ->click('[data-slot="popover-content"] button:has-text("Personal")')
+        ->assertSeeIn('button[aria-label="Organization: Personal. Switch organization"]', 'Personal')
+        ->assertSee('Anyone with the link can download. It shows your name, with no organization.')
+        ->assertDontSee('Members only')
+        ->assertValue('#transfer-title', '')
+        ->assertVisible('[aria-labelledby="protect-label"]')
+        ->assertNoJavascriptErrors();
+    expect($user->refresh()->currentOrganization()->personal)->toBeTrue();
+
+    $page = visit('/')->resize(390, 844)
+        ->click('button[aria-label="Organization: Personal. Switch organization"]')
+        ->assertSee('Send and see links as')
+        ->screenshot(fullPage: false, filename: 'organization-switcher-phone');
+    expect($page->script('document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+    $page->click('[data-slot="popover-content"] button:has-text("Mediamax")')
+        ->assertVisible('button[aria-label="Organization: Mediamax. Switch organization"]')
+        ->assertNoJavascriptErrors();
+    expect($user->refresh()->currentOrganization()->is($organization))->toBeTrue();
+});
+
+it('keeps sign-up closed to everyone but people on an allowed domain', function (): void {
+    config(['filemax.signup_open' => false]);
+    Notification::fake();
+    Organization::factory()->create()->domains()->create(['domain' => 'studioconti.it']);
+
+    $page = visit('/register')->resize(1280, 940)
+        ->assertSee('Sign-up is by invitation for now')
+        ->assertMissing('#password')
+        ->fill('email', 'luca@gmail.com')
+        ->press('Continue')
+        ->assertSee('No organization on Filemax uses gmail.com. Ask an admin of yours to invite you.')
+        ->screenshot(fullPage: false, filename: 'signup-closed')
+        ->fill('email', 'anna@studioconti.it')
+        ->press('Continue')
+        ->assertSee('Your email belongs to an organization on Filemax. Create your account to join it.')
+        ->assertValue('#email', 'anna@studioconti.it')
+        ->fill('name', 'Anna Conti')
+        ->fill('password', 'a-good-password')
+        ->fill('password_confirmation', 'a-good-password')
+        ->press('Create account')
+        ->assertSee('Verify your email')
         ->assertNoJavascriptErrors();
 
-    expect($team->users()->count())->toBe(0);
+    expect(User::query()->where('email', 'anna@studioconti.it')->exists())->toBeTrue();
+});
 
-    $page->fill('#name-'.$team->id, 'Creative Studio Updated')
-        ->press('Rename')
-        ->assertSeeIn('[data-slot="toast"]', 'Team renamed')
-        ->fill('#team-name', 'Production')
-        ->press('Create team')
-        ->assertSeeIn('[data-slot="toast"]', 'Team created')
-        ->assertSee('Production')
+it('lets an invited person create an account and join, and a signed-in invitee join with one click', function (): void {
+    config(['filemax.signup_open' => false]);
+    $inviter = User::factory()->create(['name' => 'Giulia Rossi']);
+    $organization = Organization::factory()->create(['name' => 'Mediamax Communication']);
+    $invitation = OrganizationInvitation::factory()->for($organization)->create(['email' => 'anna@studioconti.it', 'invited_by' => $inviter->id]);
+
+    $page = visit(URL::signedRoute('invitations.show', $invitation, absolute: false))->resize(1280, 940)
+        ->assertSee('Join Mediamax Communication')
+        ->assertSee('Giulia Rossi invited you. Create your account to join.')
+        ->assertValue('#email', 'anna@studioconti.it')
+        ->assertAttribute('#email', 'readonly', '');
+    $page->script('() => document.fonts.ready');
+    $page->screenshot(fullPage: false, filename: 'organization-accept-invite-new')
+        ->fill('name', 'Anna Conti')
+        ->fill('password', 'a-good-password')
+        ->fill('password_confirmation', 'a-good-password')
+        ->press('Create account and join')
+        ->assertSee('You joined Mediamax Communication')
         ->assertNoJavascriptErrors();
 
-    expect($team->refresh()->name)->toBe('Creative Studio Updated');
-    expect(Team::query()->where('name', 'Production')->exists())->toBeTrue();
+    $anna = User::query()->where('email', 'anna@studioconti.it')->sole();
+    expect($organization->hasMember($anna))->toBeTrue()->and($anna->currentOrganization()->is($organization))->toBeTrue();
+
+    $marta = User::factory()->create(['name' => 'Marta Bianchi', 'email' => 'marta@studiobassi.it']);
+    $second = OrganizationInvitation::factory()->for($organization)->create(['email' => $marta->email, 'invited_by' => $inviter->id]);
+    $this->flushSession()->actingAs($marta);
+    visit(URL::signedRoute('invitations.show', $second, absolute: false))->resize(1280, 940)
+        ->assertSee('Join Mediamax Communication?')
+        ->assertSee('Giulia Rossi invited you as a member. You’re signed in as marta@studiobassi.it.')
+        ->screenshot(fullPage: false, filename: 'organization-accept-invite-signed-in')
+        ->press('Join Mediamax Communication')
+        ->assertSee('You joined Mediamax Communication')
+        ->assertNoJavascriptErrors();
+    expect($organization->hasMember($marta))->toBeTrue();
+
+    visit(URL::signedRoute('invitations.show', $second, absolute: false))
+        ->assertSee('This invite no longer works')
+        ->assertNoJavascriptErrors();
 });
 
 it('associates sign in errors and focuses the first invalid field', function (): void {

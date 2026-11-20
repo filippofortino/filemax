@@ -237,6 +237,34 @@ it('refuses new submissions once the Drop is closed', function (): void {
     expect(Transfer::query()->count())->toBe(0);
 });
 
+it('closes a removed member’s organization Drops and cancels their unfinished submissions', function (): void {
+    Notification::fake();
+    $owner = User::factory()->create();
+    $personal = Drop::factory()->for($owner)->create();
+    $admin = User::factory()->create();
+    $organization = joinOrganization($admin, 'admin');
+    joinOrganization($owner, 'member', $organization);
+    $drop = Drop::factory()->for($owner)->create();
+    $other = Drop::factory()->for($admin)->create();
+    $sent = sendThroughDrop($drop);
+    $pending = startDropSubmission($drop)->assertCreated();
+    $id = $pending->json('submission.id');
+    $file = $pending->json('submission.files.0.id');
+    putDropPart($id, $file, 'hello')->assertOk();
+    $this->postJson(route('shared.drops.uploads.complete', [$id, $file]))->assertOk();
+
+    $this->actingAs($admin)->delete(route('organization.members.destroy', $owner), ['organization_id' => $organization->id])
+        ->assertRedirect()->assertSessionHasNoErrors();
+
+    $this->get(route('shared.drops.show', $drop->token))->assertGone();
+    startDropSubmission($drop)->assertGone();
+    $this->postJson(route('shared.drops.uploads.finalize', $id))->assertGone();
+    Notification::assertSentToTimes($owner, DropReceived::class, 1);
+    expect(Transfer::query()->findOrFail($sent)->isAvailable())->toBeTrue()
+        ->and($personal->refresh()->isOpen())->toBeTrue()
+        ->and($other->refresh()->isOpen())->toBeTrue();
+});
+
 it('validates what the uploader sends', function (array $input, string $field): void {
     $drop = Drop::factory()->create(['file_types' => ['images', 'videos'], 'max_file_size' => 2_000_000_000, 'max_submission_size' => 3_000_000_000]);
 

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Jobs\PrepareTransferArchive;
-use App\Models\Team;
+use App\Models\Organization;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
@@ -119,17 +119,18 @@ it('downloads multiple files as a ZIP through the recipient control', function (
 
 it('shows denied and expired states without disclosing the file list', function (): void {
     $sender = User::factory()->create(['name' => 'Filippo Fortino']);
-    $transfer = Transfer::factory()->for($sender, 'user')->create(['visibility' => 'teams']);
+    $transfer = Transfer::factory()->for($sender, 'user')->membersOnly()->create(['organization_id' => Organization::factory()->create(['name' => 'Mediamax Communication'])]);
     TransferFile::factory()->for($transfer)->create(['original_name' => 'private-file.pdf']);
-    $user = User::factory()->create(['name' => 'Marta Bianchi', 'email' => 'marta@mediamaxcommunication.it']);
-    $team = Team::factory()->create(['name' => 'Creative']);
-    $user->teams()->attach($team);
-    $user->teams()->attach(Team::factory()->create(['name' => 'Mediamax']));
+    $user = User::factory()->create(['name' => 'Marta Bianchi', 'email' => 'marta@studiobassi.it']);
+    Organization::factory()->create(['name' => 'Creative'])->users()->attach($user);
     $this->actingAs($user);
 
     $page = visit(route('shared.show', $transfer->token))->resize(1280, 940)
         ->assertSee("You don't have access to these files")
-        ->assertSee('Creative')
+        ->assertSee('Filippo Fortino shared this transfer with members of Mediamax Communication only.')
+        ->assertSee('marta@studiobassi.it, which isn’t a member.')
+        ->assertDontSee('Creative')
+        ->assertSee('Sent with Filemax.')
         ->assertDontSee('private-file.pdf')
         ->assertAttributeContains('a:has-text("Ask Filippo for access")', 'href', 'mailto:'.$sender->email.'?')
         ->assertAttributeMissing('a:has-text("Ask Filippo for access")', 'role')
@@ -165,11 +166,11 @@ it('shows denied and expired states without disclosing the file list', function 
 it('keeps a hidden sender off the denied page', function (): void {
     $sender = User::factory()->create(['name' => 'Filippo Fortino']);
     $sender->settings()->create(['show_name_on_transfers' => false]);
-    $transfer = Transfer::factory()->for($sender, 'user')->create(['visibility' => 'teams']);
+    $transfer = Transfer::factory()->for($sender, 'user')->membersOnly()->create();
     $this->actingAs(User::factory()->create(['name' => 'Marta Bianchi', 'email' => 'marta@mediamaxcommunication.it']));
 
     visit(route('shared.show', $transfer->token))
-        ->assertSee('This transfer is shared with selected teams.')
+        ->assertSee('This transfer is shared with members of '.$transfer->organization->name.' only.')
         ->assertDontSee('Filippo')
         ->assertMissing('a[href^="mailto:"]')
         ->assertSee('Go to Filemax')

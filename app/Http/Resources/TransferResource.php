@@ -39,7 +39,7 @@ final class TransferResource extends JsonResource
             'total_size' => $this->files->sum('size'),
             'files_count' => $this->files->count(),
             'files' => TransferFileResource::collection($this->files)->resolve($request),
-            'teams' => $this->teams->map(fn ($team): array => ['id' => $team->id, 'name' => $team->name, 'users_count' => $team->users_count ?? 0]),
+            'organization' => $this->organization->publicName(),
             'url' => $this->status === 'ready' ? url('/t/'.$this->token) : null,
             'token' => $this->status === 'ready' ? $this->token : null,
         ];

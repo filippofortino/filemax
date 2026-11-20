@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Rules\AllowedEmailDomain;
 use Carbon\CarbonInterface;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -28,6 +28,7 @@ use Laravel\Fortify\PasskeyAuthenticatable;
  * @property-read string $email
  * @property-read string|null $avatar_path
  * @property-read bool $is_admin
+ * @property-read string|null $current_organization_id
  * @property-read CarbonInterface|null $email_verified_at
  * @property-read CarbonInterface|null $onboarded_at
  * @property-read string $password
@@ -52,19 +53,38 @@ final class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     use PasskeyAuthenticatable;
 
     /** @var array<string, mixed> */
-    protected $attributes = ['is_admin' => false, 'avatar_path' => null];
+    protected $attributes = ['is_admin' => false, 'avatar_path' => null, 'current_organization_id' => null];
 
     public static function booted(): void
     {
         self::saving(function (self $user): void {
             $user->setAttribute('email', Str::lower(mb_trim($user->email)));
         });
+        self::created(function (self $user): void {
+            $user->organizations()->save(new Organization()->forceFill(['name' => 'Personal', 'personal' => true]), ['role' => 'admin']);
+        });
     }
 
-    /** @return BelongsToMany<Team, $this> */
-    public function teams(): BelongsToMany
+    /** @return BelongsToMany<Organization, $this> */
+    public function organizations(): BelongsToMany
     {
-        return $this->belongsToMany(Team::class);
+        return $this->belongsToMany(Organization::class)->withPivot('role')->withTimestamps();
+    }
+
+    /** The organization chosen in the header, or Personal when none is chosen or the user has since left it. */
+    public function currentOrganization(): Organization
+    {
+        return $this->organizations()
+            ->where(fn (Builder $query) => $query->whereKey($this->current_organization_id)->orWhere('personal', true))
+            ->orderBy('personal')
+            ->firstOrFail();
+    }
+
+    /** Joins every organization that lists this email's domain. Only call once the email is verified. */
+    public function joinOrganizationsByDomain(): void
+    {
+        $organizations = OrganizationDomain::query()->where('domain', OrganizationDomain::of($this->email))->pluck('organization_id');
+        $this->organizations()->syncWithoutDetaching($organizations->all());
     }
 
     /** @return HasMany<Secret, $this> */
@@ -83,11 +103,6 @@ final class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function settings(): HasOne
     {
         return $this->hasOne(UserSettings::class)->withDefault();
-    }
-
-    public function isEligible(): bool
-    {
-        return AllowedEmailDomain::allows($this->email);
     }
 
     public function avatarUrl(): ?string

@@ -11,7 +11,7 @@ final class SecretPolicy
 {
     public function create(User $user): bool
     {
-        return $user->isEligible() && $user->hasVerifiedEmail();
+        return $user->hasVerifiedEmail();
     }
 
     public function view(User $user, Secret $secret): bool

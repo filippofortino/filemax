@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\Drop;
+use App\Models\Organization;
 use App\Models\Transfer;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -35,6 +36,13 @@ final class TransferFactory extends Factory
             'expires_at' => now()->addDays(30),
             'received_at' => now(),
         ]);
+    }
+
+    /** Sent from an organization the owner belongs to, for its members only. */
+    public function membersOnly(): self
+    {
+        return $this->state(fn (): array => ['visibility' => 'members', 'organization_id' => Organization::factory()])
+            ->afterCreating(fn (Transfer $transfer) => $transfer->organization->users()->syncWithoutDetaching([$transfer->user_id]));
     }
 
     public function expired(): self

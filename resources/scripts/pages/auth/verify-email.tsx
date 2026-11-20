@@ -10,7 +10,7 @@ export default function VerifyEmail() {
     return (
         <AuthLayout
             title="Check your email"
-            description="One last step: verify your email to send files and open transfers shared with your teams."
+            description="One last step: verify your email to send files and open transfers shared with your organization."
             footer={
                 <Link href={logout()} method="post" as="button">
                     Sign out

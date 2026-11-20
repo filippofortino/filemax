@@ -40,6 +40,7 @@ type SharedDrop = DropRules & {
     instructions: string | null;
     /** Null when the owner hides their name, as on transfers and secrets. */
     owner: { name: string; avatar_url: string | null } | null;
+    organization: string | null;
     open: boolean;
     closes_at: string;
     closed_at: string;
@@ -90,7 +91,8 @@ export default function SharedDropPage({ drop }: { drop: SharedDrop | null }) {
     return (
         <Shell
             recipient
-            footer="Requested with Filemax, the file-sharing tool of Mediamax Communication."
+            footer="Requested with Filemax."
+            organization={drop?.organization}
         >
             <Head title={drop?.title ?? 'Drop unavailable'}>
                 <meta name="robots" content="noindex, nofollow" />
@@ -648,9 +650,12 @@ function Uploader({ drop }: { drop: SharedDrop }) {
                                 {drop.title}
                             </strong>
                             <span className="block">
-                                {owner
-                                    ? `For ${owner.name} · Mediamax Communication`
-                                    : 'Mediamax Communication'}
+                                {[
+                                    owner && `For ${owner.name}`,
+                                    drop.organization,
+                                ]
+                                    .filter(Boolean)
+                                    .join(' · ')}
                             </span>
                         </span>
                     </div>
@@ -827,9 +832,11 @@ function Uploader({ drop }: { drop: SharedDrop }) {
                                         {owner.name}
                                     </strong>{' '}
                                     is asking for files
-                                    <span className="block">
-                                        Mediamax Communication
-                                    </span>
+                                    {drop.organization && (
+                                        <span className="block">
+                                            {drop.organization}
+                                        </span>
+                                    )}
                                 </span>
                             </div>
                         )}

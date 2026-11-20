@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Jobs\PrepareTransferArchive;
-use App\Models\Team;
+use App\Models\Organization;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
@@ -60,20 +60,17 @@ it('counts every authorized individual action exactly once and never counts byte
 });
 
 it('redirects restricted guests back through login and keeps denied props private', function (): void {
-    $transfer = Transfer::factory()->create(['visibility' => 'teams', 'message' => 'secret message']);
+    $transfer = Transfer::factory()->membersOnly()->create(['message' => 'secret message']);
     TransferFile::factory()->for($transfer)->create(['original_name' => 'secret.pdf']);
-    $team = Team::factory()->create();
-    $transfer->teams()->attach($team);
     $url = route('shared.show', $transfer->token);
 
     $this->get($url)->assertRedirect(route('login'))->assertSessionHas('url.intended', $url);
     $user = User::factory()->create();
-    $ownTeam = Team::factory()->create();
-    $user->teams()->attach($ownTeam);
+    Organization::factory()->create()->users()->attach($user);
     $this->actingAs($user)->get($url)->assertForbidden()->assertInertia(fn (Assert $page): Assert => $page
         ->component('shared/denied', false)
         ->where('sender.email', $transfer->user->email)
-        ->where('own_teams.0.name', $ownTeam->name)
+        ->where('organization', $transfer->organization->name)
         ->missing('transfer')
         ->missing('files')
         ->missing('message'));
@@ -81,25 +78,20 @@ it('redirects restricted guests back through login and keeps denied props privat
     expect($transfer->refresh()->first_opened_at)->toBeNull()->and($transfer->download_count)->toBe(0);
 });
 
-it('requires verified eligibility and current membership while allowing any selected team', function (): void {
-    $transfer = Transfer::factory()->create(['visibility' => 'teams']);
+it('requires a verified email and current membership of the organization', function (): void {
+    $transfer = Transfer::factory()->membersOnly()->create();
     $file = TransferFile::factory()->for($transfer)->create();
-    $teams = Team::factory()->count(2)->create();
-    $transfer->teams()->attach($teams->modelKeys());
     $recipient = User::factory()->create();
-    $recipient->teams()->attach($teams->modelKeys());
+    $transfer->organization->users()->attach($recipient);
     $route = route('shared.files.download', [$transfer->token, $file]);
 
     $this->actingAs($recipient)->postJson($route)->assertOk();
     expect($transfer->refresh()->download_count)->toBe(1);
-    $recipient->teams()->detach($teams[0]);
+    $transfer->organization->users()->detach($recipient);
+    $this->postJson($route)->assertForbidden();
+    $transfer->organization->users()->attach($recipient);
     $this->postJson($route)->assertOk();
-    $recipient->teams()->detach();
-    $this->postJson($route)->assertForbidden();
-    $recipient->teams()->attach($teams[0]);
     $recipient->forceFill(['email_verified_at' => null])->save();
-    $this->postJson($route)->assertForbidden();
-    $recipient->forceFill(['email_verified_at' => now(), 'email' => 'person@example.com'])->save();
     $this->postJson($route)->assertForbidden();
     expect($transfer->refresh()->download_count)->toBe(2);
 });
@@ -146,16 +138,14 @@ it('blocks expiry, deletion, missing tokens and foreign file ids without countin
 });
 
 it('caps signed file links at transfer expiry and rechecks membership on local retrieval', function (): void {
-    $transfer = Transfer::factory()->create(['visibility' => 'teams', 'expires_at' => now()->addSeconds(30)]);
+    $transfer = Transfer::factory()->membersOnly()->create(['expires_at' => now()->addSeconds(30)]);
     $file = TransferFile::factory()->for($transfer)->create();
-    $team = Team::factory()->create();
-    $transfer->teams()->attach($team);
     $user = User::factory()->create();
-    $user->teams()->attach($team);
+    $transfer->organization->users()->attach($user);
     $url = $this->actingAs($user)->postJson(route('shared.files.download', [$transfer->token, $file]))->assertOk()->json('url');
     parse_str(parse_url($url, PHP_URL_QUERY), $query);
     expect((int) $query['expires'])->toBe($transfer->expires_at->timestamp);
-    $user->teams()->detach();
+    $transfer->organization->users()->detach($user);
     $this->get($url)->assertForbidden();
     expect($transfer->refresh()->download_count)->toBe(1);
 });
@@ -187,16 +177,14 @@ it('builds archives with safe unique names and counts bundles independently of f
 
 it('rechecks access while archives prepare and when they are retrieved', function (): void {
     Queue::fake([PrepareTransferArchive::class]);
-    $transfer = Transfer::factory()->create(['visibility' => 'teams']);
+    $transfer = Transfer::factory()->membersOnly()->create();
     $file = TransferFile::factory()->for($transfer)->create();
     Storage::disk('local')->put($file->path, 'test');
-    $team = Team::factory()->create();
-    $transfer->teams()->attach($team);
     $user = User::factory()->create();
-    $user->teams()->attach($team);
+    $transfer->organization->users()->attach($user);
     $this->actingAs($user)->postJson(route('shared.download', $transfer->token))->assertOk()->assertJsonPath('status', 'pending');
     Queue::assertPushed(PrepareTransferArchive::class, 1);
-    $user->teams()->detach();
+    $transfer->organization->users()->detach($user);
     new PrepareTransferArchive($transfer->id)->handle(resolve(TransferStorage::class));
     $this->getJson(route('shared.archive', $transfer->token))->assertForbidden();
     $this->get(route('shared.archive.download', $transfer->token))->assertForbidden();

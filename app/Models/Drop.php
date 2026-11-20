@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToOrganization;
 use Carbon\CarbonInterface;
 use Database\Factories\DropFactory;
 use Illuminate\Database\Eloquent\Attributes\Guarded;
@@ -41,6 +42,8 @@ use Illuminate\Support\Str;
 #[Hidden(['token'])]
 final class Drop extends Model
 {
+    use BelongsToOrganization;
+
     /** @use HasFactory<DropFactory> */
     use HasFactory;
 

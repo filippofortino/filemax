@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Jobs\PrepareTransferArchive;
-use App\Models\Team;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
@@ -26,7 +25,7 @@ beforeEach(function (): void {
 /** @return array<string, mixed> */
 function passwordTransferPayload(array $overrides = []): array
 {
-    return array_replace(['visibility' => 'public', 'expires_in_days' => 7, 'team_ids' => [], 'files' => [['name' => 'private.txt', 'size' => 4]]], $overrides);
+    return array_replace(['organization_id' => auth()->user()->currentOrganization()->id, 'visibility' => 'public', 'expires_in_days' => 7, 'team_ids' => [], 'files' => [['name' => 'private.txt', 'size' => 4]]], $overrides);
 }
 
 it('defaults protection off and stores only a hidden hash when enabled', function (): void {
@@ -61,25 +60,22 @@ it('rejects passwords when protection is off or omitted', function (array $prote
         ->assertUnprocessable()->assertJsonValidationErrors('password');
 })->with(['omitted' => [[]], 'off' => [['password_protected' => false]]]);
 
-it('rejects password protection on teams both at creation and sharing updates', function (): void {
+it('rejects password protection on members-only transfers both at creation and when made public', function (): void {
     $owner = User::factory()->create();
-    $team = Team::factory()->create();
-    $owner->teams()->attach($team);
+    joinOrganization($owner);
     $this->actingAs($owner)->postJson(route('transfers.store'), passwordTransferPayload([
-        'visibility' => 'teams', 'team_ids' => [$team->id], 'password_protected' => true, 'password' => 'Transfer123',
+        'visibility' => 'members', 'password_protected' => true, 'password' => 'Transfer123',
     ]))->assertUnprocessable();
     expect(Transfer::query()->count())->toBe(0);
-    $transfer = Transfer::factory()->for($owner)->create(['visibility' => 'teams']);
-    $this->patchJson(route('transfers.update', $transfer), ['team_ids' => [$team->id], 'password_protected' => true, 'password' => 'Transfer123'])->assertUnprocessable();
-    expect($transfer->refresh()->password_hash)->toBeNull();
+    $transfer = Transfer::factory()->for($owner)->create(['visibility' => 'members']);
+    $this->patchJson(route('transfers.update', $transfer), ['visibility' => 'public', 'password_protected' => true, 'password' => 'Transfer123'])->assertUnprocessable();
+    expect($transfer->refresh()->password_hash)->toBeNull()->and($transfer->visibility)->toBe('members');
 });
 
 it('prevents adding replacing or removing passwords through sharing updates', function (bool $protected, array $changes): void {
     $hash = $protected ? Hash::make('Transfer123') : null;
     $transfer = Transfer::factory()->create(['password_hash' => $hash]);
-    $team = Team::factory()->create();
-    $transfer->user->teams()->attach($team);
-    $this->actingAs($transfer->user)->patchJson(route('transfers.update', $transfer), ['team_ids' => [$team->id], ...$changes])->assertUnprocessable();
+    $this->actingAs($transfer->user)->patchJson(route('transfers.update', $transfer), ['visibility' => 'public', ...$changes])->assertUnprocessable();
     expect($transfer->refresh()->password_hash)->toBe($hash);
 })->with([
     'add' => [false, ['password_protected' => true, 'password' => 'NewPassword123']],
