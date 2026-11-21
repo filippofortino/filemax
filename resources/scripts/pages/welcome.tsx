@@ -5,9 +5,12 @@ import {
     Clock01Icon,
     Copy01Icon,
     Download01Icon,
+    EncryptIcon,
     Globe02Icon,
-    ListViewIcon,
+    Image01Icon,
+    LockedIcon,
     LockKeyIcon,
+    PackageReceiveIcon,
     Tick02Icon,
     Upload01Icon,
     UserGroupIcon,
@@ -27,7 +30,7 @@ const steps = [
     {
         title: 'Welcome to Filemax',
         description:
-            'Send large files to clients and teammates with one link. Here’s a quick look at what you can do.',
+            'Send large files, share a secret or ask for files, each with one link. Here’s a quick look at what you can do.',
         points: [
             {
                 icon: Upload01Icon,
@@ -44,6 +47,14 @@ const steps = [
             {
                 icon: Download01Icon,
                 text: 'See how often your files are downloaded',
+            },
+            {
+                icon: EncryptIcon,
+                text: 'Share a password or a note as a secret that opens once',
+            },
+            {
+                icon: PackageReceiveIcon,
+                text: 'Ask anyone for files with a Drop, no account needed',
             },
         ],
         label: 'The link-ready card: a share link and the two files it holds.',
@@ -197,6 +208,15 @@ const steps = [
                 ),
             },
             {
+                icon: LockKeyIcon,
+                text: (
+                    <>
+                        <strong>Password:</strong> add one to a public link, so
+                        the link alone isn’t enough.
+                    </>
+                ),
+            },
+            {
                 icon: UserGroupIcon,
                 text: (
                     <>
@@ -336,85 +356,212 @@ const steps = [
         ),
     },
     {
-        title: 'See when files are downloaded',
+        title: 'Share a secret that opens once',
         description:
-            'Every transfer counts its downloads, in total and per file, and shows when the last one happened.',
+            'Send a password, an API key or a private note from Secrets. It’s encrypted in your browser before it leaves the page, and deleted once it has been viewed.',
         points: [
             {
-                icon: Download01Icon,
-                text: 'Counts are download-button clicks, including your own.',
+                icon: LockedIcon,
+                text: 'Filemax stores only scrambled text and never sees the key.',
             },
             {
                 icon: ViewIcon,
-                text: 'See when a link was first opened, even before any downloads.',
+                text: 'Let it open once or up to 5 times, and expire in 1 hour, 1 day or 7 days.',
             },
             {
-                icon: ListViewIcon,
-                text: 'Find every transfer you’ve sent in My transfers.',
+                icon: Copy01Icon,
+                text: 'Copy the link when it’s ready, or send the key separately. Filemax can’t show either again later.',
             },
         ],
-        label: 'A transfer’s Downloads card showing 9 downloads, and click counts per file.',
+        label: 'New secret: a token in the Secret field, set to open once and expire in 1 day, then the sealed box its recipient sees.',
         figure: (
             <>
-                <div className="flex flex-col gap-3.5 rounded-lg border bg-background p-5">
-                    <span className="text-sm font-semibold text-muted-foreground">
-                        Downloads
-                    </span>
-                    <div className="flex items-baseline gap-2">
-                        <strong className="font-heading text-4xl leading-none font-bold tracking-tight">
-                            9
-                        </strong>
-                        <span className="text-sm text-muted-foreground">
-                            total
+                <div className="flex flex-col gap-4 rounded-xl border bg-background p-6">
+                    <div className="flex flex-col gap-2">
+                        <span className="text-sm font-semibold">Secret</span>
+                        <span className="block rounded-md border border-input px-3.5 py-3 font-mono text-sm leading-relaxed wrap-anywhere">
+                            Token sviluppatore Google Ads:
+                            <br />
+                            Zk3p9QwL7xVb2NcTq8Rm
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <HugeiconsIcon
+                                icon={LockedIcon}
+                                size={16}
+                                aria-hidden="true"
+                            />
+                            Encrypted in your browser
                         </span>
                     </div>
-                    <div className="flex flex-col gap-1.5 border-t pt-2.5 text-sm text-muted-foreground">
-                        <span>
-                            First opened{' '}
-                            <span className="font-medium text-foreground">
-                                yesterday
-                            </span>
+                    <Pills label="Opens" options={['Once', 'Up to 5 times']} />
+                    <Pills
+                        label="Expires in"
+                        options={['1 hour', '1 day', '7 days']}
+                        selected="1 day"
+                    />
+                </div>
+                <div className="flex items-center gap-3 rounded-xl border bg-background p-4">
+                    <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                        <HugeiconsIcon
+                            icon={EncryptIcon}
+                            size={20}
+                            aria-hidden="true"
+                        />
+                    </span>
+                    <span className="flex flex-col">
+                        <strong className="text-sm">
+                            Filippo sent you a secret
+                        </strong>
+                        <span className="text-sm text-muted-foreground">
+                            Encrypted. Only your browser can unlock it.
                         </span>
-                        <span>
-                            Last downloaded{' '}
-                            <span className="font-medium text-foreground">
-                                today, 11:05
+                    </span>
+                </div>
+            </>
+        ),
+    },
+    {
+        title: 'Ask for files with a Drop',
+        description:
+            'A Drop is a link that lets anyone send you files, no account needed. Share it with a client and what they upload comes straight to you.',
+        points: [
+            {
+                icon: Upload01Icon,
+                text: 'A Drop only uploads. Whoever uses it can’t see your transfers or anyone else’s files.',
+            },
+            {
+                icon: Clock01Icon,
+                text: 'Choose how long it accepts uploads, and limit file types and sizes if you need to.',
+            },
+            {
+                icon: PackageReceiveIcon,
+                text: 'What arrives lands in My transfers, under Received, and you get an email.',
+            },
+        ],
+        label: 'A Drop’s upload page asking for photos and videos with its rules, then the files Giulia Neri sent, listed under Received.',
+        figure: (
+            <>
+                <div className="flex flex-col gap-4 rounded-xl border bg-background p-5">
+                    <div className="flex flex-col gap-3">
+                        <div className="flex items-center gap-2.5 text-sm leading-snug text-muted-foreground">
+                            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-foreground">
+                                FF
                             </span>
+                            <span>
+                                <strong className="text-foreground">
+                                    Filippo Fortino
+                                </strong>{' '}
+                                is asking for files
+                            </span>
+                        </div>
+                        <span className="font-heading text-xl font-bold tracking-tight">
+                            Foto e video — Fiera Rimini
+                        </span>
+                    </div>
+                    <div className="flex flex-col gap-2.5 rounded-lg bg-muted px-4 py-3 text-sm text-slate-700">
+                        {[
+                            { icon: Clock01Icon, text: 'Open for 14 days' },
+                            {
+                                icon: Image01Icon,
+                                text: 'Images and videos only',
+                            },
+                            {
+                                icon: Upload01Icon,
+                                text: 'Up to 2 GB per file, 10 GB in total',
+                            },
+                        ].map((rule) => (
+                            <span
+                                key={rule.text}
+                                className="flex items-center gap-2.5"
+                            >
+                                <HugeiconsIcon
+                                    icon={rule.icon}
+                                    size={16}
+                                    className="shrink-0"
+                                    aria-hidden="true"
+                                />
+                                {rule.text}
+                            </span>
+                        ))}
+                    </div>
+                    <div className="flex items-center gap-3 rounded-lg border-2 border-dashed border-slate-300 p-4">
+                        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <HugeiconsIcon
+                                icon={Upload01Icon}
+                                size={20}
+                                aria-hidden="true"
+                            />
+                        </span>
+                        <span className="font-heading text-lg font-bold tracking-tight">
+                            Drop files here
                         </span>
                     </div>
                 </div>
-                <div className="rounded-lg border bg-background px-5 pt-4 pb-1">
-                    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
-                        <span className="text-sm font-semibold">Files</span>
-                        <span className="text-sm text-muted-foreground">
-                            download clicks per file
+                <div className="flex flex-col gap-3 rounded-xl border bg-background p-5">
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold">Received</span>
+                        <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-blue-200 bg-blue-50 px-2 text-xs font-semibold text-primary">
+                            1 new
                         </span>
                     </div>
-                    <div className="border-t">
-                        <FileRow
-                            name="Lenergy_Spot30s_v3.mp4"
-                            size={1200000000}
-                            variant="owner"
-                        >
-                            <span className="min-w-3 text-right text-sm tabular-nums">
-                                6
+                    <div className="flex items-center gap-3 border-t pt-3">
+                        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
+                            GN
+                        </span>
+                        <span className="flex min-w-0 flex-1 flex-col">
+                            <strong className="text-sm">Giulia Neri</strong>
+                            <span className="text-sm text-muted-foreground">
+                                3 files · 514 MB
                             </span>
-                        </FileRow>
-                        <FileRow
-                            name="Keyvisual_Autunno_2026.psd"
-                            size={480000000}
-                            variant="owner"
-                        >
-                            <span className="min-w-3 text-right text-sm tabular-nums">
-                                3
+                        </span>
+                        <span className="hidden max-w-42.5 min-w-0 items-center gap-1.5 rounded-full border bg-muted px-2.5 py-1 text-xs font-semibold text-slate-700 sm:inline-flex">
+                            <HugeiconsIcon
+                                icon={PackageReceiveIcon}
+                                size={13}
+                                className="shrink-0"
+                                aria-hidden="true"
+                            />
+                            <span className="truncate">
+                                Foto e video — Fiera Rimini
                             </span>
-                        </FileRow>
+                        </span>
                     </div>
                 </div>
             </>
         ),
     },
 ];
+
+/** A row of illustrative radio pills, matching the real form's RadioPill look. */
+function Pills({
+    label,
+    options,
+    selected = options[0],
+}: {
+    label: string;
+    options: string[];
+    selected?: string;
+}) {
+    return (
+        <div className="flex flex-col gap-2.5">
+            <span className="text-sm font-semibold">{label}</span>
+            <div className="flex flex-wrap gap-2">
+                {options.map((option) => (
+                    <span
+                        key={option}
+                        className={cn(
+                            'inline-flex h-10 items-center rounded-full border border-input px-3',
+                            option === selected &&
+                                'border-primary bg-primary/5 font-semibold text-primary ring-1 ring-primary',
+                        )}
+                    >
+                        {option}
+                    </span>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 export default function Welcome() {
     const firstName =
