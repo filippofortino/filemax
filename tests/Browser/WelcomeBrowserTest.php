@@ -11,6 +11,7 @@ it('walks a new account through the intro and into its first transfer', function
         ->assertPathIs('/welcome')
         ->assertSee('Step 1 of 6')
         ->assertSee('Welcome to Filemax, Filippo')
+        ->assertSee('https://filemax.dev/t/8kq2vx')
         ->assertMissing('button:has-text("Back")')
         ->assertNoJavascriptErrors();
     $page->script('() => document.fonts.ready');

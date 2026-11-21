@@ -82,7 +82,7 @@ const steps = [
                     </span>
                     <div className="flex flex-wrap gap-2">
                         <span className="flex h-11 min-w-0 grow basis-48 items-center overflow-hidden rounded-md border border-input px-3 text-base whitespace-nowrap">
-                            https://filemax.mediamax.it/t/8kq2vx
+                            https://filemax.dev/t/8kq2vx
                         </span>
                         <span className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-5 text-sm font-semibold whitespace-nowrap text-primary-foreground">
                             <HugeiconsIcon
