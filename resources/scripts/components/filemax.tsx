@@ -641,11 +641,14 @@ export function FileRow({
     size,
     children,
     variant = 'default',
+    thumbnail,
 }: {
     name: string;
     size: number;
     children?: ReactNode;
     variant?: 'default' | 'upload' | 'owner' | 'recipient';
+    /** Shown in place of the file-type icon. */
+    thumbnail?: ReactNode;
 }) {
     const extension = name.split('.').pop()?.toLowerCase() ?? '';
     const icon = ['mp4', 'mov', 'avi', 'webm', 'mkv'].includes(extension)
@@ -673,15 +676,17 @@ export function FileRow({
                 variant === 'recipient' && 'min-h-15 md:min-h-14',
             )}
         >
-            <span
-                className={cn(
-                    'inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground',
-                    (variant === 'upload' || variant === 'owner') &&
-                        'bg-blue-50 text-primary',
-                )}
-            >
-                <HugeiconsIcon icon={icon} size={19} aria-hidden="true" />
-            </span>
+            {thumbnail ?? (
+                <span
+                    className={cn(
+                        'inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground',
+                        (variant === 'upload' || variant === 'owner') &&
+                            'bg-blue-50 text-primary',
+                    )}
+                >
+                    <HugeiconsIcon icon={icon} size={19} aria-hidden="true" />
+                </span>
+            )}
             <span
                 className={cn(
                     'flex min-w-0 flex-1 flex-col',

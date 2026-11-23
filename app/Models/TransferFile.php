@@ -24,6 +24,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $download_count
  * @property ?string $upload_id
  * @property int $part_size
+ * @property ?string $preview_kind image, pdf, video or audio; null when the file has no preview
+ * @property ?string $preview_status null while the preview job hasn't run, then ready or none
+ * @property ?int $page_count
+ * @property int $preview_count
  * @property-read Transfer $transfer
  */
 #[Guarded(['id'])]
@@ -51,6 +55,17 @@ final class TransferFile extends Model
         return in_array($name, ['', '.', '..'], true) ? 'file' : $name;
     }
 
+    public function previewDirectory(): string
+    {
+        return 'previews/'.$this->transfer_id.'/'.$this->id;
+    }
+
+    /** @param 'thumbnail'|'preview' $variant */
+    public function previewPath(string $variant): string
+    {
+        return $this->previewDirectory().'/'.$variant.'.webp';
+    }
+
     public function partCount(): int
     {
         return max(1, (int) ceil($this->size / $this->part_size));
@@ -64,6 +79,6 @@ final class TransferFile extends Model
     /** @return array<string, string> */
     public function casts(): array
     {
-        return ['size' => 'integer', 'position' => 'integer', 'download_count' => 'integer', 'part_size' => 'integer'];
+        return ['size' => 'integer', 'position' => 'integer', 'download_count' => 'integer', 'part_size' => 'integer', 'page_count' => 'integer', 'preview_count' => 'integer'];
     }
 }

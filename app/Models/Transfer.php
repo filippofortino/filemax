@@ -34,6 +34,8 @@ use Illuminate\Support\Str;
  * @property int $download_count
  * @property ?CarbonInterface $last_downloaded_at
  * @property ?CarbonInterface $first_downloaded_at
+ * @property int $preview_count
+ * @property ?CarbonInterface $last_previewed_at
  * @property ?CarbonInterface $expiry_reminder_sent_at
  * @property ?CarbonInterface $revoked_at
  * @property ?CarbonInterface $purged_at
@@ -101,7 +103,7 @@ final class Transfer extends Model
     /** @return HasMany<TransferFile, $this> */
     public function files(): HasMany
     {
-        return $this->hasMany(TransferFile::class)->orderBy('position');
+        return $this->hasMany(TransferFile::class)->orderBy('position')->chaperone();
     }
 
     public function isAvailable(): bool
@@ -147,6 +149,8 @@ final class Transfer extends Model
             'download_count' => 'integer',
             'last_downloaded_at' => 'datetime',
             'first_downloaded_at' => 'datetime',
+            'preview_count' => 'integer',
+            'last_previewed_at' => 'datetime',
             'expiry_reminder_sent_at' => 'datetime',
             'revoked_at' => 'datetime',
             'purged_at' => 'datetime',

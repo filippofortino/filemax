@@ -30,6 +30,8 @@ final class TransferResource extends JsonResource
             'first_opened_at' => $this->first_opened_at?->toIso8601String(),
             'download_count' => $this->download_count,
             'last_downloaded_at' => $this->last_downloaded_at?->toIso8601String(),
+            'preview_count' => $this->preview_count,
+            'last_previewed_at' => $this->last_previewed_at?->toIso8601String(),
             'revoked_at' => $this->revoked_at?->toIso8601String(),
             'available' => $available,
             'expiring_soon' => $available && $this->expires_at?->lte(now()->addHours(24)) === true,

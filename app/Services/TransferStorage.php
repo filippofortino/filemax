@@ -9,14 +9,18 @@ use App\Models\Transfer;
 use App\Models\TransferFile;
 use Aws\S3\Exception\S3Exception;
 use Aws\S3\S3ClientInterface;
+use DateTimeInterface;
 use Illuminate\Filesystem\AwsS3V3Adapter;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Psr\Http\Message\StreamInterface;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Throwable;
 
 final class TransferStorage
@@ -24,6 +28,48 @@ final class TransferStorage
     public function isRemote(): bool
     {
         return $this->disk() instanceof AwsS3V3Adapter;
+    }
+
+    /**
+     * What a page needs to draw a file's tile. Video and audio tiles load the original: the browser reads a frame and the duration from it.
+     *
+     * @return array{kind: ?string, pending: bool, page_count: ?int, thumbnail_url: ?string}
+     */
+    public function previewProps(TransferFile $file): array
+    {
+        $kind = $file->status === 'ready' ? $file->preview_kind : null;
+        $expires = now()->addHour()->min($file->transfer->expires_at ?? now()->addHour());
+
+        return [
+            'kind' => $kind,
+            'pending' => $file->status === 'ready' && $file->preview_status === null,
+            'page_count' => $file->page_count,
+            'thumbnail_url' => match ($kind) {
+                'image', 'pdf' => $this->previewUrl($file, 'thumbnail', $expires),
+                'video', 'audio' => $this->previewUrl($file, 'original', $expires),
+                default => null,
+            },
+        ];
+    }
+
+    /**
+     * A short-lived URL that shows a file in the browser instead of downloading it. Only files the preview job gave a kind
+     * reach this, so the original is always one of its allowlisted media types.
+     *
+     * @param  'thumbnail'|'preview'|'original'  $variant
+     */
+    public function previewUrl(TransferFile $file, string $variant, DateTimeInterface $expires): string
+    {
+        $original = $variant === 'original';
+
+        if (! $this->isRemote()) {
+            return URL::temporarySignedRoute('shared.files.media', $expires, ['transfer' => $file->transfer->token, 'file' => $file->id, 'variant' => $variant]);
+        }
+
+        return $this->disk()->temporaryUrl($original ? $file->path : $file->previewPath($variant), $expires, [
+            'ResponseContentType' => $original ? $file->mime_type : 'image/webp',
+            'ResponseContentDisposition' => HeaderUtils::makeDisposition('inline', $file->safeName(), str_replace('%', '', Str::ascii($file->safeName())) ?: 'preview'),
+        ]);
     }
 
     /**

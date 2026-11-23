@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Jobs\GenerateFilePreview;
 use App\Jobs\PrepareTransferArchive;
 use App\Models\Organization;
 use App\Models\Transfer;
@@ -180,7 +181,7 @@ it('keeps a hidden sender off the denied page', function (): void {
 it('shows the first four files until the recipient asks for all of them', function (): void {
     $transfer = Transfer::factory()->create();
     foreach (range(0, 5) as $position) {
-        TransferFile::factory()->for($transfer)->create(['original_name' => 'file'.$position.'.pdf', 'position' => $position]);
+        TransferFile::factory()->for($transfer)->create(['original_name' => 'file'.$position.'.pdf', 'position' => $position, 'preview_status' => 'none']);
     }
 
     visit(route('shared.show', $transfer->token))
@@ -191,6 +192,39 @@ it('shows the first four files until the recipient asks for all of them', functi
         ->press('Show fewer files')
         ->assertDontSee('file5.pdf')
         ->assertNoJavascriptErrors();
+});
+
+it('shows photos as thumbnails and opens each one in the viewer, counting previews', function (): void {
+    Storage::fake('local');
+    $transfer = Transfer::factory()->create();
+    $image = new Imagick;
+    $image->newImage(1200, 800, '#9fb3bf');
+    $image->setImageFormat('jpeg');
+    $files = collect(range(0, 9))->map(function (int $position) use ($transfer, $image): TransferFile {
+        $file = TransferFile::factory()->for($transfer)->create(['original_name' => 'Stand_00'.$position.'.jpg', 'position' => $position, 'size' => mb_strlen($image->getImageBlob(), '8bit'), 'mime_type' => 'application/octet-stream']);
+        Storage::disk('local')->put($file->path, $image->getImageBlob());
+        dispatch_sync(new GenerateFilePreview($file->id));
+
+        return $file;
+    });
+
+    visit(route('shared.show', $transfer->token))
+        ->assertSee('Stand_007.jpg')
+        ->assertDontSee('Stand_008.jpg')
+        ->assertSee('Show all 10 files')
+        ->click('[aria-label="Preview Stand_000.jpg"]')
+        ->assertSee('1 of 10')
+        ->keys('[role="dialog"]', 'ArrowRight')
+        ->assertSee('2 of 10')
+        ->keys('[role="dialog"]', 'Escape')
+        ->assertDontSee('2 of 10')
+        ->click('[aria-label="List"]')
+        ->assertPresent('[aria-label="Download Stand_000.jpg"]')
+        ->assertNoJavascriptErrors();
+
+    expect($files[0]->refresh()->preview_count)->toBe(1)
+        ->and($files[1]->refresh()->preview_count)->toBe(1)
+        ->and($transfer->refresh()->download_count)->toBe(0);
 });
 
 it('shows a scannable QR code of the shared link at desktop and phone sizes', function (): void {

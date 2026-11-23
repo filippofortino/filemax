@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Http\Resources\TransferFileResource;
+use App\Jobs\GenerateFilePreview;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Services\TransferStorage;
@@ -17,6 +18,7 @@ final class TransferFileUploadController
     {
         return $mutation->run($transfer, $file, function (TransferFile $file) use ($storage): JsonResponse {
             $storage->complete($file);
+            dispatch(new GenerateFilePreview($file->id))->afterCommit();
 
             return response()->json(['file' => new TransferFileResource($file)]);
         });
@@ -26,7 +28,7 @@ final class TransferFileUploadController
     {
         return $mutation->run($transfer, $file, function (TransferFile $file) use ($storage): JsonResponse {
             $storage->abort($file);
-            abort_unless($storage->disk()->delete($file->path), 503, 'Could not remove this file. Please retry.');
+            abort_unless($storage->disk()->delete($file->path) && $storage->disk()->deleteDirectory($file->previewDirectory()), 503, 'Could not remove this file. Please retry.');
 
             $file->delete();
 

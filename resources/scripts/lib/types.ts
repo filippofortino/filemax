@@ -46,6 +46,7 @@ export type TransferFile = {
     part_size: number;
     position: number;
     download_count: number;
+    preview_count: number;
 };
 export type Transfer = {
     id: string;
@@ -63,6 +64,8 @@ export type Transfer = {
     download_count: number;
     first_opened_at: string | null;
     last_downloaded_at: string | null;
+    preview_count: number;
+    last_previewed_at: string | null;
     expires_at: string | null;
     created_at: string;
     revoked_at: string | null;

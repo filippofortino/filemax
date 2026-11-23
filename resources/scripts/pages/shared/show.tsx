@@ -1,11 +1,22 @@
-import { QrCodeIcon } from '@hugeicons/core-free-icons';
+import {
+    GridViewIcon,
+    ListViewIcon,
+    QrCodeIcon,
+} from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Head } from '@inertiajs/react';
+import { Head, usePoll } from '@inertiajs/react';
 import { QRCodeSVG } from 'qrcode.react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Avatar } from '@/components/avatar';
 import { DownloadAll, FileDownload } from '@/components/downloads';
 import { FileRow, PasswordBadge, Shell } from '@/components/filemax';
+import {
+    FileThumbnail,
+    FileTile,
+    PreviewViewer,
+    useStableThumbnails,
+    type PreviewFile,
+} from '@/components/previews';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -15,7 +26,9 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { dateTime } from '@/lib/format';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { bytes, dateTime } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 type SharedTransfer = {
     token: string;
@@ -25,7 +38,7 @@ type SharedTransfer = {
     password_protected: boolean;
     sender: { name: string; email: string; avatar_url: string | null } | null;
     organization: string | null;
-    files: { id: string; name: string; size: number; mime_type: string }[];
+    files: (PreviewFile & { mime_type: string })[];
     total_size: number;
     expires_at: string;
 };
@@ -35,7 +48,24 @@ export default function SharedTransferPage({
 }: {
     transfer: SharedTransfer;
 }) {
+    const hasPreviews = transfer.files.some(
+        (file) => file.preview.kind !== null || file.preview.pending,
+    );
+    const pending = transfer.files.some((file) => file.preview.pending);
+    const [view, setView] = useState<'grid' | 'list'>(
+        hasPreviews ? 'grid' : 'list',
+    );
+    const grid = hasPreviews && view === 'grid';
+    const limit = grid ? 8 : 4;
     const [allFiles, setAllFiles] = useState(false);
+    const visibleFiles = transfer.files.slice(0, allFiles ? undefined : limit);
+    const [viewing, setViewing] = useState<number | null>(null);
+    const thumbnail = useStableThumbnails();
+    const poll = usePoll(5000, { only: ['transfer'] }, { autoStart: false });
+    useEffect(() => {
+        if (pending) poll.start();
+        else poll.stop();
+    }, [pending, poll]);
     const displayUrl = transfer.url.replace(/^https?:\/\//, '');
     return (
         <Shell recipient organization={transfer.organization}>
@@ -43,7 +73,12 @@ export default function SharedTransferPage({
                 <meta name="robots" content="noindex, nofollow" />
             </Head>
             <main className="flex flex-1 justify-center px-5 py-6 md:items-center md:px-10 md:pb-2">
-                <section className="flex w-full max-w-xl min-w-0 flex-col gap-6 md:gap-7 md:rounded-xl md:border md:bg-background md:p-10">
+                <section
+                    className={cn(
+                        'flex w-full max-w-xl min-w-0 flex-col gap-6 md:gap-7 md:rounded-xl md:border md:bg-background md:p-10',
+                        grid && 'md:max-w-4xl',
+                    )}
+                >
                     <div className="flex flex-col gap-3 md:gap-3.5">
                         {transfer.sender && (
                             <div className="flex items-center gap-2.5 text-sm leading-snug text-muted-foreground">
@@ -135,16 +170,88 @@ export default function SharedTransferPage({
                             </Dialog>
                         </div>
                     </div>
-                    <div>
-                        <ul className="border-y border-border">
-                            {transfer.files
-                                .slice(0, allFiles ? undefined : 4)
-                                .map((file) => (
+                    <div className="flex flex-col gap-3">
+                        {hasPreviews && (
+                            <div className="flex items-center justify-between gap-3">
+                                <h2 className="font-sans text-sm font-semibold tracking-normal">
+                                    {transfer.files.length}{' '}
+                                    {transfer.files.length === 1
+                                        ? 'file'
+                                        : 'files'}{' '}
+                                    · {bytes(transfer.total_size)}
+                                </h2>
+                                <ToggleGroup
+                                    aria-label="Show files as"
+                                    value={[view]}
+                                    variant="outline"
+                                    spacing={0}
+                                    onValueChange={(values) =>
+                                        values[0] &&
+                                        setView(values[0] as 'grid' | 'list')
+                                    }
+                                >
+                                    <ToggleGroupItem
+                                        value="grid"
+                                        aria-label="Thumbnails"
+                                    >
+                                        <HugeiconsIcon
+                                            icon={GridViewIcon}
+                                            size={18}
+                                            aria-hidden="true"
+                                        />
+                                    </ToggleGroupItem>
+                                    <ToggleGroupItem
+                                        value="list"
+                                        aria-label="List"
+                                    >
+                                        <HugeiconsIcon
+                                            icon={ListViewIcon}
+                                            size={18}
+                                            aria-hidden="true"
+                                        />
+                                    </ToggleGroupItem>
+                                </ToggleGroup>
+                            </div>
+                        )}
+                        {grid ? (
+                            <ul className="grid grid-cols-2 gap-x-3 gap-y-4 md:grid-cols-4 md:gap-x-4 md:gap-y-5">
+                                {visibleFiles.map((file) => (
+                                    <FileTile
+                                        key={file.id}
+                                        token={transfer.token}
+                                        file={file}
+                                        url={thumbnail(file)}
+                                        onOpen={() =>
+                                            setViewing(
+                                                transfer.files.indexOf(file),
+                                            )
+                                        }
+                                    />
+                                ))}
+                            </ul>
+                        ) : (
+                            <ul className="border-y border-border">
+                                {visibleFiles.map((file) => (
                                     <li key={file.id}>
                                         <FileRow
                                             name={file.name}
                                             size={file.size}
                                             variant="recipient"
+                                            thumbnail={
+                                                hasPreviews ? (
+                                                    <FileThumbnail
+                                                        file={file}
+                                                        url={thumbnail(file)}
+                                                        onOpen={() =>
+                                                            setViewing(
+                                                                transfer.files.indexOf(
+                                                                    file,
+                                                                ),
+                                                            )
+                                                        }
+                                                    />
+                                                ) : undefined
+                                            }
                                         >
                                             <FileDownload
                                                 token={transfer.token}
@@ -154,10 +261,14 @@ export default function SharedTransferPage({
                                         </FileRow>
                                     </li>
                                 ))}
-                        </ul>
-                        {transfer.files.length > 4 && (
+                            </ul>
+                        )}
+                        {transfer.files.length > limit && (
                             <Button
-                                className="mt-3 h-auto min-h-0 p-0 text-sm"
+                                className={cn(
+                                    'h-auto min-h-0 p-0 text-sm',
+                                    grid && 'self-center',
+                                )}
                                 variant="link"
                                 onClick={() => setAllFiles(!allFiles)}
                             >
@@ -167,6 +278,12 @@ export default function SharedTransferPage({
                             </Button>
                         )}
                     </div>
+                    <PreviewViewer
+                        token={transfer.token}
+                        files={transfer.files}
+                        index={viewing}
+                        onIndexChange={setViewing}
+                    />
                     <p className="text-center text-sm text-muted-foreground">
                         {transfer.files.length}{' '}
                         {transfer.files.length === 1 ? 'file' : 'files'} ·

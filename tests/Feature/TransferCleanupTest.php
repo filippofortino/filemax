@@ -191,6 +191,7 @@ it('aborts abandoned archive uploads under the byte lock before finishing a purg
     $disk->shouldReceive('getConfig')->andReturn(['bucket' => 'private-filemax']);
     $disk->shouldReceive('path')->with($archivePath)->andReturn($key);
     $disk->shouldReceive('delete')->with($archivePath)->times($abortFails ? 0 : 1)->andReturnTrue();
+    $disk->shouldReceive('deleteDirectory')->with('previews/'.$transfer->id)->once()->andReturnTrue();
     Storage::set('r2', $disk);
     config(['filemax.disk' => 'r2']);
     $job = new PurgeTransfer($transfer->id);

@@ -10,6 +10,7 @@ use App\Http\Requests\UpdateTransferSharingRequest;
 use App\Http\Resources\TransferResource;
 use App\Jobs\PurgeTransfer;
 use App\Models\Transfer;
+use App\Models\TransferFile;
 use App\Services\TransferStorage;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -111,12 +112,13 @@ final class TransferController
         ]);
     }
 
-    public function show(Request $request, Transfer $transfer): Response
+    public function show(Request $request, Transfer $transfer, TransferStorage $storage): Response
     {
         Gate::authorize('view', $transfer);
 
         return Inertia::render('transfers/show', [
             'transfer' => new TransferResource($transfer->load(['files', 'organization']))->resolve($request),
+            'previews' => $transfer->status === 'ready' && $transfer->isAvailable() ? $transfer->files->mapWithKeys(fn (TransferFile $file): array => [$file->id => $storage->previewProps($file)]) : (object) [],
             'membersCount' => $transfer->organization->users()->count(),
             'canUpdate' => Gate::allows('update', $transfer),
         ]);

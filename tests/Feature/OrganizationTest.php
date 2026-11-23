@@ -442,7 +442,7 @@ test('admin bootstrap requires an existing verified user and supports revocation
 });
 
 test('the migration moves everything that existed into a first organization and gives each user a Personal one', function (): void {
-    $this->artisan('migrate:rollback', ['--step' => 1])->assertSuccessful();
+    $this->artisan('migrate:rollback', ['--step' => 2])->assertSuccessful();
     expect(Schema::hasTable('organizations'))->toBeFalse()->and(Schema::hasTable('teams'))->toBeTrue();
 
     $now = now();
@@ -502,14 +502,14 @@ test('the migration moves everything that existed into a first organization and 
     $this->get(route('shared.show', $expired['token']))->assertGone();
     $this->flushSession()->actingAs(User::factory()->create())->get($restrictedUrl)->assertForbidden();
 
-    expect(fn () => $this->artisan('migrate:rollback', ['--step' => 1])->run())->toThrow(RuntimeException::class, 'Restore a backup');
+    expect(fn () => $this->artisan('migrate:rollback', ['--step' => 2])->run())->toThrow(RuntimeException::class, 'Restore a backup');
     expect(Schema::hasTable('teams'))->toBeFalse()->and($organization->domains()->count())->toBe(1);
 });
 
 test('organization rollback also protects workspaces with no remaining users', function (): void {
     $organization = Organization::factory()->create();
 
-    expect(fn () => $this->artisan('migrate:rollback', ['--step' => 1])->run())->toThrow(RuntimeException::class, 'Restore a backup');
+    expect(fn () => $this->artisan('migrate:rollback', ['--step' => 2])->run())->toThrow(RuntimeException::class, 'Restore a backup');
     $this->assertModelExists($organization);
     expect(Schema::hasTable('teams'))->toBeFalse();
 });
