@@ -71,6 +71,7 @@ it('converts CMYK images to sRGB for the browser', function (): void {
 
     $copy = new Imagick;
     $copy->readImageBlob(Storage::disk('local')->get($file->previewPath('preview')));
+
     expect($copy->getImageColorspace())->toBe(Imagick::COLORSPACE_SRGB);
 });
 
@@ -104,6 +105,7 @@ it('renders the first page of a PDF and counts its pages', function (): void {
     $pdf = new Imagick;
     $pdf->newImage(200, 300, 'white');
     $pdf->setImageFormat('pdf');
+
     $page = clone $pdf;
     $pdf->addImage($page);
     $file = generatePreview(storedFile(Transfer::factory()->create(), 'Brochure.pdf', $pdf->getImagesBlob()));
@@ -116,6 +118,7 @@ it('counts opening a preview apart from downloads and emails nobody', function (
     Notification::fake();
     $transfer = Transfer::factory()->create();
     $transfer->user->settings->update(['notify_transfer_downloaded' => true]);
+
     $file = generatePreview(storedFile($transfer, 'Stand_001.jpg', jpeg(800, 600)));
 
     $url = $this->postJson(route('shared.files.preview', [$transfer->token, $file]))->assertOk()->assertHeader('Cache-Control', 'no-store, private')->json('url');

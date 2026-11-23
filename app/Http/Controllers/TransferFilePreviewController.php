@@ -46,7 +46,7 @@ final class TransferFilePreviewController
 
         // Browsers refuse to show a PDF in a sandboxed document, and a PDF viewer runs apart from the page anyway.
         if ($kind !== 'pdf' || $variant !== 'original') {
-            $headers['Content-Security-Policy'] = 'sandbox; default-src \'none\'; img-src \'self\'; media-src \'self\'';
+            $headers['Content-Security-Policy'] = "sandbox; default-src 'none'; img-src 'self'; media-src 'self'";
         }
 
         // shortcut: no Range support here, so local videos can't seek; production serves them from the bucket, which can.

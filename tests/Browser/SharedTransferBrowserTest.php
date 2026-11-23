@@ -200,6 +200,7 @@ it('shows photos as thumbnails and opens each one in the viewer, counting previe
     $image = new Imagick;
     $image->newImage(1200, 800, '#9fb3bf');
     $image->setImageFormat('jpeg');
+
     $files = collect(range(0, 9))->map(function (int $position) use ($transfer, $image): TransferFile {
         $file = TransferFile::factory()->for($transfer)->create(['original_name' => 'Stand_00'.$position.'.jpg', 'position' => $position, 'size' => mb_strlen($image->getImageBlob(), '8bit'), 'mime_type' => 'application/octet-stream']);
         Storage::disk('local')->put($file->path, $image->getImageBlob());
