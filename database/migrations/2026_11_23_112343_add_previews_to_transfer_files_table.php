@@ -25,13 +25,18 @@ return new class extends Migration
         });
 
         // Files uploaded before previews existed get them too, as long as their bytes are still kept.
-        DB::table('transfer_files')
+        $ids = DB::table('transfer_files')
             ->join('transfers', 'transfers.id', '=', 'transfer_files.transfer_id')
             ->where('transfer_files.status', 'ready')
             ->whereNull('transfers.purged_at')
             ->whereNull('transfers.revoked_at')
-            ->pluck('transfer_files.id')
-            ->each(fn (string $id): mixed => dispatch(new GenerateFilePreview($id)));
+            ->pluck('transfer_files.id');
+
+        foreach ($ids as $id) {
+            if (is_string($id)) {
+                dispatch(new GenerateFilePreview($id));
+            }
+        }
     }
 
     public function down(): void
