@@ -54,8 +54,14 @@ final class GenerateFilePreview implements ShouldBeUnique, ShouldQueue
         'audio/x-flac' => ['audio', null],
     ];
 
+    /** Camera RAW files, recognised by name: what's rendered is only the JPEG found inside, so the name can't make the server decode anything else. */
+    public const array RAW_EXTENSIONS = ['3fr', 'arw', 'cr2', 'cr3', 'crw', 'dng', 'erf', 'iiq', 'kdc', 'mef', 'mos', 'mrw', 'nef', 'nrw', 'orf', 'pef', 'raf', 'rw2', 'rwl', 'sr2', 'srf', 'srw', 'x3f'];
+
     /** Bigger sources would strain the worker's memory and temporary disk; they still download as usual. */
     private const int MAX_RENDER_BYTES = 300_000_000;
+
+    /** RAW files are read into memory whole to find their JPEG. */
+    private const int MAX_RAW_BYTES = 150_000_000;
 
     public function __construct(public string $fileId) {}
 
@@ -79,7 +85,9 @@ final class GenerateFilePreview implements ShouldBeUnique, ShouldQueue
         }
 
         $mimeType = $this->sniff($storage, $file);
-        [$kind, $coder] = self::KINDS[$mimeType] ?? [null, null];
+        [$kind, $coder] = in_array(mb_strtolower(pathinfo($file->original_name, PATHINFO_EXTENSION)), self::RAW_EXTENSIONS, true)
+            ? ['image', 'raw']
+            : self::KINDS[$mimeType] ?? [null, null];
         $pageCount = null;
 
         if ($coder !== null) {
@@ -139,13 +147,28 @@ final class GenerateFilePreview implements ShouldBeUnique, ShouldQueue
             Imagick::setResourceLimit(Imagick::RESOURCETYPE_MAP, 536870912);
 
             $image = new Imagick;
+            $jpeg = $coder === 'raw' ? $this->embeddedJpeg($temporary, $file->size) : null;
+            $dimensions = $coder === 'jpeg' ? @getimagesize($temporary) : ($jpeg === null ? false : @getimagesizefromstring($jpeg));
+
             if ($coder === 'pdf') {
                 $image->setResolution(144, 144);
-            } else {
-                $image->setOption('jpeg:size', '4096x4096');
+            } elseif (is_array($dimensions) && max($dimensions[0], $dimensions[1]) > 2048) {
+                // Decodes big JPEGs at a half, quarter or eighth of their size, never below the preview's; the hint would scale smaller ones up.
+                $image->setOption('jpeg:size', '2048x2048');
             }
 
-            $image->readImage($path.'[0]');
+            if ($jpeg !== null) {
+                $image->setFormat('jpeg');
+                $image->readImageBlob($jpeg);
+
+                // The JPEG inside often leaves the rotation to the RAW file around it.
+                $exif = $image->getImageOrientation() === Imagick::ORIENTATION_UNDEFINED ? @exif_read_data($temporary) : false;
+                if (is_array($exif) && in_array($exif['Orientation'] ?? null, [1, 2, 3, 4, 5, 6, 7, 8], true)) {
+                    $image->setImageOrientation($exif['Orientation']);
+                }
+            } else {
+                $image->readImage($path.'[0]');
+            }
 
             if ($coder === 'pdf') {
                 $image->setImageBackgroundColor('white');
@@ -183,6 +206,42 @@ final class GenerateFilePreview implements ShouldBeUnique, ShouldQueue
         } finally {
             fclose($source);
         }
+    }
+
+    /**
+     * No RAW decoder runs on these servers, but cameras store a JPEG of the shot inside the RAW file: this returns the biggest one.
+     * shortcut: colours and crop are the camera's, not a fresh development of the sensor data; add libraw if photographers need that.
+     */
+    private function embeddedJpeg(string $path, int $size): string
+    {
+        throw_if($size > self::MAX_RAW_BYTES, ImagickException::class, 'Too large to search for a preview.');
+
+        $bytes = (string) file_get_contents($path);
+        $length = mb_strlen($bytes, '8bit');
+        $word = fn (int $at): int => ord($bytes[$at]) << 8 | ord($bytes[$at + 1]);
+        [$start, $largest] = [null, 0];
+
+        // One pass over the bytes: mb_strpos rescans from the start on every call, which takes half a minute here.
+        preg_match_all('/\xFF\xD8\xFF/', $bytes, $matches, PREG_OFFSET_CAPTURE);
+
+        foreach ($matches[0] as [, $offset]) {
+            // Step over the header segments to the frame header, which holds the picture's size.
+            for ($marker = $offset + 2; $marker + 9 <= $length && $bytes[$marker] === "\xFF"; $marker += 2 + $word($marker + 2)) {
+                $type = ord($bytes[$marker + 1]);
+                if ($type === 0xDA || ($type >= 0xC0 && $type <= 0xCF && ! in_array($type, [0xC4, 0xC8, 0xCC], true))) {
+                    // Only baseline and progressive frames are pictures; lossless ones hold the sensor data.
+                    if ($type <= 0xC2 && $word($marker + 5) * $word($marker + 7) > $largest) {
+                        [$start, $largest] = [$offset, $word($marker + 5) * $word($marker + 7)];
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        throw_if($start === null, ImagickException::class, 'No preview inside this RAW file.');
+
+        return mb_substr($bytes, $start, null, '8bit');
     }
 
     /**

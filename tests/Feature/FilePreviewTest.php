@@ -57,6 +57,11 @@ it('makes small WebP copies of an image and keeps no metadata but the colour pro
         ->and($file->preview_status)->toBe('ready')
         ->and($file->mime_type)->toBe('image/jpeg');
 
+    $small = new Imagick;
+    $small->readImageBlob(Storage::disk('local')->get(generatePreview(storedFile($file->transfer, 'Stand_002.jpg', jpeg(800, 600)))->previewPath('preview')));
+
+    expect($small->getImageWidth())->toBe(800);
+
     foreach (['thumbnail' => 640, 'preview' => 2048] as $variant => $edge) {
         $copy = new Imagick;
         $copy->readImageBlob(Storage::disk('local')->get($file->previewPath($variant)));
@@ -99,7 +104,25 @@ it('never shows other files in the browser, whatever their name says', function 
     'html' => ['photo.jpg', '<html><body><script>alert(1)</script></body></html>'],
     'svg' => ['logo.svg', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'],
     'broken image' => ['Stand_002.jpg', "\xFF\xD8\xFF\xE0".str_repeat('x', 200)],
+    'RAW without a JPEG inside' => ['DSC_0001.NEF', "II*\x00".str_repeat('x', 200)],
 ]);
+
+it('shows camera RAW files through the biggest JPEG inside them, turned the way the camera was held', function (): void {
+    $raw = new Imagick;
+    $raw->newImage(16, 16, 'black');
+    $raw->setImageOrientation(Imagick::ORIENTATION_LEFTBOTTOM);
+    $raw->setImageFormat('tiff');
+    // Sensor data is stored as lossless JPEG frames, bigger than any picture: those must be skipped.
+    $sensor = "\xFF\xD8\xFF\xC3\x00\x0B\x08".pack('nn', 9000, 9000)."\x01\x01\x11\x00";
+
+    $file = generatePreview(storedFile(Transfer::factory()->create(), 'DSC04188.ARW', $raw->getImageBlob().jpeg(160, 120).$sensor.jpeg(800, 600)));
+
+    expect($file->preview_kind)->toBe('image')->and($file->preview_status)->toBe('ready');
+    $copy = new Imagick;
+    $copy->readImageBlob(Storage::disk('local')->get($file->previewPath('preview')));
+
+    expect([$copy->getImageWidth(), $copy->getImageHeight()])->toBe([600, 800]);
+});
 
 it('renders the first page of a PDF and counts its pages', function (): void {
     $pdf = new Imagick;
