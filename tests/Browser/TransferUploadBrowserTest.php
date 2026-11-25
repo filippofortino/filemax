@@ -1129,3 +1129,19 @@ it('removes a whole dropped folder before sending', function (): void {
         ->assertDontSee('Left out')
         ->assertNoJavascriptErrors();
 });
+
+it('puts an icon on every file and folder picker button', function (): void {
+    $this->actingAs(User::factory()->create());
+    $hasIcon = fn (string $label): string => "[...document.querySelectorAll('main button')].some(button => button.innerText.trim() === '{$label}' && button.querySelector('svg') !== null)";
+
+    $page = visit('/')->resize(1280, 940)->assertSee('Browse files')
+        ->assertScript($hasIcon('Browse files'), true)
+        ->assertScript($hasIcon('Browse folder'), true);
+
+    $page->script(controlledTransferUploads());
+    $page->script('() => window.dropUploadFiles([4])');
+    $page->assertSee('Add more files')
+        ->assertScript($hasIcon('Add more files'), true)
+        ->assertScript($hasIcon('Add a folder'), true)
+        ->assertNoJavascriptErrors();
+});

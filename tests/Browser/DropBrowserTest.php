@@ -107,7 +107,8 @@ it('fits the uploader on a phone', function (): void {
 
     $page = visit('/d/'.$drop->token)->resize(390, 844)
         ->assertSee('Choose the files to send')
-        ->assertSee('Choose files');
+        ->assertSee('Choose files')
+        ->assertScript("[...document.querySelectorAll('main button')].some(button => button.innerText.trim() === 'Choose files' && button.querySelector('svg') !== null)", true);
     $page->script(dropFilesOnPage());
     $page->script("() => window.dropFiles([['IMG_2041.HEIC', 3], ['IMG_2047.MOV', 5], ['Preventivo_definitivo_firmato.pdf', 4]])");
     $page->assertSee('Add more files')

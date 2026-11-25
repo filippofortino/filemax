@@ -2,6 +2,7 @@ import {
     Cancel01Icon,
     Clock01Icon,
     File01Icon,
+    Files01Icon,
     Folder01Icon,
     Image01Icon,
     Tick02Icon,
@@ -560,6 +561,7 @@ function Uploader({ drop }: { drop: SharedDrop }) {
     );
     const chooseFiles = (
         <>
+            <HugeiconsIcon icon={Files01Icon} size={18} aria-hidden="true" />
             <span className="md:hidden">Choose files</span>
             <span className="hidden md:inline">Browse files</span>
         </>
