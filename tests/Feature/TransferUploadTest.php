@@ -154,6 +154,33 @@ it('uses unique private keys for duplicate unsafe names and accepts sizes beyond
     expect($response->json('transfer.files.0'))->not->toHaveKey('path');
 });
 
+it("stores each file's folder tidied, and names an untitled transfer after its first folder", function (): void {
+    $response = $this->postJson(route('transfers.store'), transferUploadPayload(['files' => [
+        ['name' => 'Stand_001.jpg', 'size' => 1, 'folder' => 'Fiera_Rimini_2026\\Foto '],
+        ['name' => 'Brochure.pdf', 'size' => 1, 'folder' => './Fiera_Rimini_2026//Stampa/'],
+        ['name' => 'Brief.pdf', 'size' => 1, 'folder' => null],
+        ['name' => 'Note.txt', 'size' => 1, 'folder' => ' / '],
+    ]]))->assertCreated()->assertJsonPath('transfer.title', 'Fiera_Rimini_2026');
+
+    expect(Transfer::query()->findOrFail($response->json('transfer.id'))->files->pluck('folder')->all())
+        ->toBe(['Fiera_Rimini_2026/Foto', 'Fiera_Rimini_2026/Stampa', null, null])
+        ->and($response->json('transfer.files.0.folder'))->toBe('Fiera_Rimini_2026/Foto');
+});
+
+it('refuses folders that could escape the zip or hide characters, and more than 1,000 files', function (array $files, string $field): void {
+    $this->postJson(route('transfers.store'), transferUploadPayload(['files' => $files]))->assertUnprocessable()->assertJsonValidationErrors($field);
+    expect(Transfer::query()->count())->toBe(0);
+})->with([
+    'parent folder' => [[['name' => 'a.txt', 'size' => 1, 'folder' => '..']], 'files.0.folder'],
+    'parent folder inside a path' => [[['name' => 'a.txt', 'size' => 1, 'folder' => 'Shoot\\..\\..\\etc']], 'files.0.folder'],
+    'parent folder padded with spaces' => [[['name' => 'a.txt', 'size' => 1, 'folder' => 'Shoot/ .. /etc']], 'files.0.folder'],
+    'only a padded parent folder' => [[['name' => 'a.txt', 'size' => 1, 'folder' => ' .. ']], 'files.0.folder'],
+    'control character' => [[['name' => 'a.txt', 'size' => 1, 'folder' => "Shoot\nPhotos"]], 'files.0.folder'],
+    'too long' => [[['name' => 'a.txt', 'size' => 1, 'folder' => str_repeat('a', 1025)]], 'files.0.folder'],
+    'not a string' => [[['name' => 'a.txt', 'size' => 1, 'folder' => ['Shoot']]], 'files.0.folder'],
+    'too many files' => [array_fill(0, 1001, ['name' => 'a.txt', 'size' => 1]), 'files'],
+]);
+
 it('validates visibility and expiry, and keeps Personal to public links', function (array $invalid): void {
     $this->postJson(route('transfers.store'), transferUploadPayload($invalid))->assertUnprocessable();
 })->with([

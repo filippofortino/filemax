@@ -228,6 +228,92 @@ it('shows photos as thumbnails and opens each one in the viewer, counting previe
         ->and($transfer->refresh()->download_count)->toBe(0);
 });
 
+it('opens folders among the thumbnails, expands them in the list and zips one folder', function (): void {
+    Storage::fake('local');
+    config(['filemax.disk' => 'local']);
+    $transfer = Transfer::factory()->create(['title' => null]);
+    $image = new Imagick;
+    $image->newImage(1200, 800, '#9fb3bf');
+    $image->setImageFormat('jpeg');
+
+    $files = [['Fiera/Foto', 'Stand_000.jpg', $image->getImageBlob()], ['Fiera/Foto', 'Stand_001.jpg', $image->getImageBlob()], ['Fiera/Stampa', 'brief.txt', 'test'], [null, 'loose.txt', 'test']];
+    foreach ($files as $position => [$folder, $name, $content]) {
+        $file = TransferFile::factory()->for($transfer)->create(['folder' => $folder, 'original_name' => $name, 'position' => $position, 'size' => mb_strlen($content, '8bit'), 'mime_type' => 'application/octet-stream']);
+        Storage::disk('local')->put($file->path, $content);
+        dispatch_sync(new GenerateFilePreview($file->id));
+    }
+
+    $page = visit(route('shared.show', $transfer->token))->resize(1280, 1060)
+        ->assertSee('Fiera')
+        ->assertSee('loose.txt')
+        ->assertDontSee('Stand_000.jpg')
+        ->click('[aria-label="Open folder Fiera, 3 files"]')
+        ->assertSee('All files')
+        ->assertVisible('[aria-label="Open folder Foto, 2 files"]')
+        ->assertDontSee('loose.txt')
+        ->click('[aria-label="Open folder Foto, 2 files"]')
+        ->assertSee('Stand_001.jpg')
+        ->click('[aria-label="List"]')
+        ->assertSee('Stand_001.jpg')
+        ->click('nav[aria-label="Folder"] button:has-text("Fiera")')
+        ->assertDontSee('brief.txt')
+        ->click('button:has-text("Stampa")')
+        ->assertSee('brief.txt')
+        ->click('[aria-label="Download Stampa as a zip"]')
+        ->waitForEvent('networkidle')
+        // While the zip prepares the button is relabelled; it comes back once the download has started.
+        ->assertEnabled('[aria-label="Download Stampa as a zip"]')
+        ->assertNoJavascriptErrors();
+
+    $archive = $transfer->archives()->sole();
+    expect($archive->folder)->toBe('Fiera/Stampa')
+        ->and($archive->archive_status)->toBe('ready')
+        ->and($archive->download_count)->toBe(1);
+    $zip = new ZipArchive;
+    expect($zip->open(Storage::disk('local')->path($archive->archive_path)))->toBeTrue()
+        ->and($zip->getFromName('Stampa/brief.txt'))->toBe('test');
+    $zip->close();
+
+    $page->click('nav[aria-label="Folder"] button:has-text("All files")')
+        ->assertSee('loose.txt')
+        ->assertNoJavascriptErrors();
+});
+
+it('shows a folder zip filling up on its button and keeps the button shown until it is ready', function (): void {
+    Storage::fake('local');
+    config(['filemax.disk' => 'local']);
+    $transfer = Transfer::factory()->create(['title' => null]);
+    $image = new Imagick;
+    $image->newImage(1200, 800, '#9fb3bf');
+    $image->setImageFormat('jpeg');
+
+    $file = TransferFile::factory()->for($transfer)->create(['folder' => 'Fiera', 'original_name' => 'Stand_000.jpg', 'size' => mb_strlen($image->getImageBlob(), '8bit'), 'mime_type' => 'application/octet-stream']);
+    Storage::disk('local')->put($file->path, $image->getImageBlob());
+    dispatch_sync(new GenerateFilePreview($file->id));
+    TransferFile::factory()->for($transfer)->create(['original_name' => 'loose.txt', 'position' => 1]);
+
+    $page = visit(route('shared.show', $transfer->token))->resize(1280, 940)->assertSee('loose.txt');
+    // The archive stays at 40% so the in-between state can be checked.
+    $page->script(<<<'JS'
+() => {
+    const fetch = window.fetch;
+    window.fetch = (url, options) => new URL(url, location.href).pathname.endsWith('/archive')
+        ? Promise.resolve(Response.json({status: 'processing', progress: 40, url: null}))
+        : fetch(url, options);
+}
+JS);
+    $page->hover('[aria-label="Open folder Fiera, 1 file"]')
+        ->click('[aria-label="Download Fiera as a zip"]')
+        ->assertVisible('[aria-label="Preparing Fiera as a zip, 40%"] svg')
+        ->assertSeeIn('[aria-label="Preparing Fiera as a zip, 40%"]', '40')
+        ->assertScript("document.querySelector('[aria-label=\"Preparing Fiera as a zip, 40%\"]').parentElement.querySelector('[role=status]').textContent", 'Preparing Fiera as a zip.')
+        ->hover('[aria-label="List"]')
+        ->wait(0.3)
+        ->assertScript("getComputedStyle(document.querySelector('[aria-label=\"Preparing Fiera as a zip, 40%\"]').closest('.absolute')).opacity", '1')
+        ->screenshot(filename: 'folder-zip-progress')
+        ->assertNoJavascriptErrors();
+});
+
 it('shows a scannable QR code of the shared link at desktop and phone sizes', function (): void {
     $transfer = Transfer::factory()->create();
     TransferFile::factory()->for($transfer)->create();

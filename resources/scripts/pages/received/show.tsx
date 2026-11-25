@@ -7,8 +7,12 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { Form, Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
 import { Avatar } from '@/components/avatar';
-import { DownloadAll, FileDownload } from '@/components/downloads';
-import { ErrorMessage, FileRow, Shell } from '@/components/filemax';
+import {
+    DownloadAll,
+    FileDownload,
+    FolderDownload,
+} from '@/components/downloads';
+import { ErrorMessage, FileRow, FolderTree, Shell } from '@/components/filemax';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -19,6 +23,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import { folderTree } from '@/lib/folders';
 import { bytes, dateTime } from '@/lib/format';
 import type { ReceivedTransfer } from '@/lib/types';
 import { index as drops } from '@/routes/drops';
@@ -46,6 +51,11 @@ export default function Show({ transfer }: { transfer: ReceivedTransfer }) {
     const sender = transfer.sender_name ?? 'Someone';
     const filesLabel = `${transfer.files_count} ${transfer.files_count === 1 ? 'file' : 'files'}`;
     const token = transfer.available ? transfer.token : null;
+    const tree = folderTree(
+        transfer.files,
+        (file) => file.folder,
+        (file) => file.size,
+    );
     const keptUntil = transfer.available
         ? transfer.expires_at
         : transfer.gone_at;
@@ -119,11 +129,10 @@ export default function Show({ transfer }: { transfer: ReceivedTransfer }) {
                             <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
                                 <h2 className="font-sans text-sm font-semibold tracking-normal">
                                     Files
-                                    {transfer.files.length > 4 && !allFiles && (
+                                    {tree.files.length > 4 && !allFiles && (
                                         <span className="font-normal text-muted-foreground">
                                             {' '}
-                                            · showing 4 of{' '}
-                                            {transfer.files.length}
+                                            · showing 4 of {tree.files.length}
                                         </span>
                                     )}
                                 </h2>
@@ -131,28 +140,50 @@ export default function Show({ transfer }: { transfer: ReceivedTransfer }) {
                                     {filesLabel} · {bytes(transfer.total_size)}
                                 </span>
                             </div>
-                            <div className="border-t">
-                                {transfer.files
-                                    .slice(0, allFiles ? undefined : 4)
-                                    .map((file) => (
-                                        <FileRow
-                                            key={file.id}
-                                            name={file.original_name}
-                                            size={file.size}
-                                            variant="owner"
-                                        >
-                                            {token && (
-                                                <FileDownload
-                                                    token={token}
-                                                    fileId={file.id}
-                                                    name={file.original_name}
-                                                    variant="owner"
-                                                />
-                                            )}
-                                        </FileRow>
-                                    ))}
-                            </div>
-                            {transfer.files.length > 4 && (
+                            <ul className="border-t">
+                                <FolderTree
+                                    node={{
+                                        ...tree,
+                                        files: tree.files.slice(
+                                            0,
+                                            allFiles ? undefined : 4,
+                                        ),
+                                    }}
+                                    variant="owner"
+                                    fileKey={(file) => file.id}
+                                    folderActions={(folder) =>
+                                        token && (
+                                            <FolderDownload
+                                                token={token}
+                                                folder={folder.path}
+                                                name={folder.name}
+                                                variant="owner"
+                                            />
+                                        )
+                                    }
+                                    renderFile={(file) => (
+                                        <li>
+                                            <FileRow
+                                                name={file.original_name}
+                                                size={file.size}
+                                                variant="owner"
+                                            >
+                                                {token && (
+                                                    <FileDownload
+                                                        token={token}
+                                                        fileId={file.id}
+                                                        name={
+                                                            file.original_name
+                                                        }
+                                                        variant="owner"
+                                                    />
+                                                )}
+                                            </FileRow>
+                                        </li>
+                                    )}
+                                />
+                            </ul>
+                            {tree.files.length > 4 && (
                                 <Button
                                     className="mt-3 h-auto min-h-0 p-0 text-sm"
                                     variant="link"
@@ -160,7 +191,7 @@ export default function Show({ transfer }: { transfer: ReceivedTransfer }) {
                                 >
                                     {allFiles
                                         ? 'Show fewer files'
-                                        : `Show all ${transfer.files.length} files`}
+                                        : `Show all ${tree.files.length} files`}
                                 </Button>
                             )}
                         </section>

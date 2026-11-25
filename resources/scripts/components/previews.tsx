@@ -3,6 +3,7 @@ import {
     ArrowRight01Icon,
     Cancel01Icon,
     File01Icon,
+    Folder01Icon,
     MusicNote01Icon,
     PlayIcon,
 } from '@hugeicons/core-free-icons';
@@ -14,7 +15,11 @@ import {
     type KeyboardEvent,
     type ReactNode,
 } from 'react';
-import { DownloadAll, FileDownload } from '@/components/downloads';
+import {
+    DownloadAll,
+    FileDownload,
+    FolderDownload,
+} from '@/components/downloads';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -32,6 +37,7 @@ import {
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
+import { plural, type FolderNode } from '@/lib/folders';
 import { bytes } from '@/lib/format';
 import { request } from '@/lib/http';
 import { cn } from '@/lib/utils';
@@ -281,6 +287,57 @@ export function FileTile({
             {/* Always shown on touch screens; on hover or keyboard focus elsewhere. */}
             <span className="absolute top-1 right-1 transition-opacity duration-150 ease-out pointer-fine:opacity-0 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover:opacity-100 [&_button]:bg-background/95 [&_button]:shadow-sm">
                 <FileDownload token={token} fileId={file.id} name={file.name} />
+            </span>
+        </li>
+    );
+}
+
+/** A folder among the thumbnails: opening it shows what's inside, the corner button zips it. */
+export function FolderTile({
+    token,
+    folder,
+    onOpen,
+}: {
+    token: string;
+    folder: FolderNode<unknown>;
+    onOpen: () => void;
+}) {
+    return (
+        <li className="group relative flex min-w-0 flex-col gap-1.5">
+            <button
+                type="button"
+                className="relative flex aspect-4/3 w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-blue-50 text-primary transition-colors duration-150 ease-out hover:bg-blue-100"
+                onClick={onOpen}
+                aria-label={`Open folder ${folder.name}, ${plural(folder.count)}`}
+            >
+                <HugeiconsIcon
+                    icon={Folder01Icon}
+                    size={48}
+                    strokeWidth={1.25}
+                    aria-hidden="true"
+                />
+                <span className="absolute bottom-2 left-2 rounded-full bg-background/90 px-2 text-xs leading-5 font-semibold text-primary">
+                    {plural(folder.count)}
+                </span>
+            </button>
+            <span className="flex min-w-0 items-baseline justify-between gap-2">
+                <span
+                    className="truncate text-sm font-medium"
+                    title={folder.name}
+                >
+                    {folder.name}
+                </span>
+                <small className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                    {bytes(folder.size)}
+                </small>
+            </span>
+            {/* Also stays shown while its zip prepares, so the progress doesn't vanish with the pointer. */}
+            <span className="absolute top-1 right-1 transition-opacity duration-150 ease-out pointer-fine:opacity-0 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover:opacity-100 pointer-fine:has-[[aria-busy=true]]:opacity-100 [&_button]:bg-background/95 [&_button]:shadow-sm">
+                <FolderDownload
+                    token={token}
+                    folder={folder.path}
+                    name={folder.name}
+                />
             </span>
         </li>
     );

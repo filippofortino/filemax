@@ -40,3 +40,32 @@ function joinOrganization(User $user, string $role = 'member', ?Organization $or
 
     return $organization;
 }
+
+/** Defines window.dropFolder([name, [children…]]), dropping a folder the way the browser hands one over: as entries to walk. */
+function folderDropScript(): string
+{
+    return <<<'JS'
+() => {
+    const file = (name, text) => {
+        const value = new File([text], name);
+        return { isFile: true, isDirectory: false, name, file: (resolve) => resolve(value) };
+    };
+    const folder = (name, children) => ({
+        isFile: false,
+        isDirectory: true,
+        name,
+        createReader: () => {
+            let read = false;
+            return { readEntries: (resolve) => { resolve(read ? [] : children); read = true; } };
+        },
+    });
+    window.dropFolder = (tree) => {
+        const build = ([name, content]) => Array.isArray(content) ? folder(name, content.map(build)) : file(name, content);
+        const root = build(tree);
+        const event = new Event('drop', { bubbles: true, cancelable: true });
+        Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'], files: [], items: [{ webkitGetAsEntry: () => root }] } });
+        document.querySelector('main').dispatchEvent(event);
+    };
+}
+JS;
+}

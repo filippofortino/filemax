@@ -42,7 +42,7 @@ final class TransferController
 
     public function store(StoreTransferRequest $request, TransferStorage $storage): JsonResponse
     {
-        /** @var array{title?: ?string, message?: ?string, visibility: string, expires_in_days: int, files: list<array{name: string, size: int, type?: ?string}>} $data */
+        /** @var array{title?: ?string, message?: ?string, visibility: string, expires_in_days: int, files: list<array{name: string, size: int, type?: ?string, folder?: ?string}>} $data */
         $data = $request->validated();
         $passwordHash = $request->boolean('password_protected') ? Hash::make($request->string('password')->toString()) : null;
         $transfer = DB::transaction(function () use ($request, $data, $storage, $passwordHash): Transfer {
@@ -58,6 +58,7 @@ final class TransferController
             foreach ($data['files'] as $position => $file) {
                 $transfer->files()->create([
                     'original_name' => $file['name'],
+                    'folder' => TransferFile::normaliseFolder($file['folder'] ?? null),
                     'path' => 'transfers/'.$transfer->id.'/'.Str::uuid(),
                     'size' => $file['size'],
                     'position' => $position,
@@ -121,6 +122,7 @@ final class TransferController
             'previews' => $transfer->status === 'ready' && $transfer->isAvailable() ? $transfer->files->mapWithKeys(fn (TransferFile $file): array => [$file->id => $storage->previewProps($file)]) : (object) [],
             'membersCount' => $transfer->organization->users()->count(),
             'canUpdate' => Gate::allows('update', $transfer),
+            'folderDownloads' => (object) $transfer->archives()->pluck('download_count', 'folder')->all(),
         ]);
     }
 
@@ -179,7 +181,7 @@ final class TransferController
                 LOWER(COALESCE(
                     title,
                     (
-                        SELECT original_name
+                        SELECT COALESCE(folder, original_name)
                         FROM transfer_files
                         WHERE transfer_files.transfer_id = transfers.id
                         ORDER BY position

@@ -49,7 +49,7 @@ final class DropReceived extends Notification implements ShouldQueueAfterCommit
         }
 
         foreach ($files->take(self::LISTED_FILES) as $file) {
-            $mail->line($this->escape($file->original_name).' — '.$this->bytes($file->size));
+            $mail->line($this->escape(($file->folder !== null ? $file->folder.'/' : '').$file->original_name).' — '.$this->bytes($file->size));
         }
 
         if ($count > self::LISTED_FILES) {

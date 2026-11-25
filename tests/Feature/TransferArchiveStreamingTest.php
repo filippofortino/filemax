@@ -131,6 +131,39 @@ it('streams valid multipart ZIP contents including unique safe names and an empt
     }
 });
 
+it('sizes the archive for long folder names written in both zip headers', function (): void {
+    $requestedAt = now()->format('Y-m-d H:i:s');
+    $transfer = Transfer::factory()->create(['archive_status' => 'pending', 'archive_requested_at' => $requestedAt]);
+    // 15 folders of 60 three-byte characters: a 2.7 KB entry name, written twice.
+    $folder = implode('/', array_fill(0, 15, str_repeat('展', 60)));
+    $file = TransferFile::factory()->for($transfer)->create(['folder' => $folder, 'original_name' => 'a.txt', 'size' => 1]);
+    $archive = '';
+
+    streamingArchiveStorage(function (CommandInterface $command) use ($file, &$archive): Result {
+        return match ($command->getName()) {
+            'ListMultipartUploads' => new Result(['Uploads' => []]),
+            'CreateMultipartUpload' => new Result(['UploadId' => 'long-names']),
+            'GetObject' => new Result(['Body' => streamingArchiveSource($file->size, 'a')]),
+            'UploadPart' => (function () use ($command, &$archive): Result {
+                $archive .= stream_get_contents($command['Body']);
+
+                return new Result(['ETag' => 'etag-'.$command['PartNumber']]);
+            })(),
+            'CompleteMultipartUpload' => new Result,
+            default => throw new RuntimeException('Unexpected storage command: '.$command->getName()),
+        };
+    });
+
+    new PrepareTransferArchive($transfer->id, $requestedAt)->handle(resolve(TransferStorage::class));
+
+    expect($transfer->refresh()->archive_status)->toBe('ready');
+    Storage::disk('local')->put('long-names.zip', $archive);
+    $zip = new ZipArchive;
+    expect($zip->open(Storage::disk('local')->path('long-names.zip'), ZipArchive::CHECKCONS))->toBeTrue()
+        ->and($zip->getNameIndex(0))->toBe($folder.'/a.txt');
+    $zip->close();
+});
+
 it('aborts the multipart archive when a transfer is revoked during upload', function (): void {
     $requestedAt = now()->format('Y-m-d H:i:s');
     $transfer = Transfer::factory()->create(['archive_status' => 'pending', 'archive_requested_at' => $requestedAt]);

@@ -69,7 +69,7 @@ it('lets someone without an account send files through a Drop, leaving out what 
         ->assertSee('Filippo Fortino')
         ->assertSee('is asking for files')
         ->assertSee('Foto e video — Fiera Rimini')
-        ->assertSee('Drop files here');
+        ->assertSee('Drop files');
     $page->script(dropFilesOnPage());
     $page->script("() => window.dropFiles([['a.jpg', 8], ['big.jpg', 15], ['raw.zip', 4], ['b.jpg', 9], ['c.jpg', 6], ['d.jpg', 3]])");
 
@@ -96,7 +96,7 @@ it('lets someone without an account send files through a Drop, leaving out what 
         ->and($transfer->files()->pluck('original_name')->all())->toBe(['a.jpg', 'b.jpg', 'd.jpg']);
 
     $page->click('Send more files')
-        ->assertSee('Drop files here')
+        ->assertSee('Drop files')
         ->assertValue('#uploader-name', 'Giulia Neri')
         ->assertValue('#uploader-message', '')
         ->assertNoJavascriptErrors();
@@ -148,7 +148,7 @@ it('leaves out the owner’s name and photo when they hide it', function (): voi
 it('shows the closed page when the Drop closes while the form is open', function (): void {
     $drop = Drop::factory()->create();
 
-    $page = visit('/d/'.$drop->token)->assertSee('Drop files here');
+    $page = visit('/d/'.$drop->token)->assertSee('Drop files');
     $page->script(dropFilesOnPage());
     $page->script("() => window.dropFiles([['a.jpg', 4]])");
 
@@ -201,4 +201,25 @@ it('lists Drops and received files without overflowing a phone', function (): vo
     }
 
     $page->assertNoJavascriptErrors();
+});
+
+it('sends a dropped folder through a Drop, flagging the files inside that don’t fit', function (): void {
+    $owner = User::factory()->create(['name' => 'Filippo Fortino']);
+    $drop = Drop::factory()->for($owner)->create(['file_types' => ['images']]);
+
+    $page = visit('/d/'.$drop->token)->resize(1280, 1480)->assertSee('Drop files or folders here');
+    $page->script(folderDropScript());
+    $page->script("() => window.dropFolder(['Selezione', [['a.jpg', 'aaaa'], ['raw.zip', 'zz'], ['Video', [['b.jpg', 'bb']]]]])");
+
+    $page->assertSee('1 doesn’t fit')
+        ->assertSee('1 file won’t be sent because it doesn’t fit this Drop’s rules.')
+        ->fill('#uploader-name', 'Giulia Neri')
+        ->click('button[type="submit"]')
+        ->assertSee('Files sent')
+        ->assertSee('Selezione')
+        ->assertNoJavascriptErrors();
+
+    $transfer = Transfer::query()->sole();
+    expect($transfer->files->map(fn (TransferFile $file): array => [$file->folder, $file->original_name])->all())
+        ->toBe([['Selezione', 'a.jpg'], ['Selezione/Video', 'b.jpg']]);
 });

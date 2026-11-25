@@ -12,7 +12,7 @@ it('keeps the main navigation in place and offers a new transfer button outside 
     $navigationLeft = '() => document.querySelector(\'nav[aria-label="Main navigation"]\').getBoundingClientRect().left';
 
     $page = visit('/')->resize(1280, 940)
-        ->assertSee('Drop files here')
+        ->assertSee('Drop files')
         ->assertSeeIn('nav[aria-label="Main navigation"] a[aria-current="page"]', 'New transfer')
         ->assertMissing('header a[aria-label="New transfer"]');
     $page->script('() => document.fonts.ready');
@@ -63,7 +63,7 @@ it('keeps the main navigation in place and offers a new transfer button outside 
 
     $page->click('nav a:has-text("My transfers")')
         ->click('header a[aria-label="New transfer"]')
-        ->assertSee('Drop files here')
+        ->assertSee('Drop files')
         ->assertNoJavascriptErrors();
 });
 

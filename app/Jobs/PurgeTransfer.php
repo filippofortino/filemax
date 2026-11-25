@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\Transfer;
+use App\Models\TransferArchive;
 use App\Services\TransferStorage;
 use DateTimeInterface;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -88,8 +89,16 @@ final class PurgeTransfer implements ShouldBeUnique, ShouldQueue
 
             throw_unless($storage->disk()->delete($archivePath), RuntimeException::class, 'Could not delete the transfer archive.');
 
+            foreach ($transfer->archives as $archive) {
+                $storage->abortArchiveUploads(TransferArchive::storagePath($transfer->id, $archive->folder));
+            }
+
+            throw_unless($storage->disk()->deleteDirectory('archives/'.$transfer->id), RuntimeException::class, 'Could not delete the folder archives.');
+
             throw_unless(Storage::disk('local')->deleteDirectory('uploads/'.$transfer->id), RuntimeException::class, 'Could not delete temporary upload parts.');
 
+            // Rows first: once purged_at is set, a retry returns early and would leave them behind.
+            $transfer->archives()->delete();
             $transfer->forceFill(['purged_at' => now(), 'archive_path' => null, 'archive_status' => null, 'archive_progress' => 0])->save();
         } finally {
             $lock->release();

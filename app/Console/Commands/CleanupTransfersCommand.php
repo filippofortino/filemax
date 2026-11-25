@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Jobs\PurgeTransfer;
 use App\Models\Transfer;
+use App\Models\TransferArchive;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -30,9 +31,11 @@ final class CleanupTransfersCommand extends Command
             $count++;
         });
 
-        Transfer::query()->whereIn('archive_status', ['pending', 'processing'])
-            ->where('archive_requested_at', '<=', now()->subHours(4))
-            ->update(['archive_status' => 'failed', 'archive_progress' => 0]);
+        foreach ([Transfer::query(), TransferArchive::query()] as $archives) {
+            $archives->whereIn('archive_status', ['pending', 'processing'])
+                ->where('archive_requested_at', '<=', now()->subHours(4))
+                ->update(['archive_status' => 'failed', 'archive_progress' => 0]);
+        }
 
         $temporaryDirectory = storage_path('app/archive-tmp');
 
