@@ -261,6 +261,8 @@ it('opens folders among the thumbnails, expands them in the list and zips one fo
         ->assertSee('brief.txt')
         ->click('[aria-label="Download Stampa as a zip"]')
         ->waitForEvent('networkidle')
+        // While the zip prepares the button is relabelled; it comes back once the download has started.
+        ->assertEnabled('[aria-label="Download Stampa as a zip"]')
         ->assertNoJavascriptErrors();
 
     $archive = $transfer->archives()->sole();
