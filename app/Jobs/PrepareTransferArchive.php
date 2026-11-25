@@ -124,7 +124,7 @@ final class PrepareTransferArchive implements ShouldBeUnique, ShouldQueue
                     $folders = [];
                     foreach ($files as $file) {
                         $path = '';
-                        foreach (array_filter(explode('/', $this->entryDirectory($file))) as $segment) {
+                        foreach (array_filter(explode('/', $this->entryDirectory($file)), fn (string $segment): bool => $segment !== '') as $segment) {
                             $path .= $segment;
                             $folders[mb_strtolower($path)] = true;
                             $path .= '/';
