@@ -1,5 +1,6 @@
 import {
     Cancel01Icon,
+    Files01Icon,
     Folder01Icon,
     Globe02Icon,
     Tick02Icon,
@@ -711,6 +712,11 @@ export default function Create() {
                                     aria-describedby="submit-hint"
                                     onClick={() => picker.current?.click()}
                                 >
+                                    <HugeiconsIcon
+                                        icon={Files01Icon}
+                                        size={18}
+                                        aria-hidden="true"
+                                    />
                                     Browse files
                                 </Button>
                                 {/* Phones can't pick a folder. */}
@@ -839,6 +845,11 @@ export default function Create() {
                                         className="flex-1"
                                         onClick={() => picker.current?.click()}
                                     >
+                                        <HugeiconsIcon
+                                            icon={Files01Icon}
+                                            size={16}
+                                            aria-hidden="true"
+                                        />
                                         Add more files
                                     </Button>
                                     <Button
@@ -848,6 +859,11 @@ export default function Create() {
                                             folderPicker.current?.click()
                                         }
                                     >
+                                        <HugeiconsIcon
+                                            icon={Folder01Icon}
+                                            size={16}
+                                            aria-hidden="true"
+                                        />
                                         Add a folder
                                     </Button>
                                 </div>
