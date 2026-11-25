@@ -8,11 +8,16 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Form, Head, Link, router, useForm, usePoll } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
-import { DownloadAll, FileDownload } from '@/components/downloads';
+import {
+    DownloadAll,
+    FileDownload,
+    FolderDownload,
+} from '@/components/downloads';
 import {
     CopyLink,
     ErrorMessage,
     FileRow,
+    FolderTree,
     PasswordBadge,
     Shell,
 } from '@/components/filemax';
@@ -32,6 +37,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
+import { folderTree } from '@/lib/folders';
 import { bytes, date, dateTime, relativeDay } from '@/lib/format';
 import type { Transfer, TransferFile } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -41,13 +47,21 @@ export default function Show({
     membersCount,
     canUpdate,
     previews,
+    folderDownloads,
 }: {
     transfer: Transfer;
     membersCount: number;
     canUpdate: boolean;
     previews: Record<string, FilePreview>;
+    /** How many times each folder was downloaded as a zip. */
+    folderDownloads: Record<string, number>;
 }) {
     const [allFiles, setAllFiles] = useState(false);
+    const tree = folderTree(
+        transfer.files,
+        (file) => file.folder,
+        (file) => file.size,
+    );
     const thumbnail = useStableThumbnails();
     const pending = Object.values(previews).some((preview) => preview.pending);
     const poll = usePoll(5000, { only: ['previews'] }, { autoStart: false });
@@ -330,42 +344,78 @@ export default function Show({
                                     previews · downloads per file
                                 </span>
                             </div>
-                            <div className="border-t">
-                                {transfer.files
-                                    .slice(0, allFiles ? undefined : 4)
-                                    .map((file) => (
-                                        <FileRow
-                                            key={file.id}
-                                            name={file.original_name}
-                                            size={file.size}
-                                            variant="owner"
-                                            thumbnail={ownerThumbnail(file)}
-                                        >
+                            <ul className="border-t">
+                                <FolderTree
+                                    node={{
+                                        ...tree,
+                                        files: tree.files.slice(
+                                            0,
+                                            allFiles ? undefined : 4,
+                                        ),
+                                    }}
+                                    variant="owner"
+                                    fileKey={(file) => file.id}
+                                    folderActions={(folder) => (
+                                        <>
                                             {transfer.available && (
-                                                <FileDownload
+                                                <FolderDownload
                                                     token={transfer.token}
-                                                    fileId={file.id}
-                                                    name={file.original_name}
+                                                    folder={folder.path}
+                                                    name={folder.name}
                                                     variant="owner"
                                                     onDownload={refresh}
                                                 />
                                             )}
                                             <span
-                                                className="min-w-3 text-right text-sm text-muted-foreground tabular-nums"
-                                                title="Times opened in the viewer"
-                                            >
-                                                {file.preview_count || '—'}
-                                            </span>
+                                                className="min-w-3"
+                                                aria-hidden="true"
+                                            />
                                             <span
                                                 className="min-w-3 text-right text-sm tabular-nums"
-                                                title="Download-button actions"
+                                                title="Times this folder was downloaded as a zip"
                                             >
-                                                {file.download_count || '—'}
+                                                {folderDownloads[folder.path] ||
+                                                    '—'}
                                             </span>
-                                        </FileRow>
-                                    ))}
-                            </div>
-                            {transfer.files.length > 4 && (
+                                        </>
+                                    )}
+                                    renderFile={(file) => (
+                                        <li>
+                                            <FileRow
+                                                name={file.original_name}
+                                                size={file.size}
+                                                variant="owner"
+                                                thumbnail={ownerThumbnail(file)}
+                                            >
+                                                {transfer.available && (
+                                                    <FileDownload
+                                                        token={transfer.token}
+                                                        fileId={file.id}
+                                                        name={
+                                                            file.original_name
+                                                        }
+                                                        variant="owner"
+                                                        onDownload={refresh}
+                                                    />
+                                                )}
+                                                <span
+                                                    className="min-w-3 text-right text-sm text-muted-foreground tabular-nums"
+                                                    title="Times opened in the viewer"
+                                                >
+                                                    {file.preview_count || '—'}
+                                                </span>
+                                                <span
+                                                    className="min-w-3 text-right text-sm tabular-nums"
+                                                    title="Download-button actions"
+                                                >
+                                                    {file.download_count || '—'}
+                                                </span>
+                                            </FileRow>
+                                        </li>
+                                    )}
+                                />
+                            </ul>
+                            {tree.files.length > 4 && (
                                 <Button
                                     className="mt-3 h-auto min-h-0 p-0 text-sm"
                                     variant="link"
@@ -373,7 +423,7 @@ export default function Show({
                                 >
                                     {allFiles
                                         ? 'Show fewer files'
-                                        : `Show all ${transfer.files.length} files`}
+                                        : `Show all ${tree.files.length} files`}
                                 </Button>
                             )}
                         </section>

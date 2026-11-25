@@ -282,7 +282,33 @@ it('validates what the uploader sends', function (array $input, string $field): 
     'over the total' => [['files' => [['name' => 'a.mov', 'size' => 2_000_000_000], ['name' => 'b.mov', 'size' => 1_500_000_000]]], 'files'],
     'right-to-left override in a file name' => [['files' => [['name' => "invoice\u{202E}gpj.exe", 'size' => 5]]], 'files.0.name'],
     'negative size' => [['files' => [['name' => 'a.jpg', 'size' => -1]]], 'files.0.size'],
+    'folder climbing out of the zip' => [['files' => [['name' => 'a.jpg', 'size' => 1, 'folder' => 'Foto/../..']]], 'files.0.folder'],
+    'right-to-left override in a folder' => [['files' => [['name' => 'a.jpg', 'size' => 1, 'folder' => "Foto\u{202E}gpj"]]], 'files.0.folder'],
+    'folder path too long' => [['files' => [['name' => 'a.jpg', 'size' => 1, 'folder' => str_repeat('a', 1025)]]], 'files.0.folder'],
 ]);
+
+it("keeps the folders a Drop upload came in and lists them in the owner's email", function (): void {
+    Notification::fake();
+    $drop = Drop::factory()->create();
+    $response = startDropSubmission($drop, [['name' => 'Stand_001.jpg', 'size' => 5, 'folder' => 'Selezione_Giulia\\Foto'], ['name' => 'Reel.mp4', 'size' => 4, 'folder' => 'Selezione_Giulia/Video/']])
+        ->assertCreated()
+        ->assertJsonPath('submission.files.0.folder', 'Selezione_Giulia/Foto')
+        ->assertJsonPath('submission.files.1.folder', 'Selezione_Giulia/Video');
+    $id = $response->json('submission.id');
+
+    foreach ([0 => 'hello', 1 => 'reel'] as $index => $content) {
+        $fileId = $response->json('submission.files.'.$index.'.id');
+        putDropPart($id, $fileId, $content)->assertOk();
+        $this->postJson(route('shared.drops.uploads.complete', [$id, $fileId]))->assertOk();
+    }
+
+    $this->postJson(route('shared.drops.uploads.finalize', $id))->assertOk();
+    Notification::assertSentTo($drop->user, DropReceived::class, function (DropReceived $notification) use ($drop): bool {
+        $lines = implode("\n", $notification->toMail($drop->user)->introLines);
+
+        return str_contains($lines, 'Selezione_Giulia/Foto/Stand_001.jpg') && str_contains($lines, 'Selezione_Giulia/Video/Reel.mp4');
+    });
+});
 
 it('limits new submissions per network', function (): void {
     $drop = Drop::factory()->create();

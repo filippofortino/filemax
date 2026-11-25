@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Models\Drop;
+use App\Models\TransferFile;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -28,7 +29,8 @@ final class StoreDropSubmissionRequest extends FormRequest
             'sender_name' => ['required', 'string', 'max:120', 'not_regex:'.self::HIDDEN_CHARACTERS],
             'message' => ['nullable', 'string', 'max:2000'],
             'files' => ['required', 'array', 'list', 'min:1', 'max:500'],
-            'files.*' => ['required', 'array:name,size,type'],
+            'files.*' => ['required', 'array:name,size,type,folder'],
+            'files.*.folder' => ['nullable', 'string', 'max:1024', 'not_regex:'.TransferFile::UNSAFE_FOLDER],
             'files.*.name' => ['required', 'string', 'max:255', 'not_regex:'.self::HIDDEN_CHARACTERS],
             'files.*.size' => ['required', 'integer', 'min:0', 'max:'.$this->drop()->maxFileSize()],
             'files.*.type' => ['nullable', 'string', 'max:255'],
@@ -42,6 +44,7 @@ final class StoreDropSubmissionRequest extends FormRequest
             'sender_name.required' => 'Enter your name so the recipient knows who sent the files.',
             'sender_name.not_regex' => 'Your name can’t contain line breaks or hidden characters.',
             'files.*.name.not_regex' => 'A file name contains hidden characters. Rename the file and try again.',
+            'files.*.folder.not_regex' => 'A folder name contains hidden characters. Rename the folder and try again.',
             'files.*.size.max' => 'A file is larger than this Drop accepts.',
         ];
     }

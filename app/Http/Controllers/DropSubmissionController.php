@@ -23,7 +23,7 @@ final class DropSubmissionController
 {
     public function store(StoreDropSubmissionRequest $request, Drop $drop, TransferStorage $storage): JsonResponse
     {
-        /** @var array{sender_name: string, message?: ?string, files: list<array{name: string, size: int, type?: ?string}>} $data */
+        /** @var array{sender_name: string, message?: ?string, files: list<array{name: string, size: int, type?: ?string, folder?: ?string}>} $data */
         $data = $request->validated();
         $transfer = DB::transaction(function () use ($drop, $data, $storage): Transfer {
             // Member removal locks the owner before closing their Drops and cancelling unfinished submissions.
@@ -42,6 +42,7 @@ final class DropSubmissionController
             foreach ($data['files'] as $position => $file) {
                 $transfer->files()->create([
                     'original_name' => $file['name'],
+                    'folder' => TransferFile::normaliseFolder($file['folder'] ?? null),
                     'path' => 'transfers/'.$transfer->id.'/'.Str::uuid(),
                     'size' => $file['size'],
                     'position' => $position,

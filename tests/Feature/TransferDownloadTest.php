@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Jobs\PrepareTransferArchive;
+use App\Jobs\PurgeTransfer;
 use App\Models\Organization;
 use App\Models\Transfer;
 use App\Models\TransferFile;
@@ -173,6 +174,75 @@ it('builds archives with safe unique names and counts bundles independently of f
     expect($names)->toBe(['report.txt', 'report (2).txt', 'report (2) (2).txt', 'REPORT (3).txt', 'report_.txt', 'report_ (2).txt']);
     $this->postJson(route('shared.download', $transfer->token))->assertOk();
     expect($transfer->refresh()->download_count)->toBe(2)->and($transfer->files()->sum('download_count'))->toBe(0);
+});
+
+/** @return list<string> */
+function zipEntryNames(string $path): array
+{
+    $zip = new ZipArchive;
+    expect($zip->open($path))->toBeTrue();
+    $names = [];
+    for ($index = 0; $index < $zip->numFiles; $index++) {
+        $names[] = $zip->getNameIndex($index);
+    }
+
+    $zip->close();
+
+    return $names;
+}
+
+it("keeps folders in the zip, zips one folder on its own and counts each folder's zips", function (): void {
+    $transfer = Transfer::factory()->create(['title' => null]);
+    $files = [
+        ['Fiera/Foto', 'a.jpg'],
+        ['Fiera/Foto', 'A.jpg'],
+        ['Fiera/Stampa', 'b.pdf'],
+        ['Fiera/Bozze?', 'x.txt'],
+        ['Fiera_2', 'c.txt'],
+        [null, 'loose.txt'],
+    ];
+    foreach ($files as $position => [$folder, $name]) {
+        $file = TransferFile::factory()->for($transfer)->create(['folder' => $folder, 'original_name' => $name, 'position' => $position]);
+        Storage::disk('local')->put($file->path, 'test');
+    }
+
+    $this->postJson(route('shared.download', $transfer->token))->assertOk()->assertJsonPath('status', 'ready');
+    expect(zipEntryNames(Storage::disk('local')->path($transfer->refresh()->archive_path)))
+        ->toBe(['Fiera/Foto/a.jpg', 'Fiera/Foto/A (2).jpg', 'Fiera/Stampa/b.pdf', 'Fiera/Bozze_/x.txt', 'Fiera_2/c.txt', 'loose.txt']);
+
+    $photos = $this->postJson(route('shared.download', $transfer->token), ['folder' => 'Fiera/Foto'])->assertOk()->assertJsonPath('status', 'ready');
+    $this->getJson(route('shared.archive', ['transfer' => $transfer->token, 'folder' => 'Fiera/Foto']))->assertOk()->assertJsonPath('url', $photos->json('url'));
+    $this->get($photos->json('url'))->assertOk()->assertDownload('foto.zip');
+    $this->postJson(route('shared.download', $transfer->token), ['folder' => 'Fiera'])->assertOk();
+    $this->postJson(route('shared.download', $transfer->token), ['folder' => 'Fiera/Foto'])->assertOk();
+    $archives = $transfer->archives()->get()->keyBy('folder');
+
+    expect(zipEntryNames(Storage::disk('local')->path($archives['Fiera/Foto']->archive_path)))->toBe(['Foto/a.jpg', 'Foto/A (2).jpg'])
+        ->and(zipEntryNames(Storage::disk('local')->path($archives['Fiera']->archive_path)))->toBe(['Fiera/Foto/a.jpg', 'Fiera/Foto/A (2).jpg', 'Fiera/Stampa/b.pdf', 'Fiera/Bozze_/x.txt'])
+        ->and($archives['Fiera/Foto']->download_count)->toBe(2)
+        ->and($archives['Fiera']->download_count)->toBe(1)
+        ->and($transfer->refresh()->download_count)->toBe(4)
+        ->and($transfer->displayTitle())->toBe('Fiera');
+
+    foreach (['Fie', 'Nope', 'Fiera/Foto/a.jpg'] as $unknown) {
+        $this->postJson(route('shared.download', $transfer->token), ['folder' => $unknown])->assertNotFound();
+        $this->get(route('shared.archive.download', ['transfer' => $transfer->token, 'folder' => $unknown]))->assertNotFound();
+    }
+
+    $transfer->update(['revoked_at' => now()]);
+    new PurgeTransfer($transfer->id)->handle(resolve(TransferStorage::class));
+    Storage::disk('local')->assertMissing('archives/'.$transfer->id);
+    expect($transfer->archives()->count())->toBe(0);
+});
+
+it('keeps folder zips to people who may download the transfer', function (): void {
+    $transfer = Transfer::factory()->membersOnly()->create();
+    $file = TransferFile::factory()->for($transfer)->create(['folder' => 'Foto']);
+    Storage::disk('local')->put($file->path, 'test');
+
+    $this->postJson(route('shared.download', $transfer->token), ['folder' => 'Foto'])->assertForbidden();
+    $this->postJson(route('shared.download', $transfer->token), ['folder' => 'Nope'])->assertForbidden();
+    expect($transfer->archives()->count())->toBe(0);
 });
 
 it('rechecks access while archives prepare and when they are retrieved', function (): void {

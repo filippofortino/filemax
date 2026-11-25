@@ -50,6 +50,7 @@ use Illuminate\Support\Str;
  * @property CarbonInterface $updated_at
  * @property-read User $user
  * @property-read Collection<int, TransferFile> $files
+ * @property-read Collection<int, TransferArchive> $archives
  * @property-read ?Drop $drop
  */
 #[Guarded(['id'])]
@@ -100,6 +101,18 @@ final class Transfer extends Model
         return $this->belongsTo(Drop::class);
     }
 
+    /** @return HasMany<TransferArchive, $this> */
+    public function archives(): HasMany
+    {
+        return $this->hasMany(TransferArchive::class);
+    }
+
+    /** Whether any file sits in this folder or below it. */
+    public function hasFolder(string $folder): bool
+    {
+        return $this->files->contains->isIn($folder);
+    }
+
     /** @return HasMany<TransferFile, $this> */
     public function files(): HasMany
     {
@@ -136,7 +149,9 @@ final class Transfer extends Model
 
     public function displayTitle(): string
     {
-        return $this->title ?? ($this->files->first()->original_name ?? 'Untitled transfer');
+        $first = $this->files->first();
+
+        return $this->title ?? ($first?->folder !== null ? Str::before($first->folder, '/') : ($first->original_name ?? 'Untitled transfer'));
     }
 
     /** @return array<string, string> */

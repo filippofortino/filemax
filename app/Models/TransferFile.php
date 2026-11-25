@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $id
  * @property string $transfer_id
  * @property string $original_name
+ * @property ?string $folder the folder it was dropped in, relative to what was dropped ("Shoot/Photos"); null for a loose file
  * @property string $path
  * @property int $size
  * @property string $mime_type
@@ -39,7 +40,24 @@ final class TransferFile extends Model
 
     use HasUuids;
 
+    /** A ".." segment, which could climb out of the zip, or hidden characters, which could disguise a name. */
+    public const string UNSAFE_FOLDER = '#(^|[/\\\\])\.\.([/\\\\]|$)|[\p{Cc}\p{Cf}]#u';
+
     protected $attributes = ['status' => 'uploading', 'mime_type' => 'application/octet-stream', 'position' => 0, 'download_count' => 0, 'part_size' => 5242880];
+
+    /** Joins a browser's relative folder path into trimmed "/"-separated segments, or null when nothing is left. */
+    public static function normaliseFolder(?string $folder): ?string
+    {
+        $segments = array_filter(array_map(trim(...), preg_split('#[/\\\\]#', (string) $folder) ?: []), fn (string $segment): bool => ! in_array($segment, ['', '.'], true));
+
+        return $segments === [] ? null : implode('/', $segments);
+    }
+
+    /** Whether the file sits in the folder or anywhere below it. */
+    public function isIn(string $folder): bool
+    {
+        return $this->folder !== null && ($this->folder === $folder || str_starts_with($this->folder, $folder.'/'));
+    }
 
     /** @return BelongsTo<Transfer, $this> */
     public function transfer(): BelongsTo

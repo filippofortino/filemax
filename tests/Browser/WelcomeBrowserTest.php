@@ -26,7 +26,7 @@ it('walks a new account through the intro and into its first transfer', function
     $page->assertDontSee('Skip intro')->assertDontSee('Once downloaded')
         ->press('Back')->assertSee('Step 5 of 6')
         ->press('Next')->click('Create your first transfer')
-        ->assertSee('Drop files here')
+        ->assertSee('Drop files')
         ->assertNoJavascriptErrors();
 });
 
@@ -35,7 +35,7 @@ it('lets a new account skip the intro', function (): void {
 
     visit('/')->assertSee('Step 1 of 6')
         ->click('Skip intro')
-        ->assertSee('Drop files here')
+        ->assertSee('Drop files')
         ->assertNoJavascriptErrors();
 });
 

@@ -379,10 +379,10 @@ JS);
             ->and($page->script('() => window.fileCompletions'))->toBe([])
             ->and($page->script('() => window.finalizations'))->toBe(0);
         $page->script('() => window.releaseDelete()');
-        $page->assertSee('Drop files here')->assertMissing('[role="alert"]');
+        $page->assertSee('Drop files')->assertMissing('[role="alert"]');
 
         expect(Transfer::query()->sole()->revoked_at)->not->toBeNull();
-        $page->click('My transfers')->assertSee('No transfers yet')->click('nav a:has-text("New transfer")')->assertSee('Drop files here');
+        $page->click('My transfers')->assertSee('No transfers yet')->click('nav a:has-text("New transfer")')->assertSee('Drop files');
         expect($page->script('() => window.leavePrompts'))->toBe(0);
 
         $page->script('() => window.dropUploadFiles([4], "new")');
@@ -427,7 +427,7 @@ JS);
         expect(Transfer::query()->sole()->id)->toBe($transferId)
             ->and(Transfer::query()->sole()->revoked_at)->toBeNull();
         $page->script('() => { window.allowCancellation = true; }');
-        $page->press('Cancel upload')->assertSee('Drop files here')->assertNoJavascriptErrors();
+        $page->press('Cancel upload')->assertSee('Drop files')->assertNoJavascriptErrors();
         $page->assertScript('window.revocations', 2);
         expect($page->script('() => window.cancelPrompts'))->toBe(array_fill(0, 3,
             'Cancel this upload? Uploaded progress will be discarded. You will need to select and upload the files again.',
@@ -447,7 +447,7 @@ JS);
         expect($page->script('() => document.querySelector("button[type=submit]").disabled'))->toBeTrue();
 
         $page->script('() => window.releaseSigning()');
-        $page->assertSee('Drop files here')->assertMissing('[role="alert"]')->assertNoJavascriptErrors();
+        $page->assertSee('Drop files')->assertMissing('[role="alert"]')->assertNoJavascriptErrors();
         expect($page->script('() => window.uploads.length'))->toBe(3)
             ->and($page->script('() => window.signedParts.length'))->toBe(4)
             ->and($page->script('() => window.fileCompletions'))->toBe([])
@@ -517,7 +517,7 @@ it('creates a transfer when pressing near the right edge of the shrinking submit
     Storage::fake('local');
     config(['filemax.disk' => 'local']);
     $this->actingAs(User::factory()->create());
-    $page = visit('/', ['reducedMotion' => $reducedMotion])->resize(1280, 940)->assertSee('Drop files here');
+    $page = visit('/', ['reducedMotion' => $reducedMotion])->resize(1280, 940)->assertSee('Drop files');
     $page->script(<<<'JS'
 () => {
     const data = new DataTransfer();
@@ -560,7 +560,7 @@ it('recovers a failed multi-file upload while preserving finished files and shar
     $user = User::factory()->create(['name' => 'Filippo Fortino']);
     $organization = joinOrganization($user, 'member', Organization::factory()->create(['name' => 'Mediamax']));
     $this->actingAs($user);
-    $page = visit('/')->withTimezone('Europe/Rome')->resize(1280, 940)->assertSee('Drop files here');
+    $page = visit('/')->withTimezone('Europe/Rome')->resize(1280, 940)->assertSee('Drop files');
     expect($page->script('() => document.body.innerText'))->toMatch('/Available until \d{1,2} \w+ \d{4}, \d{2}:\d{2}\./');
     $page->script('() => document.fonts.ready');
     $page->screenshot(filename: 'upload-empty');
@@ -626,7 +626,7 @@ it('wraps a long filename and message in the draft summary at 320px', function (
     $this->actingAs(User::factory()->create());
     $name = 'Lenergy_Spot30s_v3_FINAL_approvato_cliente_versione_definitiva_2026.mp4';
     $link = 'https://drive.example.com/materiali/Lenergy_Spot30s_v3_FINAL_approvato_cliente_versione_definitiva_2026';
-    $page = visit('/')->resize(320, 900)->assertSee('Drop files here');
+    $page = visit('/')->resize(320, 900)->assertSee('Drop files');
     $page->fill('#transfer-message', $link);
     $page->script(<<<JS
 () => {
@@ -687,7 +687,7 @@ JS);
     expect($page->script('() => window.leavePrompts'))->toBe(1);
 
     if ($leave) {
-        $page->assertSee('No transfers yet')->click('nav a:has-text("New transfer")')->assertSee('Drop files here')->assertDontSee('finished.txt');
+        $page->assertSee('No transfers yet')->click('nav a:has-text("New transfer")')->assertSee('Drop files')->assertDontSee('finished.txt');
         expect(Transfer::query()->sole()->status)->toBe('uploading');
     } else {
         $page->assertSee('Cancel upload')->assertSee('finished.txt')->assertSee('pending.txt');
@@ -732,7 +732,7 @@ JS);
     expect(Transfer::query()->count())->toBe(0);
 
     $page->script('() => window.resumeDraft()');
-    $page->assertSee('Your link is ready')->click('Send another')->assertSee('Drop files here')->assertNoJavascriptErrors();
+    $page->assertSee('Your link is ready')->click('Send another')->assertSee('Drop files')->assertNoJavascriptErrors();
     expect($page->script('() => window.leavePrompts'))->toBe(2);
     expect(Transfer::query()->sole()->status)->toBe('ready');
 });
@@ -861,7 +861,7 @@ it('pluralizes file and member counts from upload to transfer detail', function 
     $user = User::factory()->create();
     $organization = joinOrganization($user, 'member', Organization::factory()->create(['name' => 'Mediamax']));
     $this->actingAs($user);
-    $page = visit('/')->assertSee('Drop files here');
+    $page = visit('/')->assertSee('Drop files');
     $page->click('button[aria-label^="Organization:"]')->assertSee('Member · 1 member')->assertDontSee('1 members')->keys(':focus', 'Escape');
     $organization->users()->attach(User::factory()->create());
     $page->click('Members only');
@@ -877,7 +877,7 @@ JS);
 
 it('keeps every upload form placeholder at 4.5:1 contrast and lighter than typed text', function (): void {
     $this->actingAs(User::factory()->create());
-    $page = visit('/')->assertSee('Drop files here');
+    $page = visit('/')->assertSee('Drop files');
 
     $contrast = $page->script(<<<'JS'
 () => {
@@ -946,12 +946,12 @@ it('keeps Create transfer in the tab order and sends focus to Browse files when 
     $page = visit('/')->assertSee('Browse files')
         ->keys('input[name=expiry]:checked', 'Tab')
         ->assertScript('document.activeElement.innerText', 'Create transfer')
-        ->assertScript($description, 'Add at least one file to continue');
+        ->assertScript($description, 'Add at least one file or folder to continue');
     $hintColorBefore = $page->script($hintColor);
 
     $page->keys(':focus', 'Enter')
         ->assertScript('document.activeElement.innerText', 'Browse files')
-        ->assertScript($description, 'Add at least one file to continue')
+        ->assertScript($description, 'Add at least one file or folder to continue')
         ->assertNoJavascriptErrors();
 
     expect($page->script($hintColor))->not->toBe($hintColorBefore)
@@ -1091,3 +1091,41 @@ function controlledTransferUploads(): string
 }
 JS;
 }
+
+it('uploads a dropped folder with its structure, leaving out system files and empty folders', function (): void {
+    Storage::fake('local');
+    config(['filemax.disk' => 'local']);
+    $this->actingAs(User::factory()->create());
+    $page = visit('/')->resize(1280, 940)->assertSee('Drop files or folders here')->assertSee('Browse folder');
+    $page->script(folderDropScript());
+    $page->script("() => window.dropFolder(['Fiera', [['Foto', [['b.jpg', 'bb'], ['a.jpg', 'a'], ['.DS_Store', 'x']]], ['Vuota', []], ['Liberatorie.pdf', 'ccc']]])");
+
+    $page->assertSee('Left out 2 items')
+        ->assertVisible('button[aria-label="Remove the folder Fiera and its 3 files"]')
+        ->assertDontSee('Liberatorie.pdf')
+        ->click('button:has-text("Fiera")')
+        ->assertSee('Liberatorie.pdf')
+        ->click('button:has-text("Foto")')
+        ->assertSee('a.jpg')
+        ->press('Create transfer')
+        ->assertVisible('h1:has-text("Your link is ready")')
+        ->assertSee('Fiera')
+        ->assertNoJavascriptErrors();
+
+    $transfer = Transfer::query()->sole();
+    expect($transfer->displayTitle())->toBe('Fiera')
+        ->and($transfer->files->map(fn (TransferFile $file): array => [$file->folder, $file->original_name])->all())
+        ->toBe([['Fiera/Foto', 'a.jpg'], ['Fiera/Foto', 'b.jpg'], ['Fiera', 'Liberatorie.pdf']]);
+});
+
+it('removes a whole dropped folder before sending', function (): void {
+    $this->actingAs(User::factory()->create());
+    $page = visit('/')->resize(1280, 940)->assertSee('Drop files or folders here');
+    $page->script(folderDropScript());
+    $page->script("() => window.dropFolder(['Fiera', [['a.txt', 'a'], ['b.txt', 'b']]])");
+
+    $page->click('[aria-label="Remove the folder Fiera and its 2 files"]')
+        ->assertSee('Drop files or folders here')
+        ->assertDontSee('Left out')
+        ->assertNoJavascriptErrors();
+});

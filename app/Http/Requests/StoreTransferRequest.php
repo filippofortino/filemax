@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Models\Transfer;
+use App\Models\TransferFile;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -40,8 +41,9 @@ final class StoreTransferRequest extends FormRequest
             ],
             'password_hash' => ['missing'],
             'expires_in_days' => ['required', 'integer', Rule::in([1, 7, 14, 30])],
-            'files' => ['required', 'array', 'list', 'min:1'],
-            'files.*' => ['required', 'array:name,size,type'],
+            'files' => ['required', 'array', 'list', 'min:1', 'max:1000'],
+            'files.*' => ['required', 'array:name,size,type,folder'],
+            'files.*.folder' => ['nullable', 'string', 'max:1024', 'not_regex:'.TransferFile::UNSAFE_FOLDER],
             'files.*.name' => ['required', 'string', 'max:255'],
             'files.*.size' => ['required', 'integer', 'min:0'],
             'files.*.type' => ['nullable', 'string', 'max:255'],

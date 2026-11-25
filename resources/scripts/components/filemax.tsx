@@ -6,6 +6,7 @@ import {
     Copy01Icon,
     File01Icon,
     FileZipIcon,
+    Folder01Icon,
     Image01Icon,
     LockKeyIcon,
     Logout01Icon,
@@ -18,6 +19,7 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Link, usePage } from '@inertiajs/react';
 import {
+    Fragment,
     useEffect,
     useRef,
     useState,
@@ -27,11 +29,17 @@ import {
 import { Avatar } from '@/components/avatar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
     Popover,
     PopoverContent,
     PopoverHeader,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { plural, type FolderNode } from '@/lib/folders';
 import { bytes } from '@/lib/format';
 import type { SharedProps } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -714,6 +722,111 @@ export function FileRow({
             </span>
             {children}
         </div>
+    );
+}
+
+/**
+ * A folder's subfolders as rows that open in place, then its files. Render it inside a <ul>:
+ * each folder is an <li> holding a nested <ul>, and renderFile returns an <li>.
+ */
+export function FolderTree<T>({
+    node,
+    fileKey,
+    renderFile,
+    folderActions,
+    defaultOpen,
+    variant = 'default',
+}: {
+    node: FolderNode<T>;
+    fileKey: (file: T) => string;
+    renderFile: (file: T) => ReactNode;
+    /** Trailing content of a folder row: a status, a zip download, a count. */
+    folderActions?: (folder: FolderNode<T>) => ReactNode;
+    defaultOpen?: (folder: FolderNode<T>) => boolean;
+    variant?: 'default' | 'upload' | 'owner';
+}) {
+    return (
+        <>
+            {node.folders.map((folder) => (
+                <Collapsible
+                    key={folder.path}
+                    defaultOpen={defaultOpen?.(folder)}
+                    render={<li />}
+                >
+                    <div
+                        className={cn(
+                            'flex min-h-14 min-w-0 items-center gap-3 border-b border-slate-100',
+                            variant === 'upload' && 'border-0',
+                        )}
+                    >
+                        <CollapsibleTrigger className="group flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 self-stretch rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                            <HugeiconsIcon
+                                icon={ArrowRight01Icon}
+                                size={16}
+                                strokeWidth={2}
+                                className="shrink-0 text-muted-foreground transition-transform duration-160 ease-out group-data-panel-open:rotate-90 motion-reduce:transition-none"
+                                aria-hidden="true"
+                            />
+                            <span
+                                className={cn(
+                                    'inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-blue-50 text-primary',
+                                )}
+                            >
+                                <HugeiconsIcon
+                                    icon={Folder01Icon}
+                                    size={19}
+                                    aria-hidden="true"
+                                />
+                            </span>
+                            <span
+                                className={cn(
+                                    'flex min-w-0 flex-1 flex-col',
+                                    variant === 'owner' &&
+                                        'md:flex-row md:items-center md:gap-3',
+                                )}
+                            >
+                                <span
+                                    className={cn(
+                                        'truncate font-medium',
+                                        variant === 'owner' && 'md:flex-1',
+                                    )}
+                                    title={folder.name}
+                                >
+                                    {folder.name}
+                                </span>
+                                <small
+                                    className={cn(
+                                        'text-xs text-muted-foreground',
+                                        variant === 'owner' &&
+                                            'shrink-0 md:text-sm',
+                                    )}
+                                >
+                                    {plural(folder.count)} ·{' '}
+                                    {bytes(folder.size)}
+                                </small>
+                            </span>
+                        </CollapsibleTrigger>
+                        {folderActions?.(folder)}
+                    </div>
+                    <CollapsibleContent
+                        render={<ul />}
+                        className="pl-4 md:pl-7"
+                    >
+                        <FolderTree
+                            node={folder}
+                            fileKey={fileKey}
+                            renderFile={renderFile}
+                            folderActions={folderActions}
+                            defaultOpen={defaultOpen}
+                            variant={variant}
+                        />
+                    </CollapsibleContent>
+                </Collapsible>
+            ))}
+            {node.files.map((file) => (
+                <Fragment key={fileKey(file)}>{renderFile(file)}</Fragment>
+            ))}
+        </>
     );
 }
 

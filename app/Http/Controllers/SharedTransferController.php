@@ -67,6 +67,7 @@ final class SharedTransferController
                 'files' => $transfer->files->map(fn (TransferFile $file): array => [
                     'id' => $file->id,
                     'name' => $file->original_name,
+                    'folder' => $file->folder,
                     'size' => $file->size,
                     'mime_type' => $file->mime_type,
                     'preview' => $storage->previewProps($file),

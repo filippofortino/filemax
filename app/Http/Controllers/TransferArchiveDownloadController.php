@@ -17,16 +17,19 @@ final class TransferArchiveDownloadController
     public function show(Request $request, Transfer $transfer, TransferStorage $storage): Response
     {
         Gate::forUser($request->user())->authorize('download', $transfer);
-        abort_unless($transfer->archive_status === 'ready' && $transfer->archive_path, 409);
-        $name = (Str::slug($transfer->displayTitle()) ?: 'filemax-transfer').'.zip';
+        $folder = $request->filled('folder') ? $request->string('folder')->toString() : null;
+        abort_if($folder !== null && ! $transfer->hasFolder($folder), 404);
+        $archive = $folder === null ? $transfer : $transfer->archives()->where('folder', $folder)->first();
+        abort_unless($archive?->archive_status === 'ready' && $archive->archive_path, 409);
+        $name = (Str::slug($folder === null ? $transfer->displayTitle() : Str::afterLast($folder, '/')) ?: 'filemax-transfer').'.zip';
 
         if ($storage->isRemote()) {
-            return redirect()->away($storage->disk()->temporaryUrl($transfer->archive_path, now()->addMinutes(5)->min($transfer->expires_at), [
+            return redirect()->away($storage->disk()->temporaryUrl($archive->archive_path, now()->addMinutes(5)->min($transfer->expires_at), [
                 'ResponseContentDisposition' => HeaderUtils::makeDisposition('attachment', $name, str_replace('%', '', Str::ascii($name)) ?: 'download'),
                 'ResponseContentType' => 'application/zip',
             ]))->header('Cache-Control', 'private, no-store');
         }
 
-        return $storage->disk()->download($transfer->archive_path, $name, ['Content-Type' => 'application/zip', 'Cache-Control' => 'private, no-store']);
+        return $storage->disk()->download($archive->archive_path, $name, ['Content-Type' => 'application/zip', 'Cache-Control' => 'private, no-store']);
     }
 }

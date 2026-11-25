@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Jobs\PurgeTransfer;
 use App\Models\Transfer;
+use App\Models\TransferArchive;
 use App\Models\TransferFile;
 use App\Services\TransferStorage;
 use Aws\CommandInterface;
@@ -114,8 +115,14 @@ it('allows archive recovery through the four hour stale boundary', function (str
     $recent = Transfer::factory()->create(['archive_status' => $status, 'archive_progress' => 25, 'archive_requested_at' => now()->subHours(3)]);
     $boundary = Transfer::factory()->create(['archive_status' => $status, 'archive_progress' => 50, 'archive_requested_at' => now()->subHours(4)]);
     $ready = Transfer::factory()->create(['archive_status' => 'ready', 'archive_progress' => 100, 'archive_requested_at' => now()->subHours(5)]);
+    $recentFolder = TransferArchive::factory()->create(['archive_status' => $status, 'archive_progress' => 25, 'archive_requested_at' => now()->subHours(3)]);
+    $staleFolder = TransferArchive::factory()->create(['archive_status' => $status, 'archive_progress' => 50, 'archive_requested_at' => now()->subHours(4)]);
 
     $this->artisan('filemax:cleanup')->assertSuccessful();
+
+    expect($recentFolder->refresh()->archive_status)->toBe($status)
+        ->and($staleFolder->refresh()->archive_status)->toBe('failed')
+        ->and($staleFolder->archive_progress)->toBe(0);
 
     expect($recent->refresh()->archive_status)->toBe($status)
         ->and($recent->archive_progress)->toBe(25)
@@ -192,6 +199,7 @@ it('aborts abandoned archive uploads under the byte lock before finishing a purg
     $disk->shouldReceive('path')->with($archivePath)->andReturn($key);
     $disk->shouldReceive('delete')->with($archivePath)->times($abortFails ? 0 : 1)->andReturnTrue();
     $disk->shouldReceive('deleteDirectory')->with('previews/'.$transfer->id)->once()->andReturnTrue();
+    $disk->shouldReceive('deleteDirectory')->with('archives/'.$transfer->id)->times($abortFails ? 0 : 1)->andReturnTrue();
     Storage::set('r2', $disk);
     config(['filemax.disk' => 'r2']);
     $job = new PurgeTransfer($transfer->id);

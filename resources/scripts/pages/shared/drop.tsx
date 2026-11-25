@@ -2,6 +2,7 @@ import {
     Cancel01Icon,
     Clock01Icon,
     File01Icon,
+    Folder01Icon,
     Image01Icon,
     Tick02Icon,
     Unlink01Icon,
@@ -17,9 +18,17 @@ import {
     type FormEvent,
 } from 'react';
 import { Avatar } from '@/components/avatar';
-import { ErrorMessage, FileRow, Shell } from '@/components/filemax';
+import { ErrorMessage, FileRow, FolderTree, Shell } from '@/components/filemax';
 import { Button } from '@/components/ui/button';
 import { acceptedList, rejectReason, typesLabel } from '@/lib/drop';
+import {
+    droppedFiles,
+    folderTree,
+    pickedFiles,
+    plural,
+    type FolderNode,
+    type Picked,
+} from '@/lib/folders';
 import { bytes, date, dateTime } from '@/lib/format';
 import { request } from '@/lib/http';
 import type { DropRules, TransferFile } from '@/lib/types';
@@ -49,7 +58,19 @@ type SharedDrop = DropRules & {
     accepted_extensions: string[];
 };
 /** `sending` marks the files posted with the submission; the others don't fit the Drop's rules. */
-type Entry = UploadEntry & { remote?: TransferFile; sending?: boolean };
+type Entry = UploadEntry & {
+    remote?: TransferFile;
+    sending?: boolean;
+    folder?: string;
+};
+
+function entriesIn(entries: Entry[], folder: FolderNode<Entry>) {
+    return entries.filter(
+        (entry) =>
+            entry.folder === folder.path ||
+            entry.folder?.startsWith(`${folder.path}/`),
+    );
+}
 type Sent = { files: Entry[]; time: string; open: boolean; closesAt: string };
 
 const START_AGAIN = 'This upload can’t continue. Start again.';
@@ -151,6 +172,8 @@ function Uploader({ drop }: { drop: SharedDrop }) {
     const operating = useRef(false);
     const cancelling = useRef(false);
     const picker = useRef<HTMLInputElement>(null);
+    const folderPicker = useRef<HTMLInputElement>(null);
+    const [skipped, setSkipped] = useState(0);
     const browseFiles = useRef<HTMLButtonElement>(null);
     const nameInput = useRef<HTMLInputElement>(null);
     const screenHeading = useRef<HTMLHeadingElement>(null);
@@ -192,6 +215,7 @@ function Uploader({ drop }: { drop: SharedDrop }) {
     function changeEntries(next: Entry[]) {
         currentEntries.current = next;
         setEntries(next);
+        if (!next.length) setSkipped(0);
     }
     function patch(key: string, values: Partial<Entry>) {
         changeEntries(
@@ -247,17 +271,19 @@ function Uploader({ drop }: { drop: SharedDrop }) {
             screenHeading.current;
         target?.focus();
     }, [removing, entries]);
-    function addFiles(files: FileList) {
+    function addFiles(picked: Picked) {
         if (screen !== 'form' || operating.current) return;
         changeEntries([
             ...currentEntries.current,
-            ...Array.from(files).map((file) => ({
+            ...picked.files.map(({ file, folder }) => ({
                 key: crypto.randomUUID(),
                 file,
+                folder,
                 status: 'waiting' as const,
                 loaded: 0,
             })),
         ]);
+        setSkipped((count) => count + picked.skipped);
         setError('');
     }
     function drag(event: DragEvent) {
@@ -330,6 +356,7 @@ function Uploader({ drop }: { drop: SharedDrop }) {
                         name: entry.file.name,
                         size: entry.file.size,
                         type: entry.file.type,
+                        folder: entry.folder,
                     })),
                 });
                 submission.current = result.submission.id;
@@ -477,26 +504,29 @@ function Uploader({ drop }: { drop: SharedDrop }) {
             setBusy(false);
         }
     }
-    async function removeFile(entry: Entry) {
+    /** Removes files that are not uploading; before sending, a whole folder at once. Refocuses the list row that held them. */
+    async function removeFiles(targets: Entry[], row: number) {
         if (operating.current) return;
         const transfer = submission.current;
         const rows = transfer
             ? currentEntries.current.filter((item) => item.sending)
             : currentEntries.current;
-        refocusRow.current = rows.findIndex((item) => item.key === entry.key);
+        refocusRow.current = row;
+        const keys = new Set(targets.map((entry) => entry.key));
         const others = currentEntries.current.filter(
-            (item) => item.key !== entry.key,
+            (item) => !keys.has(item.key),
         );
         if (!transfer) {
             changeEntries(others);
             return;
         }
+        const [entry] = targets;
         operating.current = true;
         setRemoving(true);
         setError('');
         try {
             // Removing the last file leaves nothing to send, so the submission is cancelled instead.
-            if (rows.length === 1)
+            if (rows.every((item) => keys.has(item.key)))
                 await request(cancel.url(transfer), 'DELETE');
             else if (entry.remote)
                 await request(
@@ -504,7 +534,7 @@ function Uploader({ drop }: { drop: SharedDrop }) {
                     'DELETE',
                 );
             changeEntries(others);
-            if (rows.length === 1) backToForm();
+            if (rows.every((item) => keys.has(item.key))) backToForm();
         } catch (cause) {
             fail(cause);
         } finally {
@@ -533,6 +563,194 @@ function Uploader({ drop }: { drop: SharedDrop }) {
             <span className="hidden md:inline">Browse files</span>
         </>
     );
+    // Phones can't pick a folder.
+    const browseFolder = (
+        <Button
+            variant="outline"
+            className="hidden md:inline-flex"
+            onClick={() => folderPicker.current?.click()}
+        >
+            <HugeiconsIcon icon={Folder01Icon} size={18} aria-hidden="true" />
+            Browse folder
+        </Button>
+    );
+    const formTree = folderTree(
+        entries,
+        (entry) => entry.folder,
+        (entry) => entry.file.size,
+    );
+    const sendingTree = folderTree(
+        sending,
+        (entry) => entry.folder,
+        (entry) => entry.file.size,
+    );
+    const sentTree = folderTree(
+        sent?.files ?? [],
+        (entry) => entry.folder,
+        (entry) => entry.file.size,
+    );
+    const reasonOf = new Map(
+        entries.map((entry, index) => [entry.key, reasons[index]]),
+    );
+    function formRow(entry: Entry, row: number) {
+        const reason = reasonOf.get(entry.key);
+        return (
+            <>
+                <FileRow
+                    name={entry.file.name}
+                    size={entry.file.size}
+                    variant="upload"
+                >
+                    {reason && (
+                        <span className="hidden text-sm text-destructive md:inline">
+                            {reason}
+                        </span>
+                    )}
+                    <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Remove ${entry.file.name}`}
+                        onClick={() => void removeFiles([entry], row)}
+                    >
+                        <HugeiconsIcon
+                            icon={Cancel01Icon}
+                            size={16}
+                            aria-hidden="true"
+                        />
+                    </Button>
+                </FileRow>
+                {/* Phones have no room beside the name, so the reason gets its own line. */}
+                {reason && (
+                    <p className="pb-3 text-sm text-destructive md:hidden">
+                        {reason}
+                    </p>
+                )}
+            </>
+        );
+    }
+    function formFolderActions(folder: FolderNode<Entry>, row: number) {
+        const inside = entriesIn(entries, folder);
+        const misfits = inside.filter((entry) =>
+            reasonOf.get(entry.key),
+        ).length;
+        return (
+            <>
+                {misfits > 0 && (
+                    <span className="text-sm text-destructive">
+                        {misfits === 1
+                            ? '1 doesn’t fit'
+                            : `${misfits} don’t fit`}
+                    </span>
+                )}
+                {!folder.path.includes('/') && (
+                    <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Remove the folder ${folder.name} and its ${plural(inside.length)}`}
+                        onClick={() => void removeFiles(inside, row)}
+                    >
+                        <HugeiconsIcon
+                            icon={Cancel01Icon}
+                            size={16}
+                            aria-hidden="true"
+                        />
+                    </Button>
+                )}
+            </>
+        );
+    }
+    function uploadRow(entry: Entry, row: number) {
+        return (
+            <>
+                <FileRow
+                    name={entry.file.name}
+                    size={entry.file.size}
+                    variant="upload"
+                >
+                    {entry.status === 'done' ? (
+                        <span className="flex items-center gap-1 text-sm font-semibold text-emerald-700">
+                            <HugeiconsIcon
+                                icon={Tick02Icon}
+                                size={16}
+                                aria-hidden="true"
+                            />
+                            Done
+                        </span>
+                    ) : entry.status === 'failed' ? (
+                        <span className="text-sm text-destructive">Failed</span>
+                    ) : entry.status === 'uploading' ? (
+                        <span className="text-sm text-primary">
+                            {entry.file.size
+                                ? Math.min(
+                                      100,
+                                      Math.round(
+                                          (entry.loaded / entry.file.size) *
+                                              100,
+                                      ),
+                                  )
+                                : 0}
+                            %
+                        </span>
+                    ) : (
+                        <span className="text-sm text-muted-foreground">
+                            Waiting
+                        </span>
+                    )}
+                    {!busy && entry.status === 'failed' && (
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Remove ${entry.file.name}`}
+                            disabled={removing}
+                            onClick={() => void removeFiles([entry], row)}
+                        >
+                            <HugeiconsIcon
+                                icon={Cancel01Icon}
+                                size={16}
+                                aria-hidden="true"
+                            />
+                        </Button>
+                    )}
+                </FileRow>
+                {entry.error && (
+                    <p className="pb-3 text-sm leading-normal wrap-anywhere text-destructive">
+                        {entry.error}
+                    </p>
+                )}
+                {entry.status === 'uploading' && (
+                    <progress
+                        className="h-1"
+                        aria-label={`Uploading ${entry.file.name}`}
+                        value={entry.loaded}
+                        max={Math.max(entry.file.size, 1)}
+                    />
+                )}
+            </>
+        );
+    }
+    function uploadFolderStatus(folder: FolderNode<Entry>) {
+        const inside = entriesIn(sending, folder);
+        const done = inside.filter((entry) => entry.status === 'done').length;
+        const failed = inside.filter(
+            (entry) => entry.status === 'failed',
+        ).length;
+        const sent = inside.reduce((sum, entry) => sum + entry.loaded, 0);
+        return done === inside.length ? (
+            <span className="flex items-center gap-1 text-sm font-semibold text-emerald-700">
+                <HugeiconsIcon icon={Tick02Icon} size={16} aria-hidden="true" />
+                Done
+            </span>
+        ) : failed ? (
+            <span className="text-sm text-destructive">{failed} failed</span>
+        ) : (
+            <span className="text-sm text-primary tabular-nums">
+                {folder.size
+                    ? Math.min(100, Math.round((sent / folder.size) * 100))
+                    : 0}
+                %
+            </span>
+        );
+    }
     return (
         <main
             className={cn(
@@ -556,7 +774,11 @@ function Uploader({ drop }: { drop: SharedDrop }) {
                 drag(event);
                 dragDepth.current = 0;
                 setDragging(false);
-                addFiles(event.dataTransfer.files);
+                droppedFiles(event.dataTransfer).then(addFiles, () =>
+                    setError(
+                        'That folder could not be read. Try Browse folder instead.',
+                    ),
+                );
             }}
         >
             {sent ? (
@@ -602,18 +824,26 @@ function Uploader({ drop }: { drop: SharedDrop }) {
                             </span>
                         </div>
                         <ul className="border-y border-border">
-                            {sent.files
-                                .slice(0, allFiles ? undefined : 4)
-                                .map((entry) => (
-                                    <li key={entry.key}>
+                            <FolderTree
+                                node={{
+                                    ...sentTree,
+                                    files: sentTree.files.slice(
+                                        0,
+                                        allFiles ? undefined : 4,
+                                    ),
+                                }}
+                                fileKey={(entry) => entry.key}
+                                renderFile={(entry) => (
+                                    <li>
                                         <FileRow
                                             name={entry.file.name}
                                             size={entry.file.size}
                                         />
                                     </li>
-                                ))}
+                                )}
+                            />
                         </ul>
-                        {sent.files.length > 4 && (
+                        {sentTree.files.length > 4 && (
                             <Button
                                 className="mt-3 h-auto min-h-0 p-0 text-sm"
                                 variant="link"
@@ -621,7 +851,7 @@ function Uploader({ drop }: { drop: SharedDrop }) {
                             >
                                 {allFiles
                                     ? 'Show fewer files'
-                                    : `Show all ${sent.files.length} files`}
+                                    : `Show all ${sentTree.files.length} files`}
                             </Button>
                         )}
                     </div>
@@ -700,78 +930,36 @@ function Uploader({ drop }: { drop: SharedDrop }) {
                         </div>
                     </div>
                     <ul ref={fileList} className="flex flex-col gap-2">
-                        {sending.map((entry) => (
+                        {sendingTree.folders.map((folder, row) => (
+                            <li
+                                key={folder.path}
+                                className="overflow-hidden rounded-lg border bg-background px-3"
+                            >
+                                <ul>
+                                    <FolderTree
+                                        node={{
+                                            ...sendingTree,
+                                            folders: [folder],
+                                            files: [],
+                                        }}
+                                        variant="upload"
+                                        fileKey={(entry) => entry.key}
+                                        folderActions={uploadFolderStatus}
+                                        renderFile={(entry) => (
+                                            <li>{uploadRow(entry, row)}</li>
+                                        )}
+                                    />
+                                </ul>
+                            </li>
+                        ))}
+                        {sendingTree.files.map((entry, index) => (
                             <li
                                 className="overflow-hidden rounded-lg border bg-background px-3"
                                 key={entry.key}
                             >
-                                <FileRow
-                                    name={entry.file.name}
-                                    size={entry.file.size}
-                                    variant="upload"
-                                >
-                                    {entry.status === 'done' ? (
-                                        <span className="flex items-center gap-1 text-sm font-semibold text-emerald-700">
-                                            <HugeiconsIcon
-                                                icon={Tick02Icon}
-                                                size={16}
-                                                aria-hidden="true"
-                                            />
-                                            Done
-                                        </span>
-                                    ) : entry.status === 'failed' ? (
-                                        <span className="text-sm text-destructive">
-                                            Failed
-                                        </span>
-                                    ) : entry.status === 'uploading' ? (
-                                        <span className="text-sm text-primary">
-                                            {entry.file.size
-                                                ? Math.min(
-                                                      100,
-                                                      Math.round(
-                                                          (entry.loaded /
-                                                              entry.file.size) *
-                                                              100,
-                                                      ),
-                                                  )
-                                                : 0}
-                                            %
-                                        </span>
-                                    ) : (
-                                        <span className="text-sm text-muted-foreground">
-                                            Waiting
-                                        </span>
-                                    )}
-                                    {!busy && entry.status === 'failed' && (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label={`Remove ${entry.file.name}`}
-                                            disabled={removing}
-                                            onClick={() =>
-                                                void removeFile(entry)
-                                            }
-                                        >
-                                            <HugeiconsIcon
-                                                icon={Cancel01Icon}
-                                                size={16}
-                                                aria-hidden="true"
-                                            />
-                                        </Button>
-                                    )}
-                                </FileRow>
-                                {entry.error && (
-                                    <p className="pb-3 text-sm leading-normal wrap-anywhere text-destructive">
-                                        {entry.error}
-                                    </p>
-                                )}
-                                {entry.status === 'uploading' && (
-                                    <progress
-                                        className="h-1"
-                                        aria-label={`Uploading ${entry.file.name}`}
-                                        value={entry.loaded}
-                                        max={Math.max(entry.file.size, 1)}
-                                    />
+                                {uploadRow(
+                                    entry,
+                                    sendingTree.folders.length + index,
                                 )}
                             </li>
                         ))}
@@ -909,7 +1097,18 @@ function Uploader({ drop }: { drop: SharedDrop }) {
                         hidden
                         onChange={(event) => {
                             if (event.target.files)
-                                addFiles(event.target.files);
+                                addFiles(pickedFiles(event.target.files));
+                            event.target.value = '';
+                        }}
+                    />
+                    <input
+                        ref={folderPicker}
+                        type="file"
+                        hidden
+                        {...{ webkitdirectory: '' }}
+                        onChange={(event) => {
+                            if (event.target.files)
+                                addFiles(pickedFiles(event.target.files));
                             event.target.value = '';
                         }}
                     />
@@ -928,17 +1127,20 @@ function Uploader({ drop }: { drop: SharedDrop }) {
                                     Choose the files to send
                                 </span>
                                 <span className="hidden md:inline">
-                                    Drop files here
+                                    Drop files or folders here
                                 </span>
                             </h2>
-                            <Button
-                                ref={browseFiles}
-                                variant="outline"
-                                aria-describedby="send-hint"
-                                onClick={() => picker.current?.click()}
-                            >
-                                {chooseFiles}
-                            </Button>
+                            <div className="flex flex-wrap justify-center gap-2">
+                                <Button
+                                    ref={browseFiles}
+                                    variant="outline"
+                                    aria-describedby="send-hint"
+                                    onClick={() => picker.current?.click()}
+                                >
+                                    {chooseFiles}
+                                </Button>
+                                {browseFolder}
+                            </div>
                         </div>
                     ) : (
                         <div className="flex flex-col gap-3">
@@ -955,16 +1157,19 @@ function Uploader({ drop }: { drop: SharedDrop }) {
                                         Add more files
                                     </span>
                                     <span className="hidden md:inline">
-                                        Drop more files here
+                                        Drop more files or folders here
                                     </span>
                                 </span>
-                                <Button
-                                    ref={browseFiles}
-                                    variant="outline"
-                                    onClick={() => picker.current?.click()}
-                                >
-                                    {chooseFiles}
-                                </Button>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        ref={browseFiles}
+                                        variant="outline"
+                                        onClick={() => picker.current?.click()}
+                                    >
+                                        {chooseFiles}
+                                    </Button>
+                                    {browseFolder}
+                                </div>
                             </div>
                             <div className="flex flex-wrap items-baseline justify-between gap-3">
                                 <h2 className="font-sans text-sm font-semibold tracking-normal">
@@ -979,48 +1184,64 @@ function Uploader({ drop }: { drop: SharedDrop }) {
                                 </span>
                             </div>
                             <ul ref={fileList} className="flex flex-col gap-2">
-                                {entries.map((entry, index) => (
+                                {formTree.folders.map((folder, row) => (
+                                    <li
+                                        key={folder.path}
+                                        className={cn(
+                                            'overflow-hidden rounded-lg border bg-background px-3',
+                                            entriesIn(entries, folder).some(
+                                                (entry) =>
+                                                    reasonOf.get(entry.key),
+                                            ) && 'border-red-200',
+                                        )}
+                                    >
+                                        <ul>
+                                            <FolderTree
+                                                node={{
+                                                    ...formTree,
+                                                    folders: [folder],
+                                                    files: [],
+                                                }}
+                                                variant="upload"
+                                                fileKey={(entry) => entry.key}
+                                                folderActions={(inner) =>
+                                                    formFolderActions(
+                                                        inner,
+                                                        row,
+                                                    )
+                                                }
+                                                renderFile={(entry) => (
+                                                    <li>
+                                                        {formRow(entry, row)}
+                                                    </li>
+                                                )}
+                                            />
+                                        </ul>
+                                    </li>
+                                ))}
+                                {formTree.files.map((entry, index) => (
                                     <li
                                         key={entry.key}
                                         className={cn(
                                             'overflow-hidden rounded-lg border bg-background px-3',
-                                            reasons[index] && 'border-red-200',
+                                            reasonOf.get(entry.key) &&
+                                                'border-red-200',
                                         )}
                                     >
-                                        <FileRow
-                                            name={entry.file.name}
-                                            size={entry.file.size}
-                                            variant="upload"
-                                        >
-                                            {reasons[index] && (
-                                                <span className="hidden text-sm text-destructive md:inline">
-                                                    {reasons[index]}
-                                                </span>
-                                            )}
-                                            <Button
-                                                variant="ghost"
-                                                size="icon-sm"
-                                                aria-label={`Remove ${entry.file.name}`}
-                                                onClick={() =>
-                                                    void removeFile(entry)
-                                                }
-                                            >
-                                                <HugeiconsIcon
-                                                    icon={Cancel01Icon}
-                                                    size={16}
-                                                    aria-hidden="true"
-                                                />
-                                            </Button>
-                                        </FileRow>
-                                        {/* Phones have no room beside the name, so the reason gets its own line. */}
-                                        {reasons[index] && (
-                                            <p className="pb-3 text-sm text-destructive md:hidden">
-                                                {reasons[index]}
-                                            </p>
+                                        {formRow(
+                                            entry,
+                                            formTree.folders.length + index,
                                         )}
                                     </li>
                                 ))}
                             </ul>
+                            {skipped > 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                    Left out {plural(skipped, 'item')}: system
+                                    files like .DS_Store and empty folders,
+                                    which can’t be sent.
+                                </p>
+                            )}
                             {rejected > 0 && (
                                 <ErrorMessage>
                                     {rejected === 1

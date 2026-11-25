@@ -40,6 +40,7 @@ declare module '@inertiajs/core' {
 export type TransferFile = {
     id: string;
     original_name: string;
+    folder: string | null;
     size: number;
     mime_type: string;
     status: string;

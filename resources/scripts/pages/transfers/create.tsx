@@ -1,5 +1,6 @@
 import {
     Cancel01Icon,
+    Folder01Icon,
     Globe02Icon,
     Tick02Icon,
     Upload01Icon,
@@ -15,11 +16,20 @@ import {
     RadioPill,
     ErrorMessage,
     FileRow,
+    FolderTree,
     PasswordBadge,
     Shell,
 } from '@/components/filemax';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import {
+    droppedFiles,
+    folderTree,
+    pickedFiles,
+    plural,
+    type FolderNode,
+    type Picked,
+} from '@/lib/folders';
 import { bytes, dateTime } from '@/lib/format';
 import { request } from '@/lib/http';
 import type { SharedProps, Transfer, TransferFile } from '@/lib/types';
@@ -29,7 +39,7 @@ import { home } from '@/routes';
 import { destroy, show, store } from '@/routes/transfers';
 import { complete, finalize, remove, sign } from '@/routes/transfers/uploads';
 
-type Entry = UploadEntry & { remote?: TransferFile };
+type Entry = UploadEntry & { remote?: TransferFile; folder?: string };
 export default function Create() {
     // Personal has nobody to restrict a link to, so it only sends public links.
     const organization = usePage<SharedProps>().props.auth.organizations.find(
@@ -43,6 +53,8 @@ export default function Create() {
     const operating = useRef(false);
     const cancelling = useRef(false);
     const picker = useRef<HTMLInputElement>(null);
+    const folderPicker = useRef<HTMLInputElement>(null);
+    const [skipped, setSkipped] = useState(0);
     const statusHeading = useRef<HTMLHeadingElement>(null);
     const readyHeading = useRef<HTMLHeadingElement>(null);
     const fileList = useRef<HTMLDivElement>(null);
@@ -69,6 +81,7 @@ export default function Create() {
     function changeEntries(next: Entry[]) {
         currentEntries.current = next;
         setEntries(next);
+        if (!next.length) setSkipped(0);
     }
     function patch(key: string, values: Partial<Entry>) {
         changeEntries(
@@ -122,45 +135,59 @@ export default function Create() {
             browseFiles.current;
         target?.focus();
     }, [busy, entries]);
-    function addFiles(files: FileList | File[]) {
+    function addFiles(picked: Picked) {
         if (draft.current || busy || ready) return;
         changeEntries([
             ...currentEntries.current,
-            ...Array.from(files).map((file) => ({
+            ...picked.files.map(({ file, folder }) => ({
                 key: crypto.randomUUID(),
                 file,
+                folder,
                 status: 'waiting' as const,
                 loaded: 0,
             })),
         ]);
+        setSkipped((count) => count + picked.skipped);
         setError('');
     }
     function drag(event: DragEvent) {
         event.preventDefault();
     }
-    async function removeFile(entry: Entry) {
+    /** Removes one file, or every file of a folder, refocusing the row (a file or a top folder) that was there. */
+    async function removeFiles(targets: Entry[], row: number) {
         if (operating.current) return;
         operating.current = true;
-        refocusRow.current = currentEntries.current.findIndex(
-            (item) => item.key === entry.key,
-        );
+        refocusRow.current = row;
         setRemoving(true);
         setBusy(true);
         setError('');
+        const keys = new Set(targets.map((entry) => entry.key));
         try {
-            if (draft.current && currentEntries.current.length === 1) {
+            if (
+                draft.current &&
+                currentEntries.current.every((item) => keys.has(item.key))
+            ) {
                 await request(destroy.url(draft.current.id), 'DELETE');
                 draft.current = null;
-            } else if (draft.current && entry.remote)
-                await request(
-                    remove.url({
-                        transfer: draft.current.id,
-                        file: entry.remote.id,
-                    }),
-                    'DELETE',
-                );
+            } else if (draft.current) {
+                for (const entry of targets) {
+                    if (!entry.remote) continue;
+                    await request(
+                        remove.url({
+                            transfer: draft.current.id,
+                            file: entry.remote.id,
+                        }),
+                        'DELETE',
+                    );
+                    changeEntries(
+                        currentEntries.current.filter(
+                            (item) => item.key !== entry.key,
+                        ),
+                    );
+                }
+            }
             changeEntries(
-                currentEntries.current.filter((item) => item.key !== entry.key),
+                currentEntries.current.filter((item) => !keys.has(item.key)),
             );
         } catch (cause) {
             setError((cause as Error).message);
@@ -209,6 +236,7 @@ export default function Create() {
                             name: entry.file.name,
                             size: entry.file.size,
                             type: entry.file.type,
+                            folder: entry.folder,
                         })),
                     },
                 );
@@ -332,6 +360,148 @@ export default function Create() {
     const availableUntil = new Date();
     availableUntil.setDate(availableUntil.getDate() + expiry);
     const hasDraft = entries.some((entry) => entry.remote !== undefined);
+    const tree = folderTree(
+        entries,
+        (entry) => entry.folder,
+        (entry) => entry.file.size,
+    );
+    function entriesIn(folder: FolderNode<Entry>) {
+        return entries.filter(
+            (entry) =>
+                entry.folder === folder.path ||
+                entry.folder?.startsWith(`${folder.path}/`),
+        );
+    }
+    /** A folder row's status, and for a top folder the button that removes all of it. */
+    function folderStatus(folder: FolderNode<Entry>, row: number) {
+        const inside = entriesIn(folder);
+        const done = inside.filter((entry) => entry.status === 'done').length;
+        const failed = inside.filter(
+            (entry) => entry.status === 'failed',
+        ).length;
+        const sent = inside.reduce((sum, entry) => sum + entry.loaded, 0);
+        return (
+            <>
+                {done === inside.length && hasDraft ? (
+                    <span className="flex items-center gap-1 text-sm font-semibold text-emerald-700">
+                        <HugeiconsIcon
+                            icon={Tick02Icon}
+                            size={16}
+                            aria-hidden="true"
+                        />
+                        Done
+                    </span>
+                ) : failed ? (
+                    <span className="text-sm text-destructive">
+                        {failed} failed
+                    </span>
+                ) : busy && hasDraft ? (
+                    <span className="text-sm text-primary tabular-nums">
+                        {folder.size
+                            ? Math.min(
+                                  100,
+                                  Math.round((sent / folder.size) * 100),
+                              )
+                            : 0}
+                        %
+                    </span>
+                ) : hasDraft ? (
+                    <span className="text-sm text-muted-foreground tabular-nums">
+                        {done} of {inside.length}
+                    </span>
+                ) : null}
+                {!busy &&
+                    !folder.path.includes('/') &&
+                    done < inside.length && (
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Remove the folder ${folder.name} and its ${plural(inside.length)}`}
+                            onClick={() => void removeFiles(inside, row)}
+                        >
+                            <HugeiconsIcon
+                                icon={Cancel01Icon}
+                                size={16}
+                                aria-hidden="true"
+                            />
+                        </Button>
+                    )}
+            </>
+        );
+    }
+    function entryRow(entry: Entry, row: number) {
+        return (
+            <>
+                <FileRow
+                    name={entry.file.name}
+                    size={entry.file.size}
+                    variant="upload"
+                >
+                    {entry.status === 'done' ? (
+                        <span className="flex items-center gap-1 text-sm font-semibold text-emerald-700">
+                            <HugeiconsIcon
+                                icon={Tick02Icon}
+                                size={16}
+                                aria-hidden="true"
+                            />
+                            Done
+                        </span>
+                    ) : entry.status === 'failed' ? (
+                        <span className="text-sm text-destructive">Failed</span>
+                    ) : entry.status === 'uploading' ? (
+                        <span className="text-sm text-primary">
+                            {entry.file.size
+                                ? Math.min(
+                                      100,
+                                      Math.round(
+                                          (entry.loaded / entry.file.size) *
+                                              100,
+                                      ),
+                                  )
+                                : 0}
+                            %
+                        </span>
+                    ) : hasDraft ? (
+                        <span className="text-sm text-muted-foreground">
+                            Waiting
+                        </span>
+                    ) : null}
+                    {!busy && entry.status !== 'done' && (
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Remove ${entry.file.name}`}
+                            onClick={() => void removeFiles([entry], row)}
+                        >
+                            <HugeiconsIcon
+                                icon={Cancel01Icon}
+                                size={16}
+                                aria-hidden="true"
+                            />
+                        </Button>
+                    )}
+                </FileRow>
+                {entry.error && (
+                    <p className="pb-3 text-sm leading-normal wrap-anywhere text-destructive">
+                        {entry.error}
+                    </p>
+                )}
+                {entry.status === 'uploading' && (
+                    <progress
+                        className="h-1"
+                        aria-label={`Uploading ${entry.file.name}`}
+                        value={entry.loaded}
+                        max={Math.max(entry.file.size, 1)}
+                    />
+                )}
+            </>
+        );
+    }
+    const readyTree = folderTree(
+        ready?.files ?? [],
+        (file) => file.folder,
+        (file) => file.size,
+    );
     if (ready)
         return (
             <Shell>
@@ -392,16 +562,27 @@ export default function Create() {
                             </div>
                         )}
                         <div>
-                            {ready.files
-                                .slice(0, allFiles ? undefined : 4)
-                                .map((file) => (
-                                    <FileRow
-                                        key={file.id}
-                                        name={file.original_name}
-                                        size={file.size}
-                                    />
-                                ))}
-                            {ready.files.length > 4 && (
+                            <ul>
+                                <FolderTree
+                                    node={{
+                                        ...readyTree,
+                                        files: readyTree.files.slice(
+                                            0,
+                                            allFiles ? undefined : 4,
+                                        ),
+                                    }}
+                                    fileKey={(file) => file.id}
+                                    renderFile={(file) => (
+                                        <li>
+                                            <FileRow
+                                                name={file.original_name}
+                                                size={file.size}
+                                            />
+                                        </li>
+                                    )}
+                                />
+                            </ul>
+                            {readyTree.files.length > 4 && (
                                 <Button
                                     className="mt-3 h-auto min-h-0 p-0 text-sm"
                                     variant="link"
@@ -409,7 +590,7 @@ export default function Create() {
                                 >
                                     {allFiles
                                         ? 'Show fewer files'
-                                        : `Show all ${ready.files.length} files`}
+                                        : `Show all ${readyTree.files.length} files`}
                                 </Button>
                             )}
                         </div>
@@ -467,7 +648,11 @@ export default function Create() {
                     drag(event);
                     dragDepth.current = 0;
                     setDragging(false);
-                    addFiles(event.dataTransfer.files);
+                    droppedFiles(event.dataTransfer).then(addFiles, () =>
+                        setError(
+                            'That folder could not be read. Try Browse folder instead.',
+                        ),
+                    );
                 }}
             >
                 <section className="flex min-w-0 flex-col gap-6 border-b bg-muted px-5 py-6 md:border-r md:border-b-0 md:p-8 lg:p-10">
@@ -478,7 +663,18 @@ export default function Create() {
                         hidden
                         onChange={(event) => {
                             if (event.target.files)
-                                addFiles(event.target.files);
+                                addFiles(pickedFiles(event.target.files));
+                            event.target.value = '';
+                        }}
+                    />
+                    <input
+                        ref={folderPicker}
+                        type="file"
+                        hidden
+                        {...{ webkitdirectory: '' }}
+                        onChange={(event) => {
+                            if (event.target.files)
+                                addFiles(pickedFiles(event.target.files));
                             event.target.value = '';
                         }}
                     />
@@ -493,19 +689,45 @@ export default function Create() {
                                 />
                             </span>
                             <h1 className="text-4xl md:text-5xl">
-                                Drop files here
+                                <span className="md:hidden">
+                                    Drop files here
+                                </span>
+                                <span className="hidden md:inline">
+                                    Drop files or folders here
+                                </span>
                             </h1>
                             <p className="text-base text-muted-foreground">
                                 Anywhere on this page works.
+                                <span className="hidden md:inline">
+                                    {' '}
+                                    Folders keep their structure.
+                                </span>
                             </p>
-                            <Button
-                                ref={browseFiles}
-                                variant="outline"
-                                aria-describedby="submit-hint"
-                                onClick={() => picker.current?.click()}
-                            >
-                                Browse files
-                            </Button>
+                            <div className="flex flex-wrap items-center justify-center gap-3">
+                                <Button
+                                    ref={browseFiles}
+                                    variant="outline"
+                                    aria-describedby="submit-hint"
+                                    onClick={() => picker.current?.click()}
+                                >
+                                    Browse files
+                                </Button>
+                                {/* Phones can't pick a folder. */}
+                                <Button
+                                    variant="outline"
+                                    className="hidden md:inline-flex"
+                                    onClick={() =>
+                                        folderPicker.current?.click()
+                                    }
+                                >
+                                    <HugeiconsIcon
+                                        icon={Folder01Icon}
+                                        size={18}
+                                        aria-hidden="true"
+                                    />
+                                    Browse folder
+                                </Button>
+                            </div>
                         </div>
                     ) : (
                         <>
@@ -568,95 +790,66 @@ export default function Create() {
                                 )}
                             </div>
                             <div ref={fileList} className="flex flex-col gap-2">
-                                {entries.map((entry) => (
+                                {tree.folders.map((folder, row) => (
+                                    <ul
+                                        key={folder.path}
+                                        className="overflow-hidden rounded-lg border bg-background px-3"
+                                    >
+                                        <FolderTree
+                                            node={{
+                                                ...tree,
+                                                folders: [folder],
+                                                files: [],
+                                            }}
+                                            variant="upload"
+                                            fileKey={(entry) => entry.key}
+                                            folderActions={(inner) =>
+                                                folderStatus(inner, row)
+                                            }
+                                            renderFile={(entry) => (
+                                                <li>{entryRow(entry, row)}</li>
+                                            )}
+                                        />
+                                    </ul>
+                                ))}
+                                {tree.files.map((entry, index) => (
                                     <div
                                         className="overflow-hidden rounded-lg border bg-background px-3"
                                         key={entry.key}
                                     >
-                                        <FileRow
-                                            name={entry.file.name}
-                                            size={entry.file.size}
-                                            variant="upload"
-                                        >
-                                            {entry.status === 'done' ? (
-                                                <span className="flex items-center gap-1 text-sm font-semibold text-emerald-700">
-                                                    <HugeiconsIcon
-                                                        icon={Tick02Icon}
-                                                        size={16}
-                                                        aria-hidden="true"
-                                                    />
-                                                    Done
-                                                </span>
-                                            ) : entry.status === 'failed' ? (
-                                                <span className="text-sm text-destructive">
-                                                    Failed
-                                                </span>
-                                            ) : entry.status === 'uploading' ? (
-                                                <span className="text-sm text-primary">
-                                                    {entry.file.size
-                                                        ? Math.min(
-                                                              100,
-                                                              Math.round(
-                                                                  (entry.loaded /
-                                                                      entry.file
-                                                                          .size) *
-                                                                      100,
-                                                              ),
-                                                          )
-                                                        : 0}
-                                                    %
-                                                </span>
-                                            ) : hasDraft ? (
-                                                <span className="text-sm text-muted-foreground">
-                                                    Waiting
-                                                </span>
-                                            ) : null}
-                                            {!busy &&
-                                                entry.status !== 'done' && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon-sm"
-                                                        aria-label={`Remove ${entry.file.name}`}
-                                                        onClick={() =>
-                                                            void removeFile(
-                                                                entry,
-                                                            )
-                                                        }
-                                                    >
-                                                        <HugeiconsIcon
-                                                            icon={Cancel01Icon}
-                                                            size={16}
-                                                            aria-hidden="true"
-                                                        />
-                                                    </Button>
-                                                )}
-                                        </FileRow>
-                                        {entry.error && (
-                                            <p className="pb-3 text-sm leading-normal wrap-anywhere text-destructive">
-                                                {entry.error}
-                                            </p>
-                                        )}
-                                        {entry.status === 'uploading' && (
-                                            <progress
-                                                className="h-1"
-                                                aria-label={`Uploading ${entry.file.name}`}
-                                                value={entry.loaded}
-                                                max={Math.max(
-                                                    entry.file.size,
-                                                    1,
-                                                )}
-                                            />
+                                        {entryRow(
+                                            entry,
+                                            tree.folders.length + index,
                                         )}
                                     </div>
                                 ))}
                             </div>
+                            {!hasDraft && skipped > 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                    Left out {plural(skipped, 'item')}: system
+                                    files like .DS_Store and empty folders,
+                                    which can’t be sent.
+                                </p>
+                            )}
                             {!hasDraft && (
-                                <Button
-                                    variant="outline"
-                                    onClick={() => picker.current?.click()}
-                                >
-                                    Add more files
-                                </Button>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1"
+                                        onClick={() => picker.current?.click()}
+                                    >
+                                        Add more files
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="hidden flex-1 md:inline-flex"
+                                        onClick={() =>
+                                            folderPicker.current?.click()
+                                        }
+                                    >
+                                        Add a folder
+                                    </Button>
+                                </div>
                             )}
                             {busy && hasDraft && (
                                 <p className="text-center text-sm text-muted-foreground">
@@ -682,7 +875,9 @@ export default function Create() {
                                     Title
                                 </span>
                                 <div className="rounded-md border bg-muted px-3.5 py-3 text-base wrap-anywhere">
-                                    {title || entries[0]?.file.name}
+                                    {title ||
+                                        entries[0]?.folder?.split('/')[0] ||
+                                        entries[0]?.file.name}
                                 </div>
                             </div>
                             <div className="flex flex-col gap-2">
@@ -1063,7 +1258,7 @@ export default function Create() {
                             )}
                         >
                             {!entries.length
-                                ? 'Add at least one file to continue'
+                                ? 'Add at least one file or folder to continue'
                                 : busy
                                   ? 'Your link appears as soon as the last file lands.'
                                   : 'Your files stay private until your link is ready.'}
@@ -1072,7 +1267,7 @@ export default function Create() {
                 </form>
                 {dragging && !hasDraft && (
                     <div className="pointer-events-none fixed inset-3 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-accent/95 p-6 text-center font-heading text-4xl transition-opacity duration-150 ease-out starting:opacity-0">
-                        Drop to add your files
+                        Drop to add your files and folders
                     </div>
                 )}
             </main>
