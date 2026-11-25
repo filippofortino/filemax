@@ -10,6 +10,7 @@ use App\Http\Controllers\SharedTransferController;
 use App\Http\Controllers\TransferArchiveController;
 use App\Http\Controllers\TransferArchiveDownloadController;
 use App\Http\Controllers\TransferFileDownloadController;
+use App\Http\Controllers\TransferFilePreviewController;
 use App\Http\Controllers\TransferFileUploadController;
 use App\Http\Controllers\TransferUploadPartController;
 use App\Http\Controllers\UnlockTransferController;
@@ -24,6 +25,8 @@ Route::scopeBindings()->prefix('t/{transfer:token}')->name('shared.')->group(fun
     Route::post('/unlock', UnlockTransferController::class)->name('unlock');
     Route::post('/files/{file}/download', [TransferFileDownloadController::class, 'store'])->name('files.download');
     Route::get('/files/{file}/content', [TransferFileDownloadController::class, 'show'])->middleware('signed')->name('files.content');
+    Route::post('/files/{file}/preview', [TransferFilePreviewController::class, 'store'])->name('files.preview');
+    Route::get('/files/{file}/media/{variant}', [TransferFilePreviewController::class, 'show'])->whereIn('variant', ['thumbnail', 'preview', 'original'])->middleware('signed')->name('files.media');
     Route::post('/archive', [TransferArchiveController::class, 'store'])->name('download');
     Route::get('/archive', [TransferArchiveController::class, 'show'])->name('archive');
     Route::get('/archive/download', [TransferArchiveDownloadController::class, 'show'])->name('archive.download');

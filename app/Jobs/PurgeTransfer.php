@@ -81,6 +81,8 @@ final class PurgeTransfer implements ShouldBeUnique, ShouldQueue
                 throw_unless($storage->disk()->delete($file->path), RuntimeException::class, 'Could not delete a transfer file.');
             }
 
+            throw_unless($storage->disk()->deleteDirectory('previews/'.$transfer->id), RuntimeException::class, 'Could not delete the file previews.');
+
             $archivePath = $transfer->archive_path ?: 'archives/'.$transfer->id.'.zip';
             $storage->abortArchiveUploads($archivePath);
 

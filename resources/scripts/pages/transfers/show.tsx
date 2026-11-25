@@ -6,8 +6,8 @@ import {
     UserGroupIcon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Form, Head, Link, router, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { Form, Head, Link, router, useForm, usePoll } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 import { DownloadAll, FileDownload } from '@/components/downloads';
 import {
     CopyLink,
@@ -16,6 +16,11 @@ import {
     PasswordBadge,
     Shell,
 } from '@/components/filemax';
+import {
+    FileThumbnail,
+    useStableThumbnails,
+    type FilePreview,
+} from '@/components/previews';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -28,19 +33,41 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
 import { bytes, date, dateTime, relativeDay } from '@/lib/format';
-import type { Transfer } from '@/lib/types';
+import type { Transfer, TransferFile } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { destroy, extend, index, update } from '@/routes/transfers';
 export default function Show({
     transfer,
     membersCount,
     canUpdate,
+    previews,
 }: {
     transfer: Transfer;
     membersCount: number;
     canUpdate: boolean;
+    previews: Record<string, FilePreview>;
 }) {
     const [allFiles, setAllFiles] = useState(false);
+    const thumbnail = useStableThumbnails();
+    const pending = Object.values(previews).some((preview) => preview.pending);
+    const poll = usePoll(5000, { only: ['previews'] }, { autoStart: false });
+    useEffect(() => {
+        if (pending) poll.start();
+        else poll.stop();
+    }, [pending, poll]);
+    const ownerThumbnail = (file: TransferFile) => {
+        const preview = previews[file.id];
+        if (!preview || (!preview.kind && !preview.pending)) return undefined;
+        const previewFile = {
+            id: file.id,
+            name: file.original_name,
+            size: file.size,
+            preview,
+        };
+        return (
+            <FileThumbnail file={previewFile} url={thumbnail(previewFile)} />
+        );
+    };
     const [sharingOpen, setSharingOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const sharing = useForm({ visibility: 'public' });
@@ -300,7 +327,7 @@ export default function Show({
                                     )}
                                 </h2>
                                 <span className="text-sm text-muted-foreground">
-                                    download clicks per file
+                                    previews · downloads per file
                                 </span>
                             </div>
                             <div className="border-t">
@@ -312,6 +339,7 @@ export default function Show({
                                             name={file.original_name}
                                             size={file.size}
                                             variant="owner"
+                                            thumbnail={ownerThumbnail(file)}
                                         >
                                             {transfer.available && (
                                                 <FileDownload
@@ -322,6 +350,12 @@ export default function Show({
                                                     onDownload={refresh}
                                                 />
                                             )}
+                                            <span
+                                                className="min-w-3 text-right text-sm text-muted-foreground tabular-nums"
+                                                title="Times opened in the viewer"
+                                            >
+                                                {file.preview_count || '—'}
+                                            </span>
                                             <span
                                                 className="min-w-3 text-right text-sm tabular-nums"
                                                 title="Download-button actions"
@@ -386,6 +420,11 @@ export default function Show({
                                             : 'No download clicks yet.'}
                                     </p>
                                 )}
+                                <p>
+                                    {transfer.preview_count > 0
+                                        ? `Previewed ${transfer.preview_count} ${transfer.preview_count === 1 ? 'time' : 'times'}, last ${date(transfer.last_previewed_at)}. Previews aren’t downloads and don’t email you.`
+                                        : 'Not previewed yet.'}
+                                </p>
                             </div>
                         </div>
                         <div className="flex flex-col gap-2">

@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Transfer;
 use App\Models\TransferFile;
+use App\Services\TransferStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -13,7 +14,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class SharedTransferController
 {
-    public function show(Request $request, Transfer $transfer): Response
+    public function show(Request $request, Transfer $transfer, TransferStorage $storage): Response
     {
         if (! $transfer->isAvailable()) {
             return Inertia::render('shared/unavailable', [
@@ -68,6 +69,7 @@ final class SharedTransferController
                     'name' => $file->original_name,
                     'size' => $file->size,
                     'mime_type' => $file->mime_type,
+                    'preview' => $storage->previewProps($file),
                 ]),
                 'total_size' => $transfer->files->sum('size'),
                 'expires_at' => $transfer->expires_at?->toIso8601String(),

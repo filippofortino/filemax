@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Jobs\GenerateFilePreview;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
@@ -193,6 +194,7 @@ function fakeRemoteTransferStorage(array $results): MockInterface&AwsS3V3Adapter
 }
 
 it('signs direct multipart requests and verifies provider-listed bytes before completion', function (int|string $partSize): void {
+    Queue::fake([GenerateFilePreview::class]);
     $transfer = Transfer::factory()->uploading()->create(['user_id' => auth()->id()]);
     $file = TransferFile::factory()->for($transfer)->create(['status' => 'uploading', 'size' => 5]);
     $disk = fakeRemoteTransferStorage([
