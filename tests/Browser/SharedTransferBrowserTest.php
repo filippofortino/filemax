@@ -279,6 +279,40 @@ it('opens folders among the thumbnails, expands them in the list and zips one fo
         ->assertNoJavascriptErrors();
 });
 
+it('shows a folder zip filling up on its button and keeps the button shown until it is ready', function (): void {
+    Storage::fake('local');
+    config(['filemax.disk' => 'local']);
+    $transfer = Transfer::factory()->create(['title' => null]);
+    $image = new Imagick;
+    $image->newImage(1200, 800, '#9fb3bf');
+    $image->setImageFormat('jpeg');
+
+    $file = TransferFile::factory()->for($transfer)->create(['folder' => 'Fiera', 'original_name' => 'Stand_000.jpg', 'size' => mb_strlen($image->getImageBlob(), '8bit'), 'mime_type' => 'application/octet-stream']);
+    Storage::disk('local')->put($file->path, $image->getImageBlob());
+    dispatch_sync(new GenerateFilePreview($file->id));
+    TransferFile::factory()->for($transfer)->create(['original_name' => 'loose.txt', 'position' => 1]);
+
+    $page = visit(route('shared.show', $transfer->token))->resize(1280, 940)->assertSee('loose.txt');
+    // The archive stays at 40% so the in-between state can be checked.
+    $page->script(<<<'JS'
+() => {
+    const fetch = window.fetch;
+    window.fetch = (url, options) => new URL(url, location.href).pathname.endsWith('/archive')
+        ? Promise.resolve(Response.json({status: 'processing', progress: 40, url: null}))
+        : fetch(url, options);
+}
+JS);
+    $page->hover('[aria-label="Open folder Fiera, 1 file"]')
+        ->click('[aria-label="Download Fiera as a zip"]')
+        ->assertVisible('[aria-label="Preparing Fiera as a zip, 40%"] svg')
+        ->assertSeeIn('[aria-label="Preparing Fiera as a zip, 40%"]', '40')
+        ->hover('[aria-label="List"]')
+        ->wait(0.3)
+        ->assertScript("getComputedStyle(document.querySelector('[aria-label=\"Preparing Fiera as a zip, 40%\"]').closest('.absolute')).opacity", '1')
+        ->screenshot(filename: 'folder-zip-progress')
+        ->assertNoJavascriptErrors();
+});
+
 it('shows a scannable QR code of the shared link at desktop and phone sizes', function (): void {
     $transfer = Transfer::factory()->create();
     TransferFile::factory()->for($transfer)->create();

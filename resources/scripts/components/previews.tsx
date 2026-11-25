@@ -331,7 +331,8 @@ export function FolderTile({
                     {bytes(folder.size)}
                 </small>
             </span>
-            <span className="absolute top-1 right-1 transition-opacity duration-150 ease-out pointer-fine:opacity-0 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover:opacity-100 [&_button]:bg-background/95 [&_button]:shadow-sm">
+            {/* Also stays shown while its zip prepares, so the progress doesn't vanish with the pointer. */}
+            <span className="absolute top-1 right-1 transition-opacity duration-150 ease-out pointer-fine:opacity-0 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover:opacity-100 pointer-fine:has-[[aria-busy=true]]:opacity-100 [&_button]:bg-background/95 [&_button]:shadow-sm">
                 <FolderDownload
                     token={token}
                     folder={folder.path}

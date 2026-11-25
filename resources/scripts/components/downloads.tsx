@@ -4,7 +4,7 @@ import {
     LoaderCircleIcon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ErrorMessage } from '@/components/filemax';
 import { Button } from '@/components/ui/button';
 import { bytes } from '@/lib/format';
@@ -300,8 +300,8 @@ export function FolderDownload({
                 type="button"
                 variant={variant === 'owner' ? 'ghost' : 'outline'}
                 size={variant === 'owner' ? 'icon-sm' : 'icon'}
+                // Stays enabled while preparing so the ring keeps its colour and focus stays put; start() ignores repeat presses.
                 onClick={start}
-                disabled={busy}
                 aria-label={
                     busy
                         ? `Preparing ${name} as a zip, ${progress}%`
@@ -309,14 +309,86 @@ export function FolderDownload({
                 }
                 aria-busy={busy}
             >
-                <HugeiconsIcon
-                    icon={busy ? LoaderCircleIcon : FolderDownloadIcon}
-                    className={busy ? 'animate-spin' : undefined}
-                    size={variant === 'owner' ? 17 : 18}
-                    aria-hidden="true"
-                />
+                {busy ? (
+                    <ProgressRing
+                        value={progress || null}
+                        size={variant === 'owner' ? 22 : 32}
+                        strokeWidth={variant === 'owner' ? 2.5 : 3}
+                    >
+                        {variant !== 'owner' && progress ? progress : null}
+                    </ProgressRing>
+                ) : (
+                    <HugeiconsIcon
+                        icon={FolderDownloadIcon}
+                        size={variant === 'owner' ? 17 : 18}
+                        aria-hidden="true"
+                    />
+                )}
             </Button>
             <ErrorMessage>{error}</ErrorMessage>
+        </span>
+    );
+}
+
+/** A ring that fills as the zip prepares, for a button too small for a bar. A null value spins as an arc while the progress is unknown. */
+function ProgressRing({
+    value,
+    size,
+    strokeWidth,
+    children,
+}: {
+    value: number | null;
+    size: number;
+    strokeWidth: number;
+    /** Shown in the middle: the percentage. */
+    children?: ReactNode;
+}) {
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const filled = Math.min(100, Math.max(0, value ?? 25)) / 100;
+    return (
+        <span
+            aria-hidden="true"
+            className="relative inline-flex shrink-0 items-center justify-center text-primary"
+            style={{ width: size, height: size }}
+        >
+            <svg
+                width={size}
+                height={size}
+                viewBox={`0 0 ${size} ${size}`}
+                className={
+                    value === null
+                        ? '-rotate-90 animate-spin motion-reduce:animate-none'
+                        : '-rotate-90'
+                }
+            >
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={strokeWidth}
+                    className="opacity-15"
+                />
+                <circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={strokeWidth}
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={circumference * (1 - filled)}
+                    className="transition-[stroke-dashoffset] duration-500 ease-out motion-reduce:transition-none"
+                />
+            </svg>
+            {children !== undefined && children !== null && (
+                <span className="absolute text-[10px] leading-none font-semibold text-foreground tabular-nums">
+                    {children}
+                </span>
+            )}
         </span>
     );
 }
