@@ -235,16 +235,16 @@ it("keeps folders in the zip, zips one folder on its own and counts each folder'
     expect($transfer->archives()->count())->toBe(0);
 });
 
-it('never lets a file and a folder share a name in the zip', function (): void {
+it('never lets a file and a folder share a name in the zip, or two folders merge', function (): void {
     $transfer = Transfer::factory()->create();
-    foreach ([[null, 'A?B'], ['A:B', 'x.txt'], ['A*B/C', 'y.txt'], [null, '0'], ['0', 'z.txt']] as $position => [$folder, $name]) {
+    foreach ([[null, 'A?B'], ['A:B', 'x.txt'], ['A*B/C', 'y.txt'], [null, '0'], ['0', 'z.txt'], ['Photos', 'p.jpg'], ['photos', 'q.jpg']] as $position => [$folder, $name]) {
         $file = TransferFile::factory()->for($transfer)->create(['folder' => $folder, 'original_name' => $name, 'position' => $position]);
         Storage::disk('local')->put($file->path, 'test');
     }
 
     $this->postJson(route('shared.download', $transfer->token))->assertOk()->assertJsonPath('status', 'ready');
 
-    expect(zipEntryNames(Storage::disk('local')->path($transfer->refresh()->archive_path)))->toBe(['A_B (2)', 'A_B/x.txt', 'A_B/C/y.txt', '0 (2)', '0/z.txt']);
+    expect(zipEntryNames(Storage::disk('local')->path($transfer->refresh()->archive_path)))->toBe(['A_B (3)', 'A_B/x.txt', 'A_B (2)/C/y.txt', '0 (2)', '0/z.txt', 'Photos/p.jpg', 'photos (2)/q.jpg']);
 });
 
 it('deletes folder zip records before it marks a purge complete', function (): void {

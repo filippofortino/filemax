@@ -95,13 +95,14 @@ final class PrepareTransferArchive implements ShouldBeUnique, ShouldQueue
             $this->currentRequest()->update(['archive_status' => 'processing', 'archive_progress' => 0]);
             $files = $this->folder === null ? $transfer->files : $transfer->files->filter->isIn($this->folder);
             $totalSize = $files->sum(fn (TransferFile $file): int => $file->size);
+            $directories = $this->entryDirectories($files);
             throw_if($totalSize > 5492189429760, RuntimeException::class, 'This archive exceeds the storage provider’s maximum object size.');
 
             /** STORE entries need only headers, names and ZIP64 records beyond the source bytes. Each name is written twice: local header and central directory. */
-            $maximumSize = $totalSize + $files->sum(fn (TransferFile $file): int => 4096 + 2 * mb_strlen($this->entryDirectory($file).$this->entrySafe($file->safeName()), '8bit')) + 1024;
+            $maximumSize = $totalSize + $files->sum(fn (TransferFile $file): int => 4096 + 2 * mb_strlen($directories[$this->relativeFolder($file)].$this->entrySafe($file->safeName()), '8bit')) + 1024;
             $path = $this->folder === null ? 'archives/'.$transfer->id.'.zip' : TransferArchive::storagePath($transfer->id, $this->folder);
 
-            $storage->writeArchive($path, $maximumSize, function (callable $write) use ($storage, $files, $totalSize): void {
+            $storage->writeArchive($path, $maximumSize, function (callable $write) use ($storage, $files, $directories, $totalSize): void {
                 $written = 0;
                 $progress = -1;
                 $output = CallbackStreamWrapper::open(function (string $bytes) use ($write, $totalSize, &$written, &$progress): void {
@@ -120,20 +121,12 @@ final class PrepareTransferArchive implements ShouldBeUnique, ShouldQueue
                 try {
                     $zip = new ZipStream(outputStream: $output, defaultCompressionMethod: CompressionMethod::STORE, enableZip64: true, defaultEnableZeroHeader: true, sendHttpHeaders: false);
                     $names = [];
-                    // Every folder the zip will hold, so no file takes a folder's name and no folder a file's.
-                    $folders = [];
-                    foreach ($files as $file) {
-                        $path = '';
-                        foreach (array_filter(explode('/', $this->entryDirectory($file)), fn (string $segment): bool => $segment !== '') as $segment) {
-                            $path .= $segment;
-                            $folders[mb_strtolower($path)] = true;
-                            $path .= '/';
-                        }
-                    }
+                    // Every folder the zip will hold, so no file takes a folder's name.
+                    $folders = array_flip(array_map(fn (string $directory): string => mb_strtolower(mb_rtrim($directory, '/')), $directories));
 
                     foreach ($files as $file) {
                         $this->ensureAvailable();
-                        $directory = $this->entryDirectory($file);
+                        $directory = $directories[$this->relativeFolder($file)];
                         $name = $this->entrySafe($file->safeName());
                         $stem = pathinfo($name, PATHINFO_FILENAME);
                         $extension = pathinfo($name, PATHINFO_EXTENSION);
@@ -201,13 +194,51 @@ final class PrepareTransferArchive implements ShouldBeUnique, ShouldQueue
         throw_unless($transfer?->isAvailable() && $this->currentRequest()->value('archive_status') === 'processing', RuntimeException::class, 'The transfer is no longer available for this archive request.');
     }
 
-    /** The file's folder inside the zip, with a trailing slash. A folder zip starts at that folder, so it unzips as one folder. */
-    private function entryDirectory(TransferFile $file): string
+    /** The file's folder below where the zip starts: a folder zip starts at that folder, so it unzips as one folder. */
+    private function relativeFolder(TransferFile $file): string
     {
         $parent = $this->folder !== null && str_contains($this->folder, '/') ? Str::beforeLast($this->folder, '/').'/' : '';
-        $relative = $file->folder === null ? '' : mb_substr($file->folder, mb_strlen($parent));
 
-        return Collection::make(explode('/', $relative))->filter(fn (string $segment): bool => $segment !== '')->map($this->entrySafe(...))->map(fn (string $segment): string => $segment.'/')->implode('');
+        return $file->folder === null ? '' : mb_substr($file->folder, mb_strlen($parent));
+    }
+
+    /**
+     * Each folder's name inside the zip, with a trailing slash, keyed by its path. Two folders that differ only in
+     * characters the zip replaces, or only in case, get " (2)" rather than merging into one.
+     *
+     * @param  Collection<int, TransferFile>  $files
+     * @return array<string, string>
+     */
+    private function entryDirectories(Collection $files): array
+    {
+        $directories = ['' => ''];
+        $taken = [];
+        foreach ($files as $file) {
+            $path = '';
+            foreach (explode('/', $this->relativeFolder($file)) as $segment) {
+                if ($segment === '') {
+                    continue;
+                }
+
+                $parent = $path;
+                $path = $path === '' ? $segment : $path.'/'.$segment;
+                if (isset($directories[$path])) {
+                    continue;
+                }
+
+                $name = $this->entrySafe($segment);
+                $candidate = $directories[$parent].$name;
+                $suffix = 1;
+                while (isset($taken[mb_strtolower($candidate)])) {
+                    $candidate = $directories[$parent].$name.' ('.(++$suffix).')';
+                }
+
+                $taken[mb_strtolower($candidate)] = true;
+                $directories[$path] = $candidate.'/';
+            }
+        }
+
+        return $directories;
     }
 
     /** Characters Windows can't extract, and control characters, become underscores. */
