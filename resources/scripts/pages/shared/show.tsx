@@ -262,6 +262,7 @@ export default function SharedTransferPage({
                                 </h2>
                                 <div className="w-full sm:w-auto">
                                     <DownloadAll
+                                        key={current.path}
                                         token={transfer.token}
                                         totalSize={current.size}
                                         folder={current.path}

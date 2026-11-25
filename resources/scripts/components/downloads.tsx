@@ -261,6 +261,8 @@ export function FolderDownload({
 }) {
     const [progress, setProgress] = useState<number | null>(null);
     const [error, setError] = useState('');
+    // Said once when the zip starts and once when it's ready; the percentages stay in the button's name.
+    const [announcement, setAnnouncement] = useState('');
     const controller = useRef<AbortController | null>(null);
     useEffect(() => () => controller.current?.abort(), []);
 
@@ -270,17 +272,19 @@ export function FolderDownload({
         controller.current = active;
         setProgress(0);
         setError('');
+        setAnnouncement(`Preparing ${name} as a zip.`);
         try {
-            window.location.assign(
-                await prepareArchive(
-                    token,
-                    folder,
-                    active.signal,
-                    setProgress,
-                    onDownload,
-                ),
+            const url = await prepareArchive(
+                token,
+                folder,
+                active.signal,
+                setProgress,
+                onDownload,
             );
+            setAnnouncement(`${name} zip is ready. Downloading.`);
+            window.location.assign(url);
         } catch (caught) {
+            setAnnouncement('');
             if (!active.signal.aborted)
                 setError(
                     caught instanceof Error
@@ -325,6 +329,9 @@ export function FolderDownload({
                     />
                 )}
             </Button>
+            <span role="status" className="sr-only">
+                {announcement}
+            </span>
             <ErrorMessage>{error}</ErrorMessage>
         </span>
     );

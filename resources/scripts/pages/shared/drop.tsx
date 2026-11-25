@@ -296,6 +296,7 @@ function Uploader({ drop }: { drop: SharedDrop }) {
             currentEntries.current.map((entry) => ({
                 key: entry.key,
                 file: entry.file,
+                folder: entry.folder,
                 status: 'waiting' as const,
                 loaded: 0,
             })),

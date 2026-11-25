@@ -97,8 +97,9 @@ final class PurgeTransfer implements ShouldBeUnique, ShouldQueue
 
             throw_unless(Storage::disk('local')->deleteDirectory('uploads/'.$transfer->id), RuntimeException::class, 'Could not delete temporary upload parts.');
 
-            $transfer->forceFill(['purged_at' => now(), 'archive_path' => null, 'archive_status' => null, 'archive_progress' => 0])->save();
+            // Rows first: once purged_at is set, a retry returns early and would leave them behind.
             $transfer->archives()->delete();
+            $transfer->forceFill(['purged_at' => now(), 'archive_path' => null, 'archive_status' => null, 'archive_progress' => 0])->save();
         } finally {
             $lock->release();
         }

@@ -40,8 +40,8 @@ final class TransferFile extends Model
 
     use HasUuids;
 
-    /** A ".." segment, which could climb out of the zip, or hidden characters, which could disguise a name. */
-    public const string UNSAFE_FOLDER = '#(^|[/\\\\])\.\.([/\\\\]|$)|[\p{Cc}\p{Cf}]#u';
+    /** A ".." segment (spaces around it are trimmed away later), which could climb out of the zip, or hidden characters, which could disguise a name. */
+    public const string UNSAFE_FOLDER = '#(^|[/\\\\])\s*\.\.\s*([/\\\\]|$)|[\p{Cc}\p{Cf}]#u';
 
     protected $attributes = ['status' => 'uploading', 'mime_type' => 'application/octet-stream', 'position' => 0, 'download_count' => 0, 'part_size' => 5242880];
 

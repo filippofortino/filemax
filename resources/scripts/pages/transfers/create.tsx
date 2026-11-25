@@ -136,7 +136,8 @@ export default function Create() {
         target?.focus();
     }, [busy, entries]);
     function addFiles(picked: Picked) {
-        if (draft.current || busy || ready) return;
+        // operating, not busy: a folder walk can finish after Create transfer starts, when busy is stale.
+        if (draft.current || operating.current || ready) return;
         changeEntries([
             ...currentEntries.current,
             ...picked.files.map(({ file, folder }) => ({

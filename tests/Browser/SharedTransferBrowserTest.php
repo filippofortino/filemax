@@ -306,6 +306,7 @@ JS);
         ->click('[aria-label="Download Fiera as a zip"]')
         ->assertVisible('[aria-label="Preparing Fiera as a zip, 40%"] svg')
         ->assertSeeIn('[aria-label="Preparing Fiera as a zip, 40%"]', '40')
+        ->assertScript("document.querySelector('[aria-label=\"Preparing Fiera as a zip, 40%\"]').parentElement.querySelector('[role=status]').textContent", 'Preparing Fiera as a zip.')
         ->hover('[aria-label="List"]')
         ->wait(0.3)
         ->assertScript("getComputedStyle(document.querySelector('[aria-label=\"Preparing Fiera as a zip, 40%\"]').closest('.absolute')).opacity", '1')

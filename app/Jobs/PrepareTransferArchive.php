@@ -97,8 +97,8 @@ final class PrepareTransferArchive implements ShouldBeUnique, ShouldQueue
             $totalSize = $files->sum(fn (TransferFile $file): int => $file->size);
             throw_if($totalSize > 5492189429760, RuntimeException::class, 'This archive exceeds the storage provider’s maximum object size.');
 
-            /** STORE entries need only headers, names and ZIP64 records beyond the source bytes. */
-            $maximumSize = $totalSize + ($files->count() * 4096) + 1024;
+            /** STORE entries need only headers, names and ZIP64 records beyond the source bytes. Each name is written twice: local header and central directory. */
+            $maximumSize = $totalSize + $files->sum(fn (TransferFile $file): int => 4096 + 2 * mb_strlen($this->entryDirectory($file).$this->entrySafe($file->safeName()), '8bit')) + 1024;
             $path = $this->folder === null ? 'archives/'.$transfer->id.'.zip' : TransferArchive::storagePath($transfer->id, $this->folder);
 
             $storage->writeArchive($path, $maximumSize, function (callable $write) use ($storage, $files, $totalSize): void {
@@ -120,6 +120,16 @@ final class PrepareTransferArchive implements ShouldBeUnique, ShouldQueue
                 try {
                     $zip = new ZipStream(outputStream: $output, defaultCompressionMethod: CompressionMethod::STORE, enableZip64: true, defaultEnableZeroHeader: true, sendHttpHeaders: false);
                     $names = [];
+                    // Every folder the zip will hold, so no file takes a folder's name and no folder a file's.
+                    $folders = [];
+                    foreach ($files as $file) {
+                        $path = '';
+                        foreach (array_filter(explode('/', $this->entryDirectory($file))) as $segment) {
+                            $path .= $segment;
+                            $folders[mb_strtolower($path)] = true;
+                            $path .= '/';
+                        }
+                    }
 
                     foreach ($files as $file) {
                         $this->ensureAvailable();
@@ -129,7 +139,7 @@ final class PrepareTransferArchive implements ShouldBeUnique, ShouldQueue
                         $extension = pathinfo($name, PATHINFO_EXTENSION);
                         $suffix = 1;
 
-                        while (isset($names[mb_strtolower($directory.$name)])) {
+                        while (isset($names[mb_strtolower($directory.$name)]) || isset($folders[mb_strtolower($directory.$name)])) {
                             $name = $stem.' ('.(++$suffix).')'.($extension !== '' ? '.'.$extension : '');
                         }
 
@@ -203,6 +213,7 @@ final class PrepareTransferArchive implements ShouldBeUnique, ShouldQueue
     /** Characters Windows can't extract, and control characters, become underscores. */
     private function entrySafe(string $name): string
     {
-        return (string) preg_replace('/[\\\\:*?"<>|\x00-\x1F\x7F]/u', '_', $name);
+        // Validation already refuses "..", but a "." or ".." here would climb out of the zip, so it never passes.
+        return in_array($name, ['.', '..'], true) ? '_' : (string) preg_replace('/[\\\\:*?"<>|\x00-\x1F\x7F]/u', '_', $name);
     }
 }

@@ -85,7 +85,8 @@ export default function Show({
     const [sharingOpen, setSharingOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const sharing = useForm({ visibility: 'public' });
-    const refresh = () => router.reload({ only: ['transfer'] });
+    const refresh = () =>
+        router.reload({ only: ['transfer', 'folderDownloads'] });
     return (
         <Shell active="transfers">
             <Head title={transfer.title} />
@@ -332,11 +333,10 @@ export default function Show({
                             <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
                                 <h2 className="font-sans text-sm font-semibold tracking-normal">
                                     Files
-                                    {transfer.files.length > 4 && !allFiles && (
+                                    {tree.files.length > 4 && !allFiles && (
                                         <span className="font-normal text-muted-foreground">
                                             {' '}
-                                            · showing 4 of{' '}
-                                            {transfer.files.length}
+                                            · showing 4 of {tree.files.length}
                                         </span>
                                     )}
                                 </h2>
@@ -374,8 +374,14 @@ export default function Show({
                                                 className="min-w-3 text-right text-sm tabular-nums"
                                                 title="Times this folder was downloaded as a zip"
                                             >
-                                                {folderDownloads[folder.path] ||
-                                                    '—'}
+                                                {(Object.hasOwn(
+                                                    folderDownloads,
+                                                    folder.path,
+                                                )
+                                                    ? folderDownloads[
+                                                          folder.path
+                                                      ]
+                                                    : 0) || '—'}
                                             </span>
                                         </>
                                     )}

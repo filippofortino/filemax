@@ -173,6 +173,8 @@ it('refuses folders that could escape the zip or hide characters, and more than 
 })->with([
     'parent folder' => [[['name' => 'a.txt', 'size' => 1, 'folder' => '..']], 'files.0.folder'],
     'parent folder inside a path' => [[['name' => 'a.txt', 'size' => 1, 'folder' => 'Shoot\\..\\..\\etc']], 'files.0.folder'],
+    'parent folder padded with spaces' => [[['name' => 'a.txt', 'size' => 1, 'folder' => 'Shoot/ .. /etc']], 'files.0.folder'],
+    'only a padded parent folder' => [[['name' => 'a.txt', 'size' => 1, 'folder' => ' .. ']], 'files.0.folder'],
     'control character' => [[['name' => 'a.txt', 'size' => 1, 'folder' => "Shoot\nPhotos"]], 'files.0.folder'],
     'too long' => [[['name' => 'a.txt', 'size' => 1, 'folder' => str_repeat('a', 1025)]], 'files.0.folder'],
     'not a string' => [[['name' => 'a.txt', 'size' => 1, 'folder' => ['Shoot']]], 'files.0.folder'],

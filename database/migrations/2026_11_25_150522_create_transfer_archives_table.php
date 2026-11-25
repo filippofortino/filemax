@@ -14,7 +14,12 @@ return new class extends Migration
         Schema::create('transfer_archives', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->foreignUuid('transfer_id')->constrained()->cascadeOnDelete();
-            $table->string('folder', 1024);
+            $folder = $table->string('folder', 1024);
+            // "Photos" and "photos" are different folders, so MySQL's case-insensitive default would mix up their zips.
+            if (in_array(Schema::getConnection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+                $folder->collation('utf8mb4_bin');
+            }
+
             $table->string('archive_status')->nullable();
             $table->string('archive_path')->nullable();
             $table->unsignedTinyInteger('archive_progress')->default(0);
