@@ -38,6 +38,7 @@ it('wraps an upload in Christmas from the drop zone to the copied link', functio
 }
 JS))->toBeTrue();
     expect($page->script('() => document.querySelector("link[rel=icon]").href'))->toEndWith('/favicon-christmas.svg');
+
     $page->script('() => document.fonts.ready');
     $page->screenshot(fullPage: false, filename: 'christmas-upload-empty');
 
@@ -66,6 +67,7 @@ JS);
         ->assertNotPresent('.xmas-snow');
     expect($page->script('() => getComputedStyle(document.querySelector("progress")).animationName'))->toBe('xmas-cane');
     expect($page->wait(0.1)->script('() => getComputedStyle(document.querySelector("progress")).getPropertyValue("--xmas-cane")'))->not->toBe('0px');
+
     $page->screenshot(fullPage: false, filename: 'christmas-upload-progress');
 
     $page->script('() => window.releaseUploads()');
