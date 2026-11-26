@@ -10,6 +10,7 @@ import { Form, Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { usePasskeyRegister } from '@laravel/passkeys/react';
 import { useEffect, useRef, useState } from 'react';
 import { update as updateSettings } from '@/actions/App/Http/Controllers/AccountSettingsController';
+import { ChristmasSettings } from '@/christmas';
 import { Avatar } from '@/components/avatar';
 import { ErrorMessage, Shell } from '@/components/filemax';
 import { sessionExpired } from '@/components/passkey-button';
@@ -127,6 +128,7 @@ export default function Settings(
                                         user={auth.user}
                                         settings={props.settings}
                                     />
+                                    <ChristmasSettings />
                                 </>
                             )}
                             {props.section === 'notifications' && auth.user && (

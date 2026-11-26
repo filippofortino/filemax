@@ -1,0 +1,339 @@
+/*
+ * Christmas decorations: motion and the hooks that let each decoration place
+ * itself, so the pages hosting them need no extra classes. See index.tsx.
+ * Under "Reduce motion" app.css stops every animation; the block at the end
+ * only sets what each decoration should look like standing still.
+ */
+
+/* Logo: Santa hat, "Ho ho ho!" and the arm that takes the hat in Grinch Mode */
+a:has(> .xmas-hat) {
+    position: relative;
+}
+
+.xmas-hat,
+.xmas-arm {
+    --s: 1;
+    position: absolute;
+    left: calc(13px * var(--s));
+    top: calc(50% - 22px * var(--s));
+    width: calc(20px * var(--s));
+    height: calc(16px * var(--s));
+    pointer-events: none;
+}
+
+.xmas-hat {
+    transform: rotate(22deg);
+}
+
+.xmas-large {
+    --s: 1.3333;
+}
+
+.xmas-arm {
+    left: 12px;
+    top: calc(50% - 70px);
+    width: 22px;
+    height: 60px;
+    animation: xmas-arm 1.4s ease-in-out both;
+}
+
+.xmas-ho span {
+    opacity: 0;
+}
+
+/* "Ho ho ho!" takes the name's place, so nothing lands on what sits beside the logo (the organization switcher). */
+a:is(:hover, :focus-visible):has(> .xmas-ho) > span:not(.xmas-ho) {
+    animation: xmas-name 2.4s ease both;
+}
+
+a:is(:hover, :focus-visible) > .xmas-ho span {
+    animation: xmas-ho 1.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+a:is(:hover, :focus-visible) > .xmas-ho span:nth-child(2) {
+    animation-delay: 0.22s;
+}
+
+a:is(:hover, :focus-visible) > .xmas-ho span:nth-child(3) {
+    animation-delay: 0.44s;
+}
+
+a:is(:hover, :focus-visible) > .xmas-hat {
+    animation: xmas-hat-wobble 0.9s ease-in-out;
+}
+
+.xmas-hat.xmas-hat-stolen {
+    animation: xmas-hat-stolen 1.4s ease-in-out both;
+}
+
+.xmas-hat.xmas-hat-back {
+    animation: xmas-hat-back 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes xmas-ho {
+    0% {
+        opacity: 0;
+        transform: translateY(6px) scale(0.8);
+    }
+    14% {
+        opacity: 1;
+        transform: translateY(-2px) scale(1.06);
+    }
+    22%,
+    70% {
+        opacity: 1;
+        transform: none;
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+}
+
+@keyframes xmas-name {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    7%,
+    86% {
+        opacity: 0;
+    }
+}
+
+@keyframes xmas-hat-wobble {
+    0%,
+    100% {
+        transform: rotate(22deg);
+    }
+    25% {
+        transform: rotate(6deg);
+    }
+    50% {
+        transform: rotate(30deg);
+    }
+    75% {
+        transform: rotate(18deg);
+    }
+}
+
+@keyframes xmas-arm {
+    0%,
+    100% {
+        transform: translateY(-90px);
+    }
+    35%,
+    48% {
+        transform: translateY(0);
+    }
+}
+
+@keyframes xmas-hat-stolen {
+    0%,
+    35%,
+    48% {
+        transform: rotate(22deg);
+        opacity: 1;
+    }
+    40% {
+        transform: rotate(12deg);
+    }
+    44% {
+        transform: rotate(30deg);
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-90px) rotate(22deg);
+        opacity: 0;
+    }
+}
+
+@keyframes xmas-hat-back {
+    from {
+        transform: translateY(-40px) rotate(22deg);
+        opacity: 0;
+    }
+}
+
+/* Room under the lights a card wears (CardLights is only shown from md up) */
+@media (width >= 48rem) {
+    :has(> .xmas-card-lights) {
+        position: relative;
+        padding-top: 60px;
+    }
+}
+
+/* Snow drifting behind the drop zone */
+:has(> .xmas-snow) {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+}
+
+.xmas-flake {
+    animation: xmas-drift 10s ease-in-out infinite;
+}
+
+@keyframes xmas-drift {
+    0% {
+        transform: translate(0, -24px) rotate(0deg);
+        opacity: 0;
+    }
+    15% {
+        opacity: 1;
+    }
+    50% {
+        transform: translate(-7px, 16px) rotate(45deg);
+    }
+    85% {
+        opacity: 1;
+    }
+    100% {
+        transform: translate(12px, 56px) rotate(90deg);
+        opacity: 0;
+    }
+}
+
+/* A puff of snow bursting out of the "link ready" gift */
+:has(> .xmas-puff) {
+    position: relative;
+}
+
+:has(> .xmas-puff) > svg:first-child {
+    animation: xmas-gift 0.7s ease-in-out 0.35s;
+}
+
+.xmas-pop {
+    animation:
+        xmas-pop 1.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both,
+        xmas-float 3.2s ease-in-out 1.8s infinite alternate;
+}
+
+.xmas-pop:nth-child(odd) {
+    animation-duration: 1.6s, 4.4s;
+}
+
+.xmas-pop:nth-child(3n) {
+    animation-delay: 0.2s, 2.6s;
+}
+
+@keyframes xmas-gift {
+    20% {
+        rotate: -12deg;
+    }
+    45% {
+        rotate: 10deg;
+    }
+    70% {
+        rotate: -5deg;
+    }
+}
+
+@keyframes xmas-pop {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.3);
+    }
+    25% {
+        opacity: 0.8;
+    }
+    100% {
+        opacity: 0.35;
+        transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy)))
+            scale(1) rotate(60deg);
+    }
+}
+
+@keyframes xmas-float {
+    to {
+        translate: 0 7px;
+        rotate: 30deg;
+        opacity: 0.7;
+    }
+}
+
+/* String lights */
+.xmas-bulb {
+    animation: xmas-flicker 4s linear infinite;
+    filter: drop-shadow(0 0 2.5px currentColor);
+}
+
+@keyframes xmas-flicker {
+    0%,
+    40%,
+    44%,
+    53%,
+    78%,
+    80%,
+    100% {
+        opacity: 1;
+    }
+    41%,
+    43% {
+        opacity: 0.3;
+    }
+    45%,
+    52% {
+        opacity: 0.22;
+    }
+    79% {
+        opacity: 0.3;
+    }
+}
+
+/* Candy-cane progress bars on any page that wears the hat */
+@property --xmas-cane {
+    syntax: '<length>';
+    inherits: true;
+    initial-value: 0px;
+}
+
+body:has(.xmas-hat) progress {
+    animation: xmas-cane 0.9s linear infinite;
+}
+
+body:has(.xmas-hat) progress::-webkit-progress-value {
+    background: repeating-linear-gradient(
+            -45deg,
+            transparent 0 5px,
+            #fff 5px 10px
+        )
+        var(--xmas-cane) 0 / 14.142px 100% #d92d20;
+}
+
+body:has(.xmas-hat) progress::-moz-progress-bar {
+    background: repeating-linear-gradient(
+            -45deg,
+            transparent 0 5px,
+            #fff 5px 10px
+        )
+        var(--xmas-cane) 0 / 14.142px 100% #d92d20;
+}
+
+/* The stripes follow a property animated on the element itself, so both vendor pseudo-elements move alike. */
+@keyframes xmas-cane {
+    to {
+        --xmas-cane: 14.142px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    a:is(:hover, :focus-visible) > .xmas-ho span {
+        opacity: 1;
+    }
+
+    a:is(:hover, :focus-visible):has(> .xmas-ho) > span:not(.xmas-ho) {
+        opacity: 0;
+    }
+
+    .xmas-hat-stolen {
+        opacity: 0;
+    }
+
+    .xmas-pop {
+        opacity: 0.35;
+        transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy)));
+    }
+}
