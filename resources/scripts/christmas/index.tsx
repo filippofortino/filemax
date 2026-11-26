@@ -34,7 +34,12 @@ function inSeason(): boolean {
     );
 }
 
+/** Choices storage refused (private mode, blocked site data). They last until the page is left. */
+const unsaved = new Map<string, boolean>();
+
 function flag(key: string): boolean {
+    const choice = unsaved.get(key);
+    if (choice !== undefined) return choice;
     try {
         return localStorage.getItem(key) !== null;
     } catch {
@@ -46,8 +51,9 @@ function setFlag(key: string, on: boolean) {
     try {
         if (on) localStorage.setItem(key, '1');
         else localStorage.removeItem(key);
+        unsaved.delete(key);
     } catch {
-        // Without storage the choice lasts until the page is left.
+        unsaved.set(key, on);
     }
 }
 

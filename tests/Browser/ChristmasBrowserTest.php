@@ -165,3 +165,15 @@ it('keeps automated browsers on the plain app unless they ask for the preview', 
         ->assertNoJavascriptErrors();
     expect($page->script('() => document.querySelector("link[rel=icon]").href'))->toEndWith('/favicon.svg');
 });
+
+it('keeps Grinch Mode on for the page when the browser refuses to store it', function (): void {
+    $this->actingAs(User::factory()->create())->withSession(['auth.password_confirmed_at' => now()->timestamp]);
+
+    $page = visit('/account/settings?christmas=on')->assertSee('Grinch Mode');
+    $page->script('() => { Storage.prototype.setItem = () => { throw new DOMException("Quota exceeded", "QuotaExceededError"); }; }');
+    $page->click('[aria-labelledby="grinch-label"]')
+        ->wait(1.8)
+        ->assertNotPresent('.xmas-hat')
+        ->assertSee('Decorations packed away. Bah, humbug.')
+        ->assertNoJavascriptErrors();
+});
