@@ -26,6 +26,7 @@ import {
     type ComponentProps,
     type ReactNode,
 } from 'react';
+import { BrandDecoration } from '@/christmas';
 import { Avatar } from '@/components/avatar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -85,6 +86,7 @@ export function Brand({ large = false }: { large?: boolean }) {
                 />
             </svg>
             <span>Filemax</span>
+            <BrandDecoration large={large} />
         </Link>
     );
 }
@@ -557,10 +559,12 @@ export function CopyLink({
     url,
     noun = 'link',
     hint,
+    onCopied,
 }: {
     url: string;
     noun?: 'link' | 'key';
     hint?: ReactNode;
+    onCopied?: () => void;
 }) {
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState('');
@@ -570,6 +574,7 @@ export function CopyLink({
             await navigator.clipboard.writeText(url);
             setCopied(true);
             setError('');
+            onCopied?.();
         } catch {
             setError(
                 `Copy is unavailable. Select the ${noun} and copy it manually.`,

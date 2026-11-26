@@ -2,6 +2,7 @@ import {
     Cancel01Icon,
     Files01Icon,
     Folder01Icon,
+    GiftIcon,
     Globe02Icon,
     Tick02Icon,
     Upload01Icon,
@@ -12,6 +13,7 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { Snow, SnowPuff, useChristmas } from '@/christmas';
 import {
     CopyLink,
     RadioPill,
@@ -23,6 +25,7 @@ import {
 } from '@/components/filemax';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { toast } from '@/components/ui/toast';
 import {
     droppedFiles,
     folderTree,
@@ -79,6 +82,7 @@ export default function Create() {
     const [dragging, setDragging] = useState(false);
     const [remaining, setRemaining] = useState<number | null>(null);
     const dragDepth = useRef(0);
+    const festive = useChristmas();
     function changeEntries(next: Entry[]) {
         currentEntries.current = next;
         setEntries(next);
@@ -516,17 +520,20 @@ export default function Create() {
                         <div className="flex flex-col items-center gap-3.5 text-center">
                             <span className="inline-flex size-18 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-[opacity,scale] [transition-delay:80ms] duration-300 ease-out starting:opacity-0 motion-safe:starting:scale-90">
                                 <HugeiconsIcon
-                                    icon={Tick02Icon}
+                                    icon={festive ? GiftIcon : Tick02Icon}
                                     size={30}
                                     aria-hidden="true"
                                 />
+                                <SnowPuff />
                             </span>
                             <h1
                                 ref={readyHeading}
                                 tabIndex={-1}
                                 className="text-4xl"
                             >
-                                Your link is ready
+                                {festive
+                                    ? 'Wrapped and ready'
+                                    : 'Your link is ready'}
                             </h1>
                             <p className="text-muted-foreground">
                                 {ready.files.length}{' '}
@@ -535,7 +542,16 @@ export default function Create() {
                                 {dateTime(ready.expires_at)}
                             </p>
                         </div>
-                        <CopyLink url={ready.url} />
+                        <CopyLink
+                            url={ready.url}
+                            onCopied={() =>
+                                festive &&
+                                toast.add({
+                                    title: 'Link copied',
+                                    description: 'Checked it twice.',
+                                })
+                            }
+                        />
                         {ready.visibility === 'members' ? (
                             <div className="flex flex-col gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-slate-700">
                                 <strong>
@@ -680,11 +696,12 @@ export default function Create() {
                             event.target.value = '';
                         }}
                     />
+                    {!entries.length && <Snow />}
                     {!entries.length ? (
                         <div className="flex min-h-72 flex-1 flex-col items-center justify-center gap-4 text-center md:min-h-80">
                             <span className="inline-flex size-18 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                                 <HugeiconsIcon
-                                    icon={Upload01Icon}
+                                    icon={festive ? GiftIcon : Upload01Icon}
                                     size={32}
                                     strokeWidth={2}
                                     aria-hidden="true"
@@ -704,6 +721,7 @@ export default function Create() {
                                     {' '}
                                     Folders keep their structure.
                                 </span>
+                                {festive && ' Under the tree too.'}
                             </p>
                             <div className="flex flex-wrap items-center justify-center gap-3">
                                 <Button
@@ -872,6 +890,7 @@ export default function Create() {
                                 <p className="text-center text-sm text-muted-foreground">
                                     Keep this tab open until the upload
                                     finishes.
+                                    {festive && ' The elves are on it.'}
                                 </p>
                             )}
                         </>
@@ -1235,6 +1254,9 @@ export default function Create() {
                                 <p className="mt-2.5 text-sm text-muted-foreground">
                                     Available until{' '}
                                     {dateTime(availableUntil.toISOString())}.
+                                    {festive &&
+                                        expiry === 30 &&
+                                        ' Outlasts the panettone.'}
                                 </p>
                             </fieldset>
                         </>

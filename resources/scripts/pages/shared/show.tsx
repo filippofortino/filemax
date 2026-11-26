@@ -7,6 +7,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { Head, usePoll } from '@inertiajs/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Fragment, useEffect, useState } from 'react';
+import { CardLights, StringLights, useChristmas } from '@/christmas';
 import { Avatar } from '@/components/avatar';
 import {
     DownloadAll,
@@ -98,11 +99,17 @@ export default function SharedTransferPage({
         else poll.stop();
     }, [pending, poll]);
     const displayUrl = transfer.url.replace(/^https?:\/\//, '');
+    const festive = useChristmas();
     return (
-        <Shell recipient organization={transfer.organization}>
+        <Shell
+            recipient
+            organization={transfer.organization}
+            footer={festive ? 'Sent with Filemax. Happy holidays!' : undefined}
+        >
             <Head title={transfer.title}>
                 <meta name="robots" content="noindex, nofollow" />
             </Head>
+            <StringLights />
             <main className="flex flex-1 justify-center px-5 py-6 md:items-center md:px-10 md:pb-2">
                 <section
                     className={cn(
@@ -110,6 +117,7 @@ export default function SharedTransferPage({
                         grid && 'md:max-w-4xl',
                     )}
                 >
+                    <CardLights swags={grid ? 5 : 3} />
                     <div className="flex flex-col gap-3 md:gap-3.5">
                         {transfer.sender && (
                             <div className="flex items-center gap-2.5 text-sm leading-snug text-muted-foreground">
