@@ -21,14 +21,14 @@ test('admins save the brand color, welcome note and footer', function (): void {
         'organization_id' => $organization->id,
         'brand_color' => '#be185d',
         'welcome_message' => 'Ciao! Ecco i file dal team.',
-        'footer_text' => 'Studio Conti, Milano',
+        'footer_text' => 'Studio Conti, Pisa',
         'footer_url' => 'https://example.com',
     ])->assertSessionHasNoErrors()->assertInertiaFlash('toast.title', 'Branding saved');
 
     expect($organization->refresh()->only(['brand_color', 'welcome_message', 'footer_text', 'footer_url']))->toBe([
         'brand_color' => '#BE185D',
         'welcome_message' => 'Ciao! Ecco i file dal team.',
-        'footer_text' => 'Studio Conti, Milano',
+        'footer_text' => 'Studio Conti, Pisa',
         'footer_url' => 'https://example.com',
     ]);
 

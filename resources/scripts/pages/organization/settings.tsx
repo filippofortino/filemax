@@ -913,7 +913,7 @@ function Branding({
                                     id="footer-text"
                                     name="footer_text"
                                     maxLength={120}
-                                    placeholder={`e.g. ${organization.name}, Milano`}
+                                    placeholder={`e.g. ${organization.name}, Pisa`}
                                     value={footerText}
                                     onChange={(event) =>
                                         setFooterText(event.target.value)
