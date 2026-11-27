@@ -11,6 +11,7 @@ use App\Http\Resources\TransferResource;
 use App\Jobs\PurgeTransfer;
 use App\Models\Transfer;
 use App\Models\TransferFile;
+use App\Models\TransferRecipient;
 use App\Services\TransferStorage;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -123,6 +124,7 @@ final class TransferController
             'membersCount' => $transfer->organization->users()->count(),
             'canUpdate' => Gate::allows('update', $transfer),
             'folderDownloads' => (object) $transfer->archives()->pluck('download_count', 'folder')->all(),
+            'people' => fn (): array => $this->people($transfer),
         ]);
     }
 
@@ -163,6 +165,49 @@ final class TransferController
         Inertia::flash('toast', ['title' => 'Transfer deleted', 'description' => "The link to “{$transfer->displayTitle()}” no longer works."]);
 
         return to_route('transfers.index');
+    }
+
+    /**
+     * Who opened, previewed or downloaded the transfer, one entry per email address, plus the recipients who haven't opened
+     * it yet. A recipient who signed in as a member with the same address is one person.
+     *
+     * @return list<array{email: string, name: ?string, sent_at: ?string, last_active_at: ?string, activity: list<array{kind: string, file_id: ?string, folder: ?string, times: int, last_at: string}>}>
+     */
+    private function people(Transfer $transfer): array
+    {
+        $recipients = $transfer->recipients()->get()->keyBy(fn (TransferRecipient $recipient): string => Str::lower($recipient->email));
+        $people = [];
+
+        // shortcut: groups every identified click in PHP; aggregate in SQL once a transfer collects tens of thousands.
+        foreach ($transfer->activities()->with(['user:id,name,email', 'recipient:id,email'])->oldest()->get() as $activity) {
+            $email = $activity->user->email ?? $activity->recipient?->email;
+            if ($email === null) {
+                continue;
+            }
+
+            $key = Str::lower($email);
+            $at = $activity->created_at->toIso8601String();
+            $people[$key] ??= ['email' => $email, 'name' => null, 'sent_at' => $recipients->get($key)?->sent_at->toIso8601String(), 'last_active_at' => null, 'activity' => []];
+            $people[$key]['name'] ??= $activity->user?->name;
+            $people[$key]['last_active_at'] = $at;
+            $entry = $activity->kind.'|'.$activity->transfer_file_id.'|'.$activity->folder;
+            $times = ($people[$key]['activity'][$entry]['times'] ?? 0) + 1;
+            $people[$key]['activity'][$entry] = ['kind' => $activity->kind, 'file_id' => $activity->transfer_file_id, 'folder' => $activity->folder, 'times' => $times, 'last_at' => $at];
+        }
+
+        foreach ($recipients as $key => $recipient) {
+            $people[$key] ??= ['email' => $recipient->email, 'name' => null, 'sent_at' => $recipient->sent_at->toIso8601String(), 'last_active_at' => null, 'activity' => []];
+        }
+
+        $people = array_map(function (array $person): array {
+            $activity = array_values($person['activity']);
+            usort($activity, fn (array $a, array $b): int => $b['last_at'] <=> $a['last_at']);
+
+            return [...$person, 'activity' => $activity];
+        }, array_values($people));
+        usort($people, fn (array $a, array $b): int => [$b['last_active_at'] ?? '', $b['sent_at'] ?? ''] <=> [$a['last_active_at'] ?? '', $a['sent_at'] ?? '']);
+
+        return $people;
     }
 
     /**

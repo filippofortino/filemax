@@ -26,6 +26,7 @@ import {
     useStableThumbnails,
     type FilePreview,
 } from '@/components/previews';
+import { People, SendByEmail } from '@/components/recipients';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -39,7 +40,7 @@ import {
 import { toast } from '@/components/ui/toast';
 import { folderTree } from '@/lib/folders';
 import { bytes, date, dateTime, relativeDay } from '@/lib/format';
-import type { Transfer, TransferFile } from '@/lib/types';
+import type { Transfer, TransferFile, TransferPerson } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { destroy, extend, index, update } from '@/routes/transfers';
 export default function Show({
@@ -48,6 +49,7 @@ export default function Show({
     canUpdate,
     previews,
     folderDownloads,
+    people,
 }: {
     transfer: Transfer;
     membersCount: number;
@@ -55,6 +57,7 @@ export default function Show({
     previews: Record<string, FilePreview>;
     /** How many times each folder was downloaded as a zip. */
     folderDownloads: Record<string, number>;
+    people: TransferPerson[];
 }) {
     const [allFiles, setAllFiles] = useState(false);
     const tree = folderTree(
@@ -205,6 +208,12 @@ export default function Show({
                         {transfer.url && (
                             <div className="flex flex-col gap-2.5">
                                 <CopyLink url={transfer.url} />
+                                {canUpdate && transfer.available && (
+                                    <SendByEmail
+                                        transfer={transfer}
+                                        className="self-start"
+                                    />
+                                )}
                                 {transfer.password_protected && (
                                     <p className="text-sm text-muted-foreground">
                                         Recipients need the password you set. It
@@ -433,6 +442,12 @@ export default function Show({
                                 </Button>
                             )}
                         </section>
+                        <People
+                            people={people}
+                            files={transfer.files}
+                            transfer={transfer}
+                            canSend={canUpdate && transfer.available}
+                        />
                     </section>
                     <aside className="flex min-w-0 flex-col gap-4">
                         <div className="flex flex-col gap-3.5 rounded-lg border p-5">

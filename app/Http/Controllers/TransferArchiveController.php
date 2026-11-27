@@ -24,6 +24,7 @@ final class TransferArchiveController
             $transfer = Transfer::query()->lockForUpdate()->findOrFail($transfer->id);
             Gate::forUser($request->user())->authorize('download', $transfer);
             $transfer->recordDownload($request->user());
+            $transfer->recordActivity($request, 'downloaded', folder: $folder);
             // The transfer's row lock keeps two requests for the same folder from creating two archives.
             $archive = $folder === null ? $transfer : $transfer->archives()->firstOrNew(['folder' => $folder]);
 

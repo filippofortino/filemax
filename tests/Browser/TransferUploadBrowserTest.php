@@ -6,7 +6,9 @@ use App\Models\Organization;
 use App\Models\Transfer;
 use App\Models\TransferFile;
 use App\Models\User;
+use App\Notifications\TransferShared;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 
 describe('concurrent upload chunks', function (): void {
@@ -467,6 +469,27 @@ JS);
         }
 
         $page->assertNoJavascriptErrors();
+    });
+
+    it('emails the link from the ready screen and keeps the screen in place', function (): void {
+        Notification::fake();
+        $page = visit('/')->assertSee('Browse files');
+        $page->script(controlledTransferUploads());
+        $page->script('() => { window.autoReleaseUploads = true; window.dropUploadFiles([4]); }');
+        $page->press('Create transfer')->assertVisible('h1:has-text("Your link is ready")')
+            ->press('Send by email')
+            ->fill('#send-emails', 'anna@studio.it, luca@example.com')
+            ->press('Send to 2 people')
+            ->assertSee('Sent to 2 people')
+            ->assertVisible('h1:has-text("Your link is ready")')
+            ->assertNoJavascriptErrors();
+        $transfer = Transfer::query()->sole();
+
+        expect($transfer->recipients()->orderBy('email')->pluck('email')->all())->toBe(['anna@studio.it', 'luca@example.com']);
+        Notification::assertSentOnDemandTimes(TransferShared::class, 2);
+
+        visit(route('transfers.show', $transfer))->assertSee('anna@studio.it')->assertSee('not opened yet')
+            ->click('button:has-text("anna@studio.it")')->assertSee('Send again')->assertNoJavascriptErrors();
     });
 });
 

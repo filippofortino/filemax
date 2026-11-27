@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -51,6 +53,8 @@ use Illuminate\Support\Str;
  * @property-read User $user
  * @property-read Collection<int, TransferFile> $files
  * @property-read Collection<int, TransferArchive> $archives
+ * @property-read Collection<int, TransferRecipient> $recipients
+ * @property-read Collection<int, TransferActivity> $activities
  * @property-read ?Drop $drop
  */
 #[Guarded(['id'])]
@@ -111,6 +115,60 @@ final class Transfer extends Model
     public function hasFolder(string $folder): bool
     {
         return $this->files->contains->isIn($folder);
+    }
+
+    /** @return HasMany<TransferRecipient, $this> */
+    public function recipients(): HasMany
+    {
+        return $this->hasMany(TransferRecipient::class);
+    }
+
+    /** @return HasMany<TransferActivity, $this> */
+    public function activities(): HasMany
+    {
+        return $this->hasMany(TransferActivity::class);
+    }
+
+    /**
+     * Credits an open, preview or download to the person behind it: a member of the transfer's organization, or the
+     * recipient whose emailed link brought them here. The owner and anyone unidentified only count in the totals.
+     *
+     * @param  'opened'|'previewed'|'downloaded'  $kind
+     */
+    public function recordActivity(Request $request, string $kind, ?TransferFile $file = null, ?string $folder = null): void
+    {
+        $user = $request->user();
+        if ($user?->id === $this->user_id) {
+            return;
+        }
+
+        $memberId = $user !== null && $this->organization->hasMember($user) ? $user->id : null;
+        $recipientId = $request->hasSession() ? $request->session()->get('transfer_recipients.'.$this->id) : null;
+        if ($memberId === null && ! is_string($recipientId)) {
+            return;
+        }
+
+        $person = ['user_id' => $memberId, 'transfer_recipient_id' => is_string($recipientId) ? $recipientId : null];
+        if ($kind !== 'opened') {
+            $this->activities()->create([...$person, 'kind' => $kind, 'transfer_file_id' => $file?->id, 'folder' => $folder]);
+
+            return;
+        }
+
+        // A recipient who signs in as the member with their own address is one person, so one open covers both.
+        $samePerson = $user !== null && $memberId !== null && $person['transfer_recipient_id'] !== null
+            && $this->recipients()->whereKey($person['transfer_recipient_id'])->where('email', $user->email)->exists();
+        DB::transaction(function () use ($person, $samePerson): void {
+            // The row lock keeps two page loads at once from both recording the first open.
+            self::query()->lockForUpdate()->findOrFail($this->id);
+            $opened = $this->activities()->where('kind', 'opened')->where(fn (Builder $query): Builder => $samePerson
+                ? $query->where('user_id', $person['user_id'])->orWhere('transfer_recipient_id', $person['transfer_recipient_id'])
+                : $query->where($person))->exists();
+
+            if (! $opened) {
+                $this->activities()->create([...$person, 'kind' => 'opened']);
+            }
+        });
     }
 
     /** @return HasMany<TransferFile, $this> */

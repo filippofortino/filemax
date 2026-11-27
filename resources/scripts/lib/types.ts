@@ -77,6 +77,21 @@ export type Transfer = {
     expires_in: string | null;
     url: string;
 };
+/** Someone the transfer was emailed to, or a signed-in member, with what they did. */
+export type TransferPerson = {
+    email: string;
+    /** Set for members, who are shown by name. */
+    name: string | null;
+    sent_at: string | null;
+    last_active_at: string | null;
+    activity: {
+        kind: 'opened' | 'previewed' | 'downloaded';
+        file_id: string | null;
+        folder: string | null;
+        times: number;
+        last_at: string;
+    }[];
+};
 export type Secret = {
     id: string;
     title: string;

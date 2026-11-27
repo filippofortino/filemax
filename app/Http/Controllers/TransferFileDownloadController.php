@@ -26,6 +26,7 @@ final class TransferFileDownloadController
             abort_unless($file->status === 'ready', 404);
             $transfer->recordDownload($request->user());
             $file->increment('download_count');
+            $transfer->recordActivity($request, 'downloaded', $file);
 
             return $transfer;
         }, attempts: 5);
