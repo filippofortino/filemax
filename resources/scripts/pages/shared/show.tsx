@@ -48,6 +48,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { folderAt, folderTree, plural } from '@/lib/folders';
 import { bytes, dateTime } from '@/lib/format';
+import type { Branding } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 type SharedTransfer = {
@@ -65,8 +66,10 @@ type SharedTransfer = {
 
 export default function SharedTransferPage({
     transfer,
+    branding,
 }: {
     transfer: SharedTransfer;
+    branding: Branding | null;
 }) {
     const hasPreviews = transfer.files.some(
         (file) => file.preview.kind !== null || file.preview.pending,
@@ -100,11 +103,13 @@ export default function SharedTransferPage({
     }, [pending, poll]);
     const displayUrl = transfer.url.replace(/^https?:\/\//, '');
     const festive = useChristmas();
+    // A sender's own message always wins over the organization's welcome note.
+    const message = transfer.message ?? branding?.welcome_message;
     return (
         <Shell
             recipient
-            organization={transfer.organization}
-            footer={festive ? 'Sent with Filemax. Happy holidays!' : undefined}
+            branding={branding}
+            footerNote={festive ? 'Happy holidays!' : undefined}
         >
             <Head title={transfer.title}>
                 <meta name="robots" content="noindex, nofollow" />
@@ -148,9 +153,9 @@ export default function SharedTransferPage({
                             {transfer.title}
                         </h1>
                         {transfer.password_protected && <PasswordBadge />}
-                        {transfer.message && (
+                        {message && (
                             <p className="text-base wrap-anywhere whitespace-pre-wrap text-muted-foreground">
-                                {transfer.message}
+                                {message}
                             </p>
                         )}
                     </div>

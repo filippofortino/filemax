@@ -28,6 +28,7 @@ final class SharedSecretController
                 'available' => $secret->isAvailable(),
                 'reason' => $secret->unavailableReason(),
             ],
+            'branding' => $secret->organization->branding(),
         ])->toResponse($request);
         $response->setStatusCode($secret->isAvailable() ? 200 : 410);
         $response->headers->set('Cache-Control', 'private, no-store');

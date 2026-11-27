@@ -33,6 +33,7 @@ final class SharedDropController
                 'extensions' => $drop->extensions ?? [],
                 'accepted_extensions' => $drop->acceptedExtensions(),
             ],
+            'branding' => $drop->organization->branding(),
         ])->toResponse($request);
         $response->setStatusCode($drop->isOpen() ? 200 : 410);
         $response->headers->set('Cache-Control', 'private, no-store');

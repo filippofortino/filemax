@@ -2,11 +2,15 @@ import { Clock01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Head } from '@inertiajs/react';
 import { Shell } from '@/components/filemax';
+import type { Branding } from '@/lib/types';
 
 export default function Unavailable({
     reason,
+    branding = null,
 }: {
     reason: 'expired' | 'deleted' | 'unavailable';
+    /** Missing for an unknown link, which belongs to no organization. */
+    branding?: Branding | null;
 }) {
     const explanation =
         reason === 'expired'
@@ -15,7 +19,7 @@ export default function Unavailable({
               ? 'This transfer was removed by its sender.'
               : 'This transfer is unavailable or the link is incorrect.';
     return (
-        <Shell recipient>
+        <Shell recipient branding={branding}>
             <Head title="Link unavailable">
                 <meta name="robots" content="noindex, nofollow" />
             </Head>

@@ -4,21 +4,22 @@ import { Form, Head } from '@inertiajs/react';
 import { useState } from 'react';
 import { ErrorMessage, Shell } from '@/components/filemax';
 import { Button } from '@/components/ui/button';
+import type { Branding } from '@/lib/types';
 import { unlock } from '@/routes/shared';
 
 export default function Password({
     token,
     sender,
-    organization,
+    branding,
 }: {
     token: string;
     sender: { name: string; email: string } | null;
-    organization: string | null;
+    branding: Branding | null;
 }) {
     const [passwordVisible, setPasswordVisible] = useState(false);
 
     return (
-        <Shell recipient organization={organization}>
+        <Shell recipient branding={branding}>
             <Head title="Password required">
                 <meta name="robots" content="noindex, nofollow" />
             </Head>

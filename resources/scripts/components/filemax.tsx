@@ -24,6 +24,7 @@ import {
     useRef,
     useState,
     type ComponentProps,
+    type CSSProperties,
     type ReactNode,
 } from 'react';
 import { BrandDecoration } from '@/christmas';
@@ -42,7 +43,7 @@ import {
 } from '@/components/ui/popover';
 import { plural, type FolderNode } from '@/lib/folders';
 import { bytes } from '@/lib/format';
-import type { SharedProps } from '@/lib/types';
+import type { Branding, SharedProps } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { home, logout } from '@/routes';
 import { settings } from '@/routes/account';
@@ -62,32 +63,43 @@ export function Brand({ large = false }: { large?: boolean }) {
                 large && 'gap-3 text-3xl md:gap-3 md:text-3xl',
             )}
         >
-            <svg
-                width={large ? 32 : 24}
-                height={large ? 32 : 24}
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-            >
-                <rect
-                    x="2"
-                    y="2"
-                    width="20"
-                    height="20"
-                    rx="5"
-                    fill="#2140E0"
-                />
-                <path
-                    d="M12 17V8M8.5 11.5 12 8l3.5 3.5"
-                    stroke="white"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                />
-            </svg>
+            <BrandMark size={large ? 32 : 24} />
             <span>Filemax</span>
             <BrandDecoration large={large} />
         </Link>
+    );
+}
+/** The Filemax mark. It keeps its own blue, even on pages in an organization's brand color. */
+function BrandMark({ size }: { size: number }) {
+    return (
+        <svg
+            width={size}
+            height={size}
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+        >
+            <rect x="2" y="2" width="20" height="20" rx="5" fill="#2140E0" />
+            <path
+                d="M12 17V8M8.5 11.5 12 8l3.5 3.5"
+                stroke="white"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </svg>
+    );
+}
+/** "Sent with" and a small Filemax logo, at the foot of every page a recipient opens. */
+export function FooterCredit({ verb = 'Sent with' }: { verb?: string }) {
+    return (
+        <span className="inline-flex items-center gap-1.5">
+            {verb}{' '}
+            <span className="inline-flex items-center gap-1 font-heading text-[13px] font-bold tracking-tight text-foreground">
+                <BrandMark size={14} />
+                Filemax
+            </span>
+        </span>
     );
 }
 export function Shell({
@@ -95,8 +107,9 @@ export function Shell({
     active = 'new',
     recipient = false,
     recipientAccount = false,
-    footer = 'Sent with Filemax.',
-    organization = null,
+    footer = 'Sent with',
+    footerNote,
+    branding = null,
 }: {
     children: ReactNode;
     active?:
@@ -110,11 +123,27 @@ export function Shell({
         | 'account';
     recipient?: boolean;
     recipientAccount?: boolean;
+    /** The recipient footer's credit, before the Filemax logo. */
     footer?: string;
+    /** A line after the credit, like a holiday greeting. */
+    footerNote?: string;
     /** On recipient pages, the organization the link was sent from. Personal links pass none. */
-    organization?: string | null;
+    branding?: Branding | null;
 }) {
     const user = usePage<SharedProps>().props.auth.user;
+    const brandColor = recipient ? branding?.color : null;
+    // Dialogs render outside this tree, so the brand color goes on the root element too.
+    useEffect(() => {
+        if (!brandColor) return;
+        const root = document.documentElement;
+        root.style.setProperty('--brand', brandColor);
+        root.dataset.brand = '';
+        return () => {
+            root.style.removeProperty('--brand');
+            delete root.dataset.brand;
+        };
+    }, [brandColor]);
+
     // The header's primary action creates what the current section lists, and hides on its own form.
     const action =
         recipient ||
@@ -148,6 +177,12 @@ export function Shell({
                 'flex min-h-svh flex-col',
                 recipient && 'bg-background md:bg-muted',
             )}
+            data-brand={brandColor ? '' : undefined}
+            style={
+                brandColor
+                    ? ({ '--brand': brandColor } as CSSProperties)
+                    : undefined
+            }
         >
             <header
                 className={cn(
@@ -233,10 +268,8 @@ export function Shell({
                         </Link>
                     )}
                     {recipient && !recipientAccount
-                        ? organization && (
-                              <span className="text-xs text-muted-foreground md:text-sm">
-                                  {organization}
-                              </span>
+                        ? branding && (
+                              <RecipientOrganization branding={branding} />
                           )
                         : user && (
                               <Popover>
@@ -303,11 +336,74 @@ export function Shell({
             </header>
             {children}
             {recipient && (
-                <footer className="min-h-12 px-5 py-3 text-center text-xs text-muted-foreground">
-                    {footer}
-                </footer>
+                <RecipientFooter
+                    branding={branding}
+                    verb={footer}
+                    note={footerNote}
+                />
             )}
         </div>
+    );
+}
+/** The foot of a recipient page: the organization's line and website, then the Filemax credit. */
+export function RecipientFooter({
+    branding,
+    verb,
+    note,
+}: {
+    branding: Branding | null;
+    verb?: string;
+    note?: string;
+}) {
+    const host = branding?.footer_url
+        ?.replace(/^https:\/\//, '')
+        .replace(/\/$/, '');
+    return (
+        <footer className="flex min-h-12 flex-col items-center gap-1 px-5 py-3 text-center text-xs text-muted-foreground">
+            {(branding?.footer_text || host) && (
+                <span className="wrap-anywhere">
+                    {branding?.footer_text}
+                    {branding?.footer_text && host && ' · '}
+                    {host && (
+                        <a
+                            href={branding?.footer_url ?? undefined}
+                            className="font-semibold text-primary underline hover:text-primary/90"
+                            rel="noopener"
+                        >
+                            {host}
+                        </a>
+                    )}
+                </span>
+            )}
+            <span>
+                <FooterCredit verb={verb} />
+                {note && `. ${note}`}
+            </span>
+        </footer>
+    );
+}
+/** Top right on recipient pages: the full logo, or the icon and name. */
+export function RecipientOrganization({ branding }: { branding: Branding }) {
+    if (branding.wordmark_url) {
+        return (
+            <img
+                src={branding.wordmark_url}
+                alt={branding.name}
+                className="h-4.5 w-auto max-w-[45vw] object-contain md:h-6 md:max-w-60"
+            />
+        );
+    }
+    return (
+        <span className="flex min-w-0 items-center gap-2 md:gap-2.5">
+            <OrganizationMark
+                name={branding.name}
+                logoUrl={branding.logo_url}
+                className="size-6 rounded-md text-xs md:size-8 md:rounded-lg md:text-sm"
+            />
+            <span className="truncate text-xs font-semibold text-foreground md:text-sm">
+                {branding.name}
+            </span>
+        </span>
     );
 }
 /** Switches My transfers between what you sent and what people sent you through your Drops. */

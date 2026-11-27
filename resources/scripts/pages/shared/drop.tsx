@@ -32,7 +32,7 @@ import {
 } from '@/lib/folders';
 import { bytes, date, dateTime } from '@/lib/format';
 import { request } from '@/lib/http';
-import type { DropRules, TransferFile } from '@/lib/types';
+import type { Branding, DropRules, TransferFile } from '@/lib/types';
 import { uploadEntries, type UploadEntry } from '@/lib/upload';
 import { cn } from '@/lib/utils';
 import { store } from '@/routes/shared/drops/submissions';
@@ -96,7 +96,13 @@ function rejections(entries: Entry[], drop: SharedDrop): string[] {
     });
 }
 
-export default function SharedDropPage({ drop }: { drop: SharedDrop | null }) {
+export default function SharedDropPage({
+    drop,
+    branding = null,
+}: {
+    drop: SharedDrop | null;
+    branding?: Branding | null;
+}) {
     const first = drop?.owner?.name.split(' ')[0];
     const closedHeading = useRef<HTMLHeadingElement>(null);
     const wasOpen = useRef(drop?.open);
@@ -111,11 +117,7 @@ export default function SharedDropPage({ drop }: { drop: SharedDrop | null }) {
         wasOpen.current = drop?.open;
     }, [drop?.open]);
     return (
-        <Shell
-            recipient
-            footer="Requested with Filemax."
-            organization={drop?.organization}
-        >
+        <Shell recipient footer="Requested with" branding={branding}>
             <Head title={drop?.title ?? 'Drop unavailable'}>
                 <meta name="robots" content="noindex, nofollow" />
             </Head>

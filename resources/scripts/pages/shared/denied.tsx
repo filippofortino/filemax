@@ -4,7 +4,7 @@ import { Head, Link, usePage } from '@inertiajs/react';
 import switchAccount from '@/actions/App/Http/Controllers/SwitchAccountController';
 import { Shell } from '@/components/filemax';
 import { buttonVariants } from '@/components/ui/button';
-import type { SharedProps } from '@/lib/types';
+import type { Branding, SharedProps } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { home } from '@/routes';
 import { show } from '@/routes/shared';
@@ -15,6 +15,7 @@ type DeniedProps = {
     token: string;
     url: string;
     organization: string | null;
+    branding: Branding | null;
     requires_verification: boolean;
 };
 
@@ -23,6 +24,7 @@ export default function AccessDenied({
     token,
     url,
     organization,
+    branding,
     requires_verification,
 }: DeniedProps) {
     const { auth } = usePage<SharedProps>().props;
@@ -33,7 +35,7 @@ export default function AccessDenied({
         `Hi ${firstName},\n\nCould you help me access the files in your Filemax transfer?\n${url}\n\nThanks!`,
     );
     return (
-        <Shell recipient recipientAccount>
+        <Shell recipient recipientAccount branding={branding}>
             <Head title="Access required">
                 <meta name="robots" content="noindex, nofollow" />
             </Head>

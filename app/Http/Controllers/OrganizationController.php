@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Image;
 use Illuminate\Support\Facades\Storage;
@@ -31,6 +32,10 @@ final class OrganizationController
         return Inertia::render('organization/settings', [
             'section' => $section,
             'organization' => [...$organization->only(['id', 'name']), 'logo_url' => $organization->logoUrl()],
+            'branding' => $section !== 'branding' ? null : [
+                ...$organization->only(['brand_color', 'welcome_message', 'footer_text', 'footer_url']),
+                'wordmark_url' => $organization->wordmarkUrl(),
+            ],
             'members' => $section !== 'members' ? [] : $organization->users()->select(['users.*', 'organization_user.role as role'])->orderBy('name')->get()
                 ->map(fn (User $member): array => [...$member->only(['id', 'name', 'email']), 'avatar_url' => $member->avatarUrl(), 'role' => $member->getAttribute('role')]),
             'invitations' => $section !== 'members' ? [] : $organization->invitations()->with('inviter:id,name')->latest()->get()
@@ -73,8 +78,9 @@ final class OrganizationController
 
         $organization->fill(['name' => $request->string('name')->toString()])->save();
 
+        // The route runs in a transaction; a rolled-back save must still find its old file.
         if ($oldPath !== null && $oldPath !== $organization->logo_path) {
-            Storage::delete($oldPath);
+            DB::afterCommit(fn (): bool => Storage::delete($oldPath));
         }
 
         Inertia::flash('toast', ['title' => 'Organization updated']);

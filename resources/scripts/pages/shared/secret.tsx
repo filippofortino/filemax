@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { date, dateTime } from '@/lib/format';
 import { request } from '@/lib/http';
 import { normaliseKey, secretKeys } from '@/lib/secret';
+import type { Branding } from '@/lib/types';
 import { open as openSecret } from '@/routes/shared/secrets';
 
 type SharedSecret = {
@@ -34,8 +35,10 @@ type KeyError = 'wrong' | 'throttled' | 'link';
 
 export default function SharedSecretPage({
     secret,
+    branding = null,
 }: {
     secret: SharedSecret | null;
+    branding?: Branding | null;
 }) {
     const [mode, setMode] = useState<'view' | 'key' | null>(null);
     const [linkKey, setLinkKey] = useState<string | null>(null);
@@ -203,7 +206,7 @@ export default function SharedSecretPage({
     );
 
     return (
-        <Shell recipient organization={secret?.organization}>
+        <Shell recipient branding={branding}>
             <Head title={first ? `${first} sent you a secret` : 'Secret'}>
                 <meta name="robots" content="noindex, nofollow" />
             </Head>

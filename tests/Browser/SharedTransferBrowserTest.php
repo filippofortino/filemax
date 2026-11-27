@@ -131,7 +131,7 @@ it('shows denied and expired states without disclosing the file list', function 
         ->assertSee('Filippo Fortino shared this transfer with members of Mediamax Communication only.')
         ->assertSee('marta@studiobassi.it, which isn’t a member.')
         ->assertDontSee('Creative')
-        ->assertSee('Sent with Filemax.')
+        ->assertSee('Sent with Filemax')
         ->assertDontSee('private-file.pdf')
         ->assertAttributeContains('a:has-text("Ask Filippo for access")', 'href', 'mailto:'.$sender->email.'?')
         ->assertAttributeMissing('a:has-text("Ask Filippo for access")', 'role')

@@ -134,7 +134,7 @@ test('organization settings open only for admins of a real organization', functi
 
     $user->forceFill(['email_verified_at' => null])->save();
     $this->get(route($route))->assertRedirect(route('verification.notice'));
-})->with(['organization.show', 'organization.members', 'organization.domains']);
+})->with(['organization.show', 'organization.members', 'organization.domains', 'organization.branding']);
 
 test('stale forms cannot write to the organization selected in another tab', function (): void {
     $admin = User::factory()->create();
@@ -182,8 +182,10 @@ test('members cannot change anything in organization settings', function (): voi
     $this->delete(route('organization.invitations.destroy', $invitation))->assertForbidden();
     $this->post(route('organization.domains.store'), ['organization_id' => $organization->id, 'domain' => 'evil.com'])->assertForbidden();
     $this->delete(route('organization.domains.destroy', $domain))->assertForbidden();
+    $this->post(route('organization.branding.update'), ['organization_id' => $organization->id, 'brand_color' => '#B91C1C'])->assertForbidden();
 
     expect($organization->refresh()->name)->not->toBe('Hijacked')
+        ->and($organization->brand_color)->toBeNull()
         ->and($organization->hasAdmin($admin))->toBeTrue()
         ->and($organization->invitations()->count())->toBe(1)
         ->and($organization->domains()->count())->toBe(1);
@@ -442,7 +444,7 @@ test('admin bootstrap requires an existing verified user and supports revocation
 });
 
 test('the migration moves everything that existed into a first organization and gives each user a Personal one', function (): void {
-    $this->artisan('migrate:rollback', ['--step' => 5])->assertSuccessful();
+    $this->artisan('migrate:rollback', ['--step' => 6])->assertSuccessful();
     expect(Schema::hasTable('organizations'))->toBeFalse()->and(Schema::hasTable('teams'))->toBeTrue();
 
     $now = now();
@@ -502,14 +504,14 @@ test('the migration moves everything that existed into a first organization and 
     $this->get(route('shared.show', $expired['token']))->assertGone();
     $this->flushSession()->actingAs(User::factory()->create())->get($restrictedUrl)->assertForbidden();
 
-    expect(fn () => $this->artisan('migrate:rollback', ['--step' => 5])->run())->toThrow(RuntimeException::class, 'Restore a backup');
+    expect(fn () => $this->artisan('migrate:rollback', ['--step' => 6])->run())->toThrow(RuntimeException::class, 'Restore a backup');
     expect(Schema::hasTable('teams'))->toBeFalse()->and($organization->domains()->count())->toBe(1);
 });
 
 test('organization rollback also protects workspaces with no remaining users', function (): void {
     $organization = Organization::factory()->create();
 
-    expect(fn () => $this->artisan('migrate:rollback', ['--step' => 5])->run())->toThrow(RuntimeException::class, 'Restore a backup');
+    expect(fn () => $this->artisan('migrate:rollback', ['--step' => 6])->run())->toThrow(RuntimeException::class, 'Restore a backup');
     $this->assertModelExists($organization);
     expect(Schema::hasTable('teams'))->toBeFalse();
 });
