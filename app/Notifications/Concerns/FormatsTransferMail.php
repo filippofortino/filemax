@@ -5,21 +5,36 @@ declare(strict_types=1);
 namespace App\Notifications\Concerns;
 
 use App\Models\Transfer;
+use App\Models\TransferFile;
 use Carbon\CarbonInterface;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\HtmlString;
 
 /** Shared pieces of the emails that describe a transfer's files. */
 trait FormatsTransferMail
 {
     private const int LISTED_FILES = 5;
 
-    /** Adds the first few files with their sizes, then "and N more files". */
+    /** The sender's message as a quote, which the mail theme draws as the design's muted box. */
+    private function quote(MailMessage $mail, ?string $message): MailMessage
+    {
+        if ($message === null) {
+            return $mail;
+        }
+
+        // Each line of the message stays a line of the quote; the trailing spaces are Markdown hard breaks.
+        return $mail->line(new HtmlString('> '.implode("  \n> ", (array) preg_split('/\R/', e($this->escape($message))))));
+    }
+
+    /**
+     * Adds the first few files with their sizes, then "and N more files". A Markdown table gives the HTML part the
+     * design's rows and keeps the plain-text part readable; its empty header draws the list's top rule.
+     */
     private function listFiles(MailMessage $mail, Transfer $transfer): MailMessage
     {
-        foreach ($transfer->files->take(self::LISTED_FILES) as $file) {
-            $mail->line($this->escape(($file->folder !== null ? $file->folder.'/' : '').$file->original_name).' — '.$this->bytes($file->size));
-        }
+        $rows = $transfer->files->take(self::LISTED_FILES)->map(fn (TransferFile $file): string => '| '.$this->cell(($file->folder !== null ? $file->folder.'/' : '').$file->original_name).' | '.$this->bytes($file->size).' |');
+        $mail->line(new HtmlString("| | |\n|:--|--:|\n".$rows->implode("\n")));
 
         $more = $transfer->files->count() - self::LISTED_FILES;
         if ($more > 0) {
@@ -27,6 +42,12 @@ trait FormatsTransferMail
         }
 
         return $mail;
+    }
+
+    /** A table cell is raw Markdown, so it is HTML-escaped here and can't break out of its row. */
+    private function cell(string $text): string
+    {
+        return str_replace(['|', "\r", "\n"], ['\\|', ' ', ' '], e($this->escape($text)));
     }
 
     /** People choose titles, messages and file names, so their brackets must not become links or images in an email. */

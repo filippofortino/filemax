@@ -104,7 +104,7 @@ it('writes the email from what the transfer allows the recipient to see', functi
     $transfer = organizationTransfer(['title' => 'Spot [final](https://evil.test)', 'message' => 'Ecco ![x](y)', 'password_hash' => Hash::make('Transfer123')]);
     $transfer->user->update(['name' => 'Filippo Fortino']);
     foreach (range(1, 6) as $position) {
-        TransferFile::factory()->for($transfer)->create(['original_name' => "file{$position}.jpg", 'size' => 1000, 'position' => $position]);
+        TransferFile::factory()->for($transfer)->create(['original_name' => $position === 1 ? 'file1 <i>|</i>.jpg' : "file{$position}.jpg", 'size' => 1000, 'position' => $position]);
     }
 
     $recipient = TransferRecipient::factory()->for($transfer)->create();
@@ -113,7 +113,7 @@ it('writes the email from what the transfer allows the recipient to see', functi
 
     expect($mail->subject)->toBe('Filippo Fortino sent you 6 files')
         ->and($mail->replyTo)->toBe([[$transfer->user->email, 'Filippo Fortino']])
-        ->and($lines)->toContain('Spot \[final\](https://evil.test)', 'Ecco !\[x\](y)', 'file5.jpg — 1 KB', 'and 1 more file', 'protected by a password. Filippo will give it')
+        ->and($lines)->toContain('Spot \[final\](https://evil.test)', '> Ecco !\[x\](y)', '| file1 &lt;i&gt;\|&lt;/i&gt;.jpg | 1 KB |', '| file5.jpg | 1 KB |', 'and 1 more file', 'protected by a password. Filippo will give it')
         ->and($lines)->not->toContain('file6.jpg', 'Transfer123');
 
     $transfer->user->settings()->create(['show_name_on_transfers' => false]);

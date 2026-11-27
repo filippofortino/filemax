@@ -41,11 +41,7 @@ final class DropReceived extends Notification implements ShouldQueueAfterCommit
             ->greeting($this->escape($headline))
             ->line('Through your Drop “'.$this->escape($drop->title ?? $transfer->displayTitle()).'”.');
 
-        if ($transfer->message !== null) {
-            $mail->line($this->escape($transfer->message));
-        }
-
-        $this->listFiles($mail, $transfer)
+        $this->listFiles($this->quote($mail, $transfer->message), $transfer)
             ->action('View files', route('received.show', $transfer))
             ->line('Only you can see these files. They’re kept until '.$this->date($transfer->expires_at, 'j M Y').'.');
 

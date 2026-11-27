@@ -49,11 +49,7 @@ final class TransferShared extends Notification implements ShouldQueueAfterCommi
             ->greeting($this->escape($headline))
             ->line('“'.$this->escape($transfer->displayTitle()).'” · '.$this->bytes($transfer->files->reduce(fn (int $total, TransferFile $file): int => $total + $file->size, 0)));
 
-        if ($transfer->message !== null) {
-            $mail->line($this->escape($transfer->message));
-        }
-
-        $this->listFiles($mail, $transfer)
+        $this->listFiles($this->quote($mail, $transfer->message), $transfer)
             ->action('Get your files', $this->recipient->url())
             ->line('The link works until '.$this->date($transfer->expires_at, 'j M Y, H:i').'.');
 
