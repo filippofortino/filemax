@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\UpdateOrganizationBrandingRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Image;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -53,8 +54,9 @@ final class OrganizationBrandingController
 
         $organization->save();
 
+        // The route runs in a transaction; a rolled-back save must still find its old file.
         if ($oldPath !== null && $oldPath !== $organization->wordmark_path) {
-            Storage::delete($oldPath);
+            DB::afterCommit(fn (): bool => Storage::delete($oldPath));
         }
 
         Inertia::flash('toast', ['title' => 'Branding saved']);

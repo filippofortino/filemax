@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Image;
 use Illuminate\Support\Facades\Storage;
@@ -77,8 +78,9 @@ final class OrganizationController
 
         $organization->fill(['name' => $request->string('name')->toString()])->save();
 
+        // The route runs in a transaction; a rolled-back save must still find its old file.
         if ($oldPath !== null && $oldPath !== $organization->logo_path) {
-            Storage::delete($oldPath);
+            DB::afterCommit(fn (): bool => Storage::delete($oldPath));
         }
 
         Inertia::flash('toast', ['title' => 'Organization updated']);
