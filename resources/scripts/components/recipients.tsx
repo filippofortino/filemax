@@ -1,13 +1,13 @@
 import {
     ArrowDown01Icon,
     Download01Icon,
-    FileZipIcon,
     FolderDownloadIcon,
     Link01Icon,
     MailSend01Icon,
     UserGroupIcon,
     UserIcon,
     ViewIcon,
+    Zip01Icon,
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Form } from '@inertiajs/react';
@@ -259,7 +259,7 @@ export function People({
                 ? Download01Icon
                 : activity.folder
                   ? FolderDownloadIcon
-                  : FileZipIcon;
+                  : Zip01Icon;
 
     return (
         <section className="flex flex-col gap-2" aria-labelledby="people-title">
