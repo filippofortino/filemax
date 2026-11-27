@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -148,11 +149,26 @@ final class Transfer extends Model
         }
 
         $person = ['user_id' => $memberId, 'transfer_recipient_id' => is_string($recipientId) ? $recipientId : null];
-        if ($kind === 'opened' && $this->activities()->where($person)->where('kind', 'opened')->exists()) {
+        if ($kind !== 'opened') {
+            $this->activities()->create([...$person, 'kind' => $kind, 'transfer_file_id' => $file?->id, 'folder' => $folder]);
+
             return;
         }
 
-        $this->activities()->create([...$person, 'kind' => $kind, 'transfer_file_id' => $file?->id, 'folder' => $folder]);
+        // A recipient who signs in as the member with their own address is one person, so one open covers both.
+        $samePerson = $user !== null && $memberId !== null && $person['transfer_recipient_id'] !== null
+            && $this->recipients()->whereKey($person['transfer_recipient_id'])->where('email', $user->email)->exists();
+        DB::transaction(function () use ($person, $samePerson): void {
+            // The row lock keeps two page loads at once from both recording the first open.
+            self::query()->lockForUpdate()->findOrFail($this->id);
+            $opened = $this->activities()->where('kind', 'opened')->where(fn (Builder $query): Builder => $samePerson
+                ? $query->where('user_id', $person['user_id'])->orWhere('transfer_recipient_id', $person['transfer_recipient_id'])
+                : $query->where($person))->exists();
+
+            if (! $opened) {
+                $this->activities()->create([...$person, 'kind' => 'opened']);
+            }
+        });
     }
 
     /** @return HasMany<TransferFile, $this> */

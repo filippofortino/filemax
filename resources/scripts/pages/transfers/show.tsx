@@ -446,6 +446,7 @@ export default function Show({
                             people={people}
                             files={transfer.files}
                             transfer={transfer}
+                            canSend={canUpdate && transfer.available}
                         />
                     </section>
                     <aside className="flex min-w-0 flex-col gap-4">

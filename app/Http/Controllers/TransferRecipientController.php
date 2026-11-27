@@ -27,11 +27,12 @@ final class TransferRecipientController
         $emails = $request->validated('emails');
         $budget = 'transfer-mail:'.$user->id;
 
-        if (count($emails) > RateLimiter::remaining($budget, self::EMAILS_PER_HOUR)) {
+        // Reserve first, then check: the increment is atomic, so two requests at once can't both slip under the budget.
+        if (RateLimiter::increment($budget, 3600, count($emails)) > self::EMAILS_PER_HOUR) {
+            RateLimiter::decrement($budget, 3600, count($emails));
+
             throw ValidationException::withMessages(['emails' => 'You’ve sent a lot of emails in the last hour. Try again later, or copy the link instead.']);
         }
-
-        RateLimiter::increment($budget, 3600, count($emails));
 
         foreach ($emails as $email) {
             $recipient = $transfer->recipients()->updateOrCreate(['email' => $email], ['sent_at' => now()]);

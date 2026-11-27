@@ -229,10 +229,13 @@ export function People({
     people,
     files,
     transfer,
+    canSend,
 }: {
     people: TransferPerson[];
     files: TransferFile[];
     transfer: Transfer;
+    /** Whether the viewer may still email the transfer, which "Send again" does. */
+    canSend: boolean;
 }) {
     const names = new Map(files.map((file) => [file.id, file.original_name]));
     const label = (activity: TransferPerson['activity'][number]) => {
@@ -373,7 +376,7 @@ export function People({
                                             Nothing yet: opening the email alone
                                             doesn’t count.
                                         </p>
-                                        {transfer.available && (
+                                        {canSend && (
                                             <Form
                                                 action={sendByEmail(
                                                     transfer.id,

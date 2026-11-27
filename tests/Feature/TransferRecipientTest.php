@@ -13,6 +13,7 @@ use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -92,6 +93,7 @@ it('caps how many emails one person can send in an hour', function (): void {
     }
 
     $this->post(route('transfers.recipients.store', $transfer), ['emails' => 'one-more@example.com'])->assertSessionHasErrors('emails');
+    expect(RateLimiter::attempts('transfer-mail:'.$transfer->user_id))->toBe(50);
     $this->travel(61)->minutes();
     $this->post(route('transfers.recipients.store', $transfer), ['emails' => 'one-more@example.com'])->assertSessionHasNoErrors();
 
@@ -137,6 +139,23 @@ it('remembers the recipient from their link and redirects to the clean link', fu
     expect(TransferActivity::query()->sole())->kind->toBe('opened')->transfer_recipient_id->toBe($recipient->id)->user_id->toBeNull();
     $this->get($clean)->assertOk();
     expect(TransferActivity::query()->count())->toBeOne();
+});
+
+it('counts one open for a recipient who signs in as the member with their address, and one per other person', function (): void {
+    $transfer = organizationTransfer();
+    $elena = User::factory()->create(['email' => 'elena@mediamax.it']);
+    $marco = User::factory()->create();
+    $transfer->organization->users()->attach([$elena->id, $marco->id]);
+    $recipient = TransferRecipient::factory()->for($transfer)->create(['email' => 'elena@mediamax.it']);
+
+    $this->get(route('shared.show', ['transfer' => $transfer->token, 'recipient' => $recipient->id]))->assertRedirect();
+    $this->get(route('shared.show', $transfer->token))->assertOk();
+    $this->actingAs($elena)->get(route('shared.show', $transfer->token))->assertOk();
+    expect(TransferActivity::query()->where('kind', 'opened')->count())->toBeOne();
+
+    $this->flushSession()->actingAs($marco)->withSession(['transfer_recipients.'.$transfer->id => $recipient->id])
+        ->get(route('shared.show', $transfer->token))->assertOk();
+    expect(TransferActivity::query()->where('kind', 'opened')->count())->toBe(2);
 });
 
 it('ignores a recipient id that is unknown, belongs to another transfer, or is opened by the owner', function (): void {
