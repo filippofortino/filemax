@@ -7,6 +7,17 @@ export type Organization = {
     members_count: number;
     current: boolean;
 };
+/** How the pages a recipient opens look for an organization's links. */
+export type Branding = {
+    name: string;
+    logo_url: string | null;
+    /** The logo with the name in it; replaces the icon and name when set. */
+    wordmark_url: string | null;
+    color: string | null;
+    welcome_message: string | null;
+    footer_text: string | null;
+    footer_url: string | null;
+};
 export type User = {
     id: string;
     name: string;

@@ -19,6 +19,7 @@ final class SharedTransferController
         if (! $transfer->isAvailable()) {
             return Inertia::render('shared/unavailable', [
                 'reason' => $transfer->revoked_at ? 'deleted' : ($transfer->expires_at?->lte(now()) ? 'expired' : 'unavailable'),
+                'branding' => $transfer->organization->branding(),
             ])->toResponse($request)->setStatusCode(410);
         }
 
@@ -38,6 +39,7 @@ final class SharedTransferController
 
         $sender = $transfer->user->settings->show_name_on_transfers ? $transfer->user : null;
         $organization = $transfer->organization->publicName();
+        $branding = $transfer->organization->branding();
 
         if (! Gate::forUser($request->user())->allows('download', $transfer)) {
             if ($transfer->visibility === 'public' && $transfer->password_hash !== null) {
@@ -45,6 +47,7 @@ final class SharedTransferController
                     'token' => $transfer->token,
                     'sender' => $sender?->only(['name', 'email']),
                     'organization' => $organization,
+                    'branding' => $branding,
                 ])->toResponse($request);
                 $response->headers->set('Cache-Control', 'private, no-store');
 
@@ -58,6 +61,7 @@ final class SharedTransferController
                 'token' => $transfer->token,
                 'url' => route('shared.show', $transfer->token),
                 'organization' => $organization,
+                'branding' => $branding,
                 'requires_verification' => ! $request->user()?->hasVerifiedEmail(),
             ])->toResponse($request)->setStatusCode(403);
         }
@@ -88,6 +92,7 @@ final class SharedTransferController
                 'visibility' => $transfer->visibility,
                 'password_protected' => $transfer->password_hash !== null,
             ],
+            'branding' => $branding,
         ])->toResponse($request);
         $response->headers->set('Cache-Control', 'private, no-store');
 

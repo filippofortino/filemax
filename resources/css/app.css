@@ -11,7 +11,8 @@
     --font-heading: 'Bricolage Grotesque', system-ui, sans-serif;
     --color-background: var(--color-white);
     --color-foreground: var(--color-slate-900);
-    --color-primary: #2140e0;
+    /* Recipient pages set --brand to the organization's color; everywhere else it is Filemax blue. */
+    --color-primary: var(--brand, #2140e0);
     --color-primary-foreground: var(--color-white);
     --color-muted: var(--color-slate-100);
     --color-muted-foreground: var(--color-slate-600);
@@ -32,6 +33,13 @@
 @theme {
     /* easeOutQuad: a gentler curve felt better than a strong ease-out (see plans/README.md). */
     --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* On a branded recipient page the light blue tints follow the organization's color. */
+[data-brand] {
+    --color-blue-50: color-mix(in oklab, var(--brand) 7%, white);
+    --color-blue-100: color-mix(in oklab, var(--brand) 13%, white);
+    --color-blue-200: color-mix(in oklab, var(--brand) 26%, white);
 }
 
 @layer base {

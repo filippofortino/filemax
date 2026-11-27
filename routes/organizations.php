@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\AcceptInvitationController;
+use App\Http\Controllers\OrganizationBrandingController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationDomainController;
 use App\Http\Controllers\OrganizationInvitationController;
@@ -22,7 +23,9 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('/', [OrganizationController::class, 'show'])->name('show');
         Route::get('/members', [OrganizationController::class, 'show'])->defaults('section', 'members')->name('members');
         Route::get('/domains', [OrganizationController::class, 'show'])->defaults('section', 'domains')->name('domains');
+        Route::get('/branding', [OrganizationController::class, 'show'])->defaults('section', 'branding')->name('branding');
         Route::post('/', [OrganizationController::class, 'update'])->middleware(EnsureCurrentOrganization::class)->name('update');
+        Route::post('/branding', [OrganizationBrandingController::class, 'update'])->middleware(EnsureCurrentOrganization::class)->name('branding.update');
         Route::patch('/members/{user}', [OrganizationMemberController::class, 'update'])->middleware(EnsureCurrentOrganization::class)->name('members.update');
         Route::delete('/members/{user}', [OrganizationMemberController::class, 'destroy'])->middleware(EnsureCurrentOrganization::class)->name('members.destroy');
         Route::post('/invitations', [OrganizationInvitationController::class, 'store'])->middleware(['throttle:20,1', EnsureCurrentOrganization::class])->name('invitations.store');
