@@ -579,7 +579,7 @@ function Branding({
                                             ref={wordmarkInput}
                                             type="file"
                                             name="wordmark"
-                                            accept="image/png"
+                                            accept="image/jpeg,image/png"
                                             hidden
                                             disabled={processing}
                                             onChange={(event) => {
@@ -625,10 +625,11 @@ function Branding({
                                     id="wordmark-hint"
                                     className="text-sm text-muted-foreground"
                                 >
-                                    Your logo with the name in it, as a PNG with
-                                    a transparent background, at least 600 px
-                                    wide. It replaces the icon and name at the
-                                    top of recipient pages, up to 24 px tall.
+                                    Your logo with the name in it, as a JPG or
+                                    PNG at least 600 px wide. A PNG with a
+                                    transparent background looks best. It
+                                    replaces the icon and name at the top of
+                                    recipient pages, up to 24 px tall.
                                 </p>
                                 <ErrorMessage>{errors.wordmark}</ErrorMessage>
                                 <ErrorMessage>

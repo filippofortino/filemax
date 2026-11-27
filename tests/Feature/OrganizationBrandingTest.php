@@ -86,7 +86,7 @@ test('admins upload, replace and remove a full logo', function (): void {
     $organization = joinOrganization($admin, 'admin');
     $form = ['organization_id' => $organization->id];
 
-    $this->actingAs($admin)->post(route('organization.branding.update'), $form + ['wordmark' => UploadedFile::fake()->image('logo.jpg', 800, 120)])
+    $this->actingAs($admin)->post(route('organization.branding.update'), $form + ['wordmark' => UploadedFile::fake()->image('logo.gif', 800, 120)])
         ->assertSessionHasErrors('wordmark');
     $this->post(route('organization.branding.update'), $form + ['wordmark' => UploadedFile::fake()->image('logo.png', 400, 80)])
         ->assertSessionHasErrors('wordmark');
@@ -97,7 +97,7 @@ test('admins upload, replace and remove a full logo', function (): void {
     expect($first)->toStartWith('logos/');
     Storage::assertExists($first);
 
-    $this->post(route('organization.branding.update'), $form + ['wordmark' => UploadedFile::fake()->image('logo.png', 1600, 240)])
+    $this->post(route('organization.branding.update'), $form + ['wordmark' => UploadedFile::fake()->image('logo.jpg', 1600, 240)])
         ->assertSessionHasNoErrors();
     $second = $organization->refresh()->wordmark_path;
     expect($second)->not->toBe($first);

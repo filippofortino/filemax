@@ -32,7 +32,7 @@ final class UpdateOrganizationBrandingRequest extends FormRequest
             'footer_text' => ['nullable', 'string', 'max:120'],
             'footer_url' => ['nullable', 'string', 'url:https', 'max:255'],
             'wordmark' => [
-                'nullable', 'prohibited_if_accepted:remove_wordmark', 'image', 'mimes:png', 'max:5120',
+                'nullable', 'prohibited_if_accepted:remove_wordmark', 'image', 'mimes:jpg,jpeg,png', 'max:5120',
                 Rule::dimensions()->minWidth(600)->maxWidth(4096)->maxHeight(4096),
             ],
             'remove_wordmark' => ['sometimes', 'boolean'],
@@ -45,7 +45,7 @@ final class UpdateOrganizationBrandingRequest extends FormRequest
         return [
             'brand_color.regex' => 'Enter six hex digits after the #, like #2140E0.',
             'footer_url.url' => 'Use a full address that starts with https://.',
-            'wordmark.mimes' => 'The full logo must be a PNG.',
+            'wordmark.mimes' => 'The full logo must be a JPG or PNG.',
             'wordmark.dimensions' => 'The full logo must be at least 600 px wide.',
         ];
     }
