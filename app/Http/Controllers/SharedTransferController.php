@@ -22,6 +22,16 @@ final class SharedTransferController
             ])->toResponse($request)->setStatusCode(410);
         }
 
+        // An emailed link names its recipient once; the clean URL keeps the id out of copied links and url.intended.
+        if ($request->has('recipient')) {
+            $recipient = $request->user()?->id === $transfer->user_id ? null : $transfer->recipients()->find($request->string('recipient')->toString());
+            if ($recipient !== null) {
+                $request->session()->put('transfer_recipients.'.$transfer->id, $recipient->id);
+            }
+
+            return to_route('shared.show', $transfer->token);
+        }
+
         if ($transfer->visibility === 'members' && ! $request->user()) {
             return redirect()->guest(route('login'));
         }
@@ -53,6 +63,7 @@ final class SharedTransferController
         }
 
         $transfer->whereKey($transfer->id)->whereNull('first_opened_at')->update(['first_opened_at' => now()]);
+        $transfer->recordActivity($request, 'opened');
         $transfer->load('files');
 
         $response = Inertia::render('shared/show', [

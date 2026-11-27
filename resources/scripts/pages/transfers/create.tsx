@@ -23,6 +23,7 @@ import {
     PasswordBadge,
     Shell,
 } from '@/components/filemax';
+import { SendByEmail } from '@/components/recipients';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/toast';
@@ -542,16 +543,25 @@ export default function Create() {
                                 {dateTime(ready.expires_at)}
                             </p>
                         </div>
-                        <CopyLink
-                            url={ready.url}
-                            onCopied={() =>
-                                festive &&
-                                toast.add({
-                                    title: 'Link copied',
-                                    description: 'Checked it twice.',
-                                })
-                            }
-                        />
+                        <div className="flex flex-col gap-3">
+                            <CopyLink
+                                url={ready.url}
+                                onCopied={() =>
+                                    festive &&
+                                    toast.add({
+                                        title: 'Link copied',
+                                        description: 'Checked it twice.',
+                                    })
+                                }
+                            />
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                                <SendByEmail transfer={ready} />
+                                <p className="text-sm text-muted-foreground">
+                                    Each person gets their own link, so you’ll
+                                    see who opens it.
+                                </p>
+                            </div>
+                        </div>
                         {ready.visibility === 'members' ? (
                             <div className="flex flex-col gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-slate-700">
                                 <strong>

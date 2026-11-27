@@ -601,7 +601,7 @@ it('makes a transfer public only on confirmation and keeps delete dialog keyboar
         ->press('[role="dialog"] button:has-text("Make public")')
         ->assertDontSee('Make this transfer public?')
         ->assertSeeIn('[data-slot="toast"]', 'Transfer is now public')
-        ->assertDontSee('Members of Mediamax')
+        ->assertDontSee('Shared with')
         ->assertSee('Public link');
     expect($transfer->refresh()->visibility)->toBe('public');
 

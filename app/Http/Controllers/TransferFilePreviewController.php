@@ -24,6 +24,7 @@ final class TransferFilePreviewController
 
         $file->increment('preview_count');
         $transfer->increment('preview_count', 1, ['last_previewed_at' => now()]);
+        $transfer->recordActivity($request, 'previewed', $file);
 
         $expires = now()->addHour()->min($transfer->expires_at);
         $url = $storage->previewUrl($file->setRelation('transfer', $transfer), $file->preview_kind === 'image' ? 'preview' : 'original', $expires);
