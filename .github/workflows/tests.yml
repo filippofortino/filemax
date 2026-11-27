@@ -33,8 +33,16 @@ jobs:
           tools: composer:v2
           coverage: xdebug
 
+      - name: Read Bun version
+        id: bun-version
+        run: |
+          bun_version=$(jq -er '.devEngines.packageManager.version' package.json)
+          echo "version=$bun_version" >> "$GITHUB_OUTPUT"
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: ${{ steps.bun-version.outputs.version }}
 
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@68f39c78aaf39be468cabd2afb09c162574c84af # v1.21.2

@@ -5,7 +5,9 @@ declare(strict_types=1);
 use Rector\Caching\ValueObject\Storage\FileCacheStorage;
 use Rector\CodingStyle\Rector\ClassMethod\MakeInheritedMethodVisibilitySameAsParentRector;
 use Rector\Config\RectorConfig;
+use Rector\DeadCode\Rector\ClassMethod\RemoveEmptyClassMethodRector;
 use Rector\Php85\Rector\Property\AddOverrideAttributeToOverriddenPropertiesRector;
+use RectorLaravel\Rector\Class_\RemoveDefaultAuthorizeTrueFromFormRequestRector;
 use RectorLaravel\Set\LaravelSetList;
 
 return RectorConfig::configure()
@@ -41,6 +43,12 @@ return RectorConfig::configure()
     ->withSkip([
         MakeInheritedMethodVisibilitySameAsParentRector::class,
         AddOverrideAttributeToOverriddenPropertiesRector::class,
+        RemoveDefaultAuthorizeTrueFromFormRequestRector::class => [
+            __DIR__.'/app/Http/Requests/OpenSecretRequest.php',
+        ],
+        RemoveEmptyClassMethodRector::class => [
+            __DIR__.'/database/migrations/2026_10_06_220037_backfill_first_downloaded_at_on_transfers.php',
+        ],
     ])
     ->withPreparedSets(
         deadCode: true,
